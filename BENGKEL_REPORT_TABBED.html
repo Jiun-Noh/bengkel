@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>📦 Sistem Bengkel - Menu Terstruktur</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; font-family: Segoe UI, sans-serif; margin: 0; padding: 0; }
         html, body { height: 100%; }
@@ -199,7 +200,7 @@
         <h2>🔐 Masuk Aplikasi Bengkel</h2>
         <input type="password" id="inputSandi" placeholder="Masukkan Kata Sandi">
         <button onclick="verifikasiSandi()">MASUK</button>
-        <p style="color:#888; margin-top:15px; font-size:13px;">Kata sandi bawaan: <b>1234</b> — ganti setelah masuk</p>
+        <p style="color:#888; margin-top:15px; font-size:13px;">Kata sandi = kata sandi akun toko yang dibuat di Supabase</p>
         <button class="btn-blue btn-sm" onclick="bukaGantiSandi()" style="width:auto; margin-top:10px;">🔧 Ganti Kata Sandi</button>
     </div>
 </div>
@@ -266,6 +267,7 @@
                     ⏰ Tanggal: <span id="dashTanggalSekarang" style="font-weight: bold;">—</span><br>
                     📱 Responsive - Bisa diakses dari desktop, tablet, atau mobile<br>
                 </p>
+                <button id="btnMigrasiCloud" class="sembunyi" onclick="migrasiKeCloud()" style="background:#7c3aed; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; margin-top:10px;">☁️ Pindahkan Data Lama ke Cloud (Sekali Saja)</button>
             </div>
 
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:15px;">
@@ -742,6 +744,17 @@
 </div>
 
 <script>
+// ============ KONFIGURASI SUPABASE (WAJIB DIISI) ============
+// 1. Buat project gratis di https://supabase.com
+// 2. Di SQL Editor, jalankan skema tabel + RLS (lihat berkas skema di repo/dokumentasi)
+// 3. Di Authentication > Users, buat 1 akun untuk toko ini (email bebas, password = password aplikasi ini)
+// 4. Salin 3 nilai berikut dari Settings > API & isi di bawah ini
+const SUPABASE_URL = 'https://tnsovusdhochukvvdfrm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuc292dXNkaG9jaHVrdnZkZnJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNTYxNjIsImV4cCI6MjEwMzczMjE2Mn0.7wQ_mwTrn8-7fMV-Su06oxDafQ28Wg9-0IM-AozsLqo';
+const SHOP_EMAIL = 'scrpt@naver.com';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let migrasiSelesai = localStorage.getItem('migrasiSelesai') === '1';
+
 // ============ FUNGSI TAB SWITCHING ============
 function switchTab(tabName) {
     // Sembunyikan semua tab
@@ -810,8 +823,7 @@ function updateDashboard() {
 }
 
 // ============ SEMUA FUNGSI DARI FILE ASLI (DIPINDAHKAN) ============
-let kataSandiAplikasi = localStorage.getItem('sandiAplikasiBengkel') || '1234';
-let kataSandiLaporan = localStorage.getItem('sandiLaporanBengkel') || '1234';
+let kataSandiLaporan = '1234'; // dimuat ulang dari tabel `pengaturan` setelah login, lihat muatDataDariCloud()
 const stokMinim = 3;
 let barang = [];
 let riwayat = [];
@@ -821,47 +833,211 @@ document.addEventListener('keypress', function(e){
     if(e.key === 'Enter' && document.activeElement.id === 'inputSandi') verifikasiSandi();
 });
 
-function verifikasiSandi(){
+async function verifikasiSandi(){
     let input = document.getElementById('inputSandi').value;
-    if(input === kataSandiAplikasi){
+    let tombol = document.querySelector('#layarLogin button');
+    tombol.disabled = true;
+    tombol.textContent = 'Menghubungkan...';
+
+    let { error } = await db.auth.signInWithPassword({ email: SHOP_EMAIL, password: input });
+
+    tombol.disabled = false;
+    tombol.textContent = 'MASUK';
+
+    if(!error){
         document.getElementById('layarLogin').style.display = 'none';
         document.getElementById('isiAplikasi').classList.remove('sembunyi');
-        bacaDataDariPenyimpanan();
+        await muatDataDariCloud();
         tampilkanTabel();
         riwayatAsliFilter = [...riwayat];
         tampilkanRiwayat();
         tampilkanBarangTerlaris();
         updateDashboard();
+        aktifkanSinkronisasiRealtime();
     }else{
-        alert('❌ Kata sandi salah!');
+        alert('❌ Kata sandi salah, atau tidak ada koneksi internet!');
         document.getElementById('inputSandi').value = '';
     }
 }
 
-function bukaGantiSandi(){
+async function bukaGantiSandi(){
     let sandiLama = prompt('Masukkan kata sandi lama:');
-    if(sandiLama !== kataSandiAplikasi) { alert('❌ Sandi lama salah!'); return; }
+    if(sandiLama === null) return;
+    let { error: errLama } = await db.auth.signInWithPassword({ email: SHOP_EMAIL, password: sandiLama });
+    if(errLama) { alert('❌ Sandi lama salah!'); return; }
     let baru = prompt('Masukkan kata sandi baru: (minimal 4 karakter)');
     if(!baru || baru.length < 4) { alert('⚠️ Sandi terlalu pendek!'); return; }
     let ulang = prompt('Ulangi kata sandi baru:');
     if(baru !== ulang) { alert('❌ Sandi tidak cocok!'); return; }
-    kataSandiAplikasi = baru;
-    localStorage.setItem('sandiAplikasiBengkel', baru);
+    let { error } = await db.auth.updateUser({ password: baru });
+    if(error) { alert('❌ Gagal mengganti sandi: ' + error.message); return; }
     alert('✅ Kata sandi berhasil diganti!');
 }
 
-function simpanData(){
-    localStorage.setItem('bengkelBarang', JSON.stringify(barang));
-    localStorage.setItem('bengkelRiwayat', JSON.stringify(riwayat));
+async function muatDataDariCloud(){
+    try {
+        let [rBarang, rRiwayat, rAbsensi, rPengaturan] = await Promise.all([
+            db.from('barang').select('*').order('nama'),
+            db.from('riwayat').select('*').order('created_at', { ascending: false }),
+            db.from('absensi').select('*'),
+            db.from('pengaturan').select('*').eq('id', 1).single()
+        ]);
+
+        if(rBarang.error) throw rBarang.error;
+        if(rRiwayat.error) throw rRiwayat.error;
+        if(rAbsensi.error) throw rAbsensi.error;
+        if(rPengaturan.error) throw rPengaturan.error;
+
+        barang = (rBarang.data || []).map(kolomBarangKeInternal);
+        riwayat = (rRiwayat.data || []).map(kolomRiwayatKeInternal);
+        daftarAbsensi = (rAbsensi.data || []).map(kolomAbsensiKeInternal);
+
+        if(rPengaturan.data){
+            pengaturan.operasional = rPengaturan.data.operasional || 0;
+            pengaturan.maintenance = rPengaturan.data.maintenance || 0;
+            pengaturan.persenMekanik = rPengaturan.data.persen_mekanik || 15;
+            pengaturan.persenInvestor = rPengaturan.data.persen_investor || 15;
+            kataSandiLaporan = rPengaturan.data.kata_sandi_laporan || '1234';
+        }
+
+        if(!migrasiSelesai) tampilkanTombolMigrasi();
+    } catch(e) {
+        alert('⚠️ Gagal memuat data dari cloud: ' + e.message);
+        barang = []; riwayat = []; daftarAbsensi = [];
+    }
 }
 
-function bacaDataDariPenyimpanan(){
+// ============ MAPPING KOLOM DATABASE (snake_case) <-> OBJEK INTERNAL (camelCase) ============
+function kolomBarangKeInternal(row){
+    return {
+        kode: row.kode, nama: row.nama, jenisMotor: row.jenis_motor, satuan: row.satuan,
+        hargaPokok: row.harga_pokok, hargaJual: row.harga_jual, stok: row.stok,
+        stokAwal: row.stok_awal, restock: row.restock, terjual: row.terjual,
+        tanggalStokAwal: row.tanggal_stok_awal, riwayatRestock: row.riwayat_restock || []
+    };
+}
+function kolomRiwayatKeInternal(row){
+    return {
+        id: row.id, tgl: row.tgl, namaPelanggan: row.nama_pelanggan, nomorHP: row.nomor_hp,
+        platKendaraan: row.plat_kendaraan, jenisMotor: row.jenis_motor, namaJasa: row.nama_jasa,
+        namaMekanik: row.nama_mekanik, biayaJasa: row.biaya_jasa, items: row.items || [],
+        totalBarang: row.total_barang, modalKeluar: row.modal_keluar, labaBarang: row.laba_barang,
+        totalBayar: row.total_bayar, caraBayar: row.cara_bayar,
+        uangdibayarkan: row.uangdibayarkan, sisaBayar: row.sisa_bayar
+    };
+}
+function kolomAbsensiKeInternal(row){
+    return {
+        id: row.id, tanggal: row.tanggal, jamDatang: row.jam_datang, jamPulang: row.jam_pulang,
+        jamKerja: row.jam_kerja, jabatan: row.jabatan, nama: row.nama, status: row.status,
+        keterangan: row.keterangan, bulan: row.bulan
+    };
+}
+
+// ============ SINKRONISASI REALTIME ANTAR PERANGKAT ============
+function aktifkanSinkronisasiRealtime(){
+    db.channel('sinkronisasi-bengkel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'barang' }, async () => {
+            let { data } = await db.from('barang').select('*').order('nama');
+            barang = (data || []).map(kolomBarangKeInternal);
+            tampilkanTabel(); updateDashboard();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'riwayat' }, async () => {
+            let { data } = await db.from('riwayat').select('*').order('created_at', { ascending: false });
+            riwayat = (data || []).map(kolomRiwayatKeInternal);
+            riwayatAsliFilter = [...riwayat];
+            tampilkanRiwayat(); updateDashboard();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, async () => {
+            let { data } = await db.from('absensi').select('*');
+            daftarAbsensi = (data || []).map(kolomAbsensiKeInternal);
+            tampilkanRekapAbsensi();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, async () => {
+            let { data } = await db.from('pengaturan').select('*').eq('id', 1).single();
+            if(!data) return;
+            pengaturan.operasional = data.operasional || 0;
+            pengaturan.maintenance = data.maintenance || 0;
+            pengaturan.persenMekanik = data.persen_mekanik || 15;
+            pengaturan.persenInvestor = data.persen_investor || 15;
+            kataSandiLaporan = data.kata_sandi_laporan || '1234';
+        })
+        .subscribe();
+}
+
+// ============ MIGRASI 1x DARI LOCALSTORAGE LAMA KE CLOUD ============
+function tampilkanTombolMigrasi(){
+    let sb = localStorage.getItem('bengkelBarang');
+    let sr = localStorage.getItem('bengkelRiwayat');
+    let sa = localStorage.getItem('bengkelAbsensi');
+    if(!sb && !sr && !sa) return; // tidak ada data lama di browser ini, tidak perlu migrasi
+    let tombol = document.getElementById('btnMigrasiCloud');
+    if(tombol) tombol.classList.remove('sembunyi');
+}
+
+async function migrasiKeCloud(){
+    if(!confirm('☁️ Pindahkan data lama di browser ini (localStorage) ke cloud?\nLakukan ini HANYA SEKALI, dari perangkat yang menyimpan data terbanyak.')) return;
+
     try {
-        let sb = localStorage.getItem('bengkelBarang');
-        let sr = localStorage.getItem('bengkelRiwayat');
-        if(sb) barang = JSON.parse(sb);
-        if(sr) riwayat = JSON.parse(sr);
-    } catch(e) { barang = []; riwayat = []; }
+        let barangLama = JSON.parse(localStorage.getItem('bengkelBarang') || '[]');
+        let riwayatLama = JSON.parse(localStorage.getItem('bengkelRiwayat') || '[]');
+        let absensiLama = JSON.parse(localStorage.getItem('bengkelAbsensi') || '[]');
+        let pengaturanLama = JSON.parse(localStorage.getItem('pengaturanPembagian') || 'null');
+
+        if(barangLama.length > 0){
+            let baris = barangLama.map(b => ({
+                kode: b.kode, nama: b.nama, jenis_motor: b.jenisMotor, satuan: b.satuan,
+                harga_pokok: b.hargaPokok, harga_jual: b.hargaJual, stok: b.stok,
+                stok_awal: b.stokAwal, restock: b.restock, terjual: b.terjual,
+                tanggal_stok_awal: b.tanggalStokAwal, riwayat_restock: b.riwayatRestock || []
+            }));
+            let { error } = await db.from('barang').upsert(baris);
+            if(error) throw error;
+        }
+
+        if(riwayatLama.length > 0){
+            let baris = riwayatLama.map(r => ({
+                tgl: r.tgl, nama_pelanggan: r.namaPelanggan, nomor_hp: r.nomorHP,
+                plat_kendaraan: r.platKendaraan, jenis_motor: r.jenisMotor, nama_jasa: r.namaJasa,
+                nama_mekanik: r.namaMekanik, biaya_jasa: r.biayaJasa, items: r.items || [],
+                total_barang: r.totalBarang, modal_keluar: r.modalKeluar, laba_barang: r.labaBarang,
+                total_bayar: r.totalBayar, cara_bayar: r.caraBayar,
+                uangdibayarkan: r.uangdibayarkan, sisa_bayar: r.sisaBayar
+            }));
+            let { error } = await db.from('riwayat').insert(baris);
+            if(error) throw error;
+        }
+
+        if(absensiLama.length > 0){
+            let baris = absensiLama.map(a => ({
+                tanggal: a.tanggal, jam_datang: a.jamDatang, jam_pulang: a.jamPulang,
+                jam_kerja: a.jamKerja, jabatan: a.jabatan, nama: a.nama, status: a.status,
+                keterangan: a.keterangan, bulan: a.bulan
+            }));
+            let { error } = await db.from('absensi').upsert(baris, { onConflict: 'tanggal,nama' });
+            if(error) throw error;
+        }
+
+        if(pengaturanLama){
+            let { error } = await db.from('pengaturan').update({
+                operasional: pengaturanLama.operasional, maintenance: pengaturanLama.maintenance,
+                persen_mekanik: pengaturanLama.persenMekanik, persen_investor: pengaturanLama.persenInvestor
+            }).eq('id', 1);
+            if(error) throw error;
+        }
+
+        migrasiSelesai = true;
+        localStorage.setItem('migrasiSelesai', '1');
+        document.getElementById('btnMigrasiCloud').classList.add('sembunyi');
+        alert('✅ Migrasi selesai! Memuat ulang data dari cloud...');
+        await muatDataDariCloud();
+        tampilkanTabel();
+        riwayatAsliFilter = [...riwayat];
+        tampilkanRiwayat();
+        updateDashboard();
+    } catch(e) {
+        alert('❌ Migrasi gagal: ' + e.message);
+    }
 }
 
 function formatRupiah(angka){
@@ -897,7 +1073,7 @@ function cekKodeBarang(kode){
     }
 }
 
-function simpanBarang(){
+async function simpanBarang(){
     let kode = document.getElementById('kode').value.trim().toUpperCase();
     let nama = document.getElementById('nama').value.trim();
     let motor = document.getElementById('jenisMotorBarang').value.trim();
@@ -910,36 +1086,53 @@ function simpanBarang(){
     if(!kode || !nama) { alert('⚠️ Kode & Nama Barang wajib diisi!'); return; }
 
     let indeks = barang.findIndex(x=>x.kode === kode);
+    let baris, pesan;
 
     if(dataEdit){
         let b = barang[dataEdit];
-        b.kode = kode;
-        b.nama = nama;
-        b.jenisMotor = motor;
-        b.satuan = satuan;
-        b.hargaPokok = pokok;
-        b.hargaJual = jual;
-        b.stok = jumlah;
-        alert('✅ Data barang berhasil diubah!');
+        baris = {
+            kode: kode, nama: nama, jenis_motor: motor, satuan: satuan,
+            harga_pokok: pokok, harga_jual: jual, stok: jumlah,
+            stok_awal: b.stokAwal, restock: b.restock, terjual: b.terjual,
+            tanggal_stok_awal: b.tanggalStokAwal, riwayat_restock: b.riwayatRestock || []
+        };
+        pesan = '✅ Data barang berhasil diubah!';
+    }else if(indeks >= 0){
+        let b = barang[indeks];
+        let riwayatRestockBaru = [...(b.riwayatRestock||[]), {jumlah: jumlah, tanggal: waktuSekarang}];
+        baris = {
+            kode: b.kode, nama: b.nama, jenis_motor: b.jenisMotor, satuan: b.satuan,
+            harga_pokok: b.hargaPokok, harga_jual: b.hargaJual,
+            stok: (b.stok||0) + jumlah, stok_awal: b.stokAwal,
+            restock: (b.restock||0) + jumlah, terjual: b.terjual,
+            tanggal_stok_awal: b.tanggalStokAwal, riwayat_restock: riwayatRestockBaru
+        };
+        pesan = `✅ Restock berhasil!\nJumlah: ${jumlah} ${satuan}\nWaktu: ${waktuSekarang}\nStok Sekarang: ${baris.stok} ${satuan}`;
+    }else{
+        baris = {
+            kode: kode, nama: nama, jenis_motor: motor, satuan: satuan,
+            harga_pokok: pokok, harga_jual: jual, stok: jumlah, stok_awal: jumlah,
+            restock: jumlah, terjual: 0, tanggal_stok_awal: waktuSekarang,
+            riwayat_restock: [{jumlah: jumlah, tanggal: waktuSekarang}]
+        };
+        pesan = `✅ Barang baru berhasil ditambahkan!\nWaktu: ${waktuSekarang}`;
+    }
+
+    let { error } = await db.from('barang').upsert(baris);
+    if(error) { alert('❌ Gagal menyimpan ke cloud: ' + error.message); return; }
+
+    let hasil = kolomBarangKeInternal(baris);
+    if(dataEdit){
+        barang[dataEdit] = hasil;
         dataEdit = null;
         document.getElementById('infoModeEdit').classList.add('sembunyi');
     }else if(indeks >= 0){
-        barang[indeks].stok = (barang[indeks].stok||0) + jumlah;
-        barang[indeks].restock = (barang[indeks].restock||0) + jumlah;
-        if(!barang[indeks].riwayatRestock) barang[indeks].riwayatRestock = [];
-        barang[indeks].riwayatRestock.push({jumlah: jumlah, tanggal: waktuSekarang});
-        alert(`✅ Restock berhasil!\nJumlah: ${jumlah} ${satuan}\nWaktu: ${waktuSekarang}\nStok Sekarang: ${barang[indeks].stok} ${satuan}`);
+        barang[indeks] = hasil;
     }else{
-        barang.push({
-            kode:kode, nama:nama, jenisMotor:motor, satuan:satuan,
-            hargaPokok:pokok, hargaJual:jual, stok:jumlah, stokAwal:jumlah,
-            restock:jumlah, terjual:0, tanggalStokAwal:waktuSekarang,
-            riwayatRestock: [{jumlah: jumlah, tanggal: waktuSekarang}]
-        });
-        alert(`✅ Barang baru berhasil ditambahkan!\nWaktu: ${waktuSekarang}`);
+        barang.push(hasil);
     }
 
-    simpanData();
+    alert(pesan);
     tampilkanTabel();
     kosongkanFormBarang();
 }
@@ -983,10 +1176,11 @@ function ambilDataEdit(kode){
     switchTab('stok');
 }
 
-function hapusBarang(kode){
+async function hapusBarang(kode){
     if(!confirm(`⚠️ Hapus barang ${kode}?`)) return;
+    let { error } = await db.from('barang').delete().eq('kode', kode);
+    if(error) { alert('❌ Gagal menghapus di cloud: ' + error.message); return; }
     barang = barang.filter(x=>x.kode !== kode);
-    simpanData();
     tampilkanTabel();
 }
 
@@ -1146,7 +1340,7 @@ function kosongkanKeranjang(){
     document.getElementById('jenisMotor').value = '';
 }
 
-function selesaikanTransaksi(){
+async function selesaikanTransaksi(){
     let nama = document.getElementById('namaPelanggan').value.trim()||'-';
     let hp = document.getElementById('nomorHP').value.trim()||'-';
     let plat = document.getElementById('platKendaraan').value.trim()||'-';
@@ -1170,44 +1364,57 @@ function selesaikanTransaksi(){
 
     if(!adaBarang && !adaJasa) { alert('⚠️ Masukkan barang ATAU pilih jasa!'); return; }
 
-    if(adaBarang){
-        keranjang.forEach(item=>{
-            let b = barang.find(x=>x.kode === item.kode);
-            if(b){
-                b.stok = (b.stok||0) - item.jumlah;
-                b.terjual = (b.terjual||0) + item.jumlah;
+    let tombol = document.querySelector('button[onclick="selesaikanTransaksi()"]');
+    if(tombol) { tombol.disabled = true; tombol.textContent = 'Menyimpan...'; }
+
+    try {
+        if(adaBarang){
+            for(let item of keranjang){
+                let b = barang.find(x=>x.kode === item.kode);
+                if(!b) continue;
+                let stokBaru = (b.stok||0) - item.jumlah;
+                let terjualBaru = (b.terjual||0) + item.jumlah;
+                let { error } = await db.from('barang').update({ stok: stokBaru, terjual: terjualBaru }).eq('kode', b.kode);
+                if(error) throw error;
+                b.stok = stokBaru;
+                b.terjual = terjualBaru;
             }
-        });
+        }
+
+        let { data, error } = await db.from('riwayat').insert({
+            tgl: tgl, nama_pelanggan: nama, nomor_hp: hp,
+            plat_kendaraan: plat, jenis_motor: motor,
+            nama_jasa: namaJasa, nama_mekanik: namaMekanik,
+            biaya_jasa: jasa, items: JSON.parse(JSON.stringify(keranjang)),
+            total_barang: totalBrg, modal_keluar: totalModal, laba_barang: totalLabaBrg,
+            total_bayar: totalBayar, cara_bayar: caraBayarTerpilih,
+            uangdibayarkan: uangdibayarkan, sisa_bayar: sisaBayar
+        }).select().single();
+        if(error) throw error;
+
+        riwayat.unshift(kolomRiwayatKeInternal(data));
+        riwayatAsliFilter = [...riwayat];
+        tampilkanRiwayat();
+        tampilkanTabel();
+        updateDashboard();
+
+        keranjang = [];
+        tampilkanKeranjang();
+        document.getElementById('biayaJasaTotal').value = '';
+        document.getElementById('jenisJasa').selectedIndex = 0;
+        document.getElementById('uangdibayarkan').value = '0';
+        document.getElementById('sisaBayar').textContent = 'Rp 0';
+        document.getElementById('namaPelanggan').value = '';
+        document.getElementById('nomorHP').value = '';
+        document.getElementById('platKendaraan').value = '';
+        document.getElementById('jenisMotor').value = '';
+
+        alert(`✅ SELESAI!\nTotal Bayar: ${formatRupiah(totalBayar)}\nUang Dibayarkan: ${formatRupiah(uangdibayarkan)}\nSisa Bayar: ${formatRupiah(sisaBayar)}\n\n👉 Klik tombol: 🖨️ Cetak Nota Terakhir`);
+    } catch(e) {
+        alert('❌ Gagal menyimpan transaksi ke cloud: ' + e.message);
+    } finally {
+        if(tombol) { tombol.disabled = false; tombol.textContent = '✅ Selesai & Simpan'; }
     }
-
-    riwayat.unshift({
-        tgl: tgl, namaPelanggan: nama, nomorHP: hp,
-        platKendaraan: plat, jenisMotor: motor,
-        namaJasa: namaJasa, namaMekanik: namaMekanik,
-        biayaJasa: jasa, items: JSON.parse(JSON.stringify(keranjang)),
-        totalBarang: totalBrg, modalKeluar: totalModal, labaBarang: totalLabaBrg,
-        totalBayar: totalBayar, caraBayar: caraBayarTerpilih,
-        uangdibayarkan: uangdibayarkan, sisaBayar: sisaBayar
-    });
-
-    simpanData();
-    riwayatAsliFilter = [...riwayat];  
-    tampilkanRiwayat();               
-    tampilkanTabel();
-    updateDashboard();
-
-    keranjang = [];
-    tampilkanKeranjang();
-    document.getElementById('biayaJasaTotal').value = '';
-    document.getElementById('jenisJasa').selectedIndex = 0;
-    document.getElementById('uangdibayarkan').value = '0';
-    document.getElementById('sisaBayar').textContent = 'Rp 0';
-    document.getElementById('namaPelanggan').value = '';
-    document.getElementById('nomorHP').value = '';
-    document.getElementById('platKendaraan').value = '';
-    document.getElementById('jenisMotor').value = '';
-
-    alert(`✅ SELESAI!\nTotal Bayar: ${formatRupiah(totalBayar)}\nUang Dibayarkan: ${formatRupiah(uangdibayarkan)}\nSisa Bayar: ${formatRupiah(sisaBayar)}\n\n👉 Klik tombol: 🖨️ Cetak Nota Terakhir`);
 }
 
 function cetakNotaTerakhir(){
@@ -1357,10 +1564,11 @@ document.getElementById('totalTransfer').textContent = formatRupiah(totalTransfe
 tampilkanBarangTerlaris();
 }
 
-function hapusRiwayat(idx) {
+async function hapusRiwayat(idx) {
     if (!confirm('⚠️ Hapus riwayat ini?')) return;
+    let { error } = await db.from('riwayat').delete().eq('id', riwayat[idx].id);
+    if (error) { alert('❌ Gagal menghapus di cloud: ' + error.message); return; }
     riwayat.splice(idx, 1);
-    simpanData();
     riwayatAsliFilter = [...riwayat];
     tampilkanRiwayat();
     hitungUlangLaporan();
@@ -1406,18 +1614,20 @@ function simpanPengaturan() {
     pengaturan.maintenance = parseInt(document.getElementById('biayaMaintenance').value) || 0;
     pengaturan.persenMekanik = parseInt(document.getElementById('persenMekanik').value) || 0;
     pengaturan.persenInvestor = parseInt(document.getElementById('persenInvestor').value) || 0;
-    localStorage.setItem('pengaturanPembagian', JSON.stringify(pengaturan));
+    // Dipanggil per-keystroke (lihat hitungUlangLaporan) — kirim ke cloud tanpa memblokir/alert
+    // supaya tidak mengganggu saat mengetik.
+    db.from('pengaturan').update({
+        operasional: pengaturan.operasional, maintenance: pengaturan.maintenance,
+        persen_mekanik: pengaturan.persenMekanik, persen_investor: pengaturan.persenInvestor
+    }).eq('id', 1).then(({error}) => { if(error) console.error('Gagal menyimpan pengaturan:', error); });
 }
 
 function muatPengaturan() {
-    let tersimpan = localStorage.getItem('pengaturanPembagian');
-    if (tersimpan) {
-        pengaturan = JSON.parse(tersimpan);
-        document.getElementById('biayaOperasional').value = pengaturan.operasional;
-        document.getElementById('biayaMaintenance').value = pengaturan.maintenance;
-        document.getElementById('persenMekanik').value = pengaturan.persenMekanik;
-        document.getElementById('persenInvestor').value = pengaturan.persenInvestor;
-    }
+    // pengaturan sudah dimuat dari cloud saat login (lihat muatDataDariCloud), tinggal isi form
+    document.getElementById('biayaOperasional').value = pengaturan.operasional;
+    document.getElementById('biayaMaintenance').value = pengaturan.maintenance;
+    document.getElementById('persenMekanik').value = pengaturan.persenMekanik;
+    document.getElementById('persenInvestor').value = pengaturan.persenInvestor;
 }
 
 function bukaLaporan() {
@@ -1560,12 +1770,12 @@ function lihatDetailRiwayat(idx) {
     alert(isi);
 }
 
-function ubahRiwayat(idx) {
+async function ubahRiwayat(idx) {
     let r = riwayat[idx];
     if (!r) return;
 
     let menu = prompt(`PILIH UBAHAN:\n1. Ubah Data Pelanggan\n2. Catat Pelunasan Sisa Bayar\n\nKetik angka pilihan:`, '2');
-    
+
     if (menu === '1') {
         let nama = prompt('Nama Pelanggan:', r.namaPelanggan);
         let plat = prompt('Nomor Plat:', r.platKendaraan);
@@ -1573,16 +1783,21 @@ function ubahRiwayat(idx) {
         let hp = prompt('Nomor HP:', r.nomorHP || '');
         let mekanik = prompt('Nama Mekanik:', r.namaMekanik || '');
         if (nama === null || plat === null) return;
-        
+
+        let { error } = await db.from('riwayat').update({
+            nama_pelanggan: nama, plat_kendaraan: plat, jenis_motor: motor,
+            nomor_hp: hp, nama_mekanik: mekanik
+        }).eq('id', r.id);
+        if (error) { alert('❌ Gagal menyimpan ke cloud: ' + error.message); return; }
+
         r.namaPelanggan = nama;
         r.platKendaraan = plat;
         r.jenisMotor = motor;
         r.nomorHP = hp;
         r.namaMekanik = mekanik;
-        simpanData();
         tampilkanRiwayat();
         alert('✅ Data berhasil diubah!');
-        
+
     } else if (menu === '2') {
         let sisa = r.sisaBayar || 0;
         if (sisa <= 0) {
@@ -1593,10 +1808,16 @@ function ubahRiwayat(idx) {
         if (bayar === null) return;
         let nominal = parseInt(bayar.replace(/\D/g,'')) || 0;
         if (nominal <= 0) return;
-        
-        r.uangdibayarkan = (r.uangdibayarkan || 0) + nominal;
-        r.sisaBayar = Math.max(0, sisa - nominal);
-        simpanData();
+
+        let uangBaru = (r.uangdibayarkan || 0) + nominal;
+        let sisaBaru = Math.max(0, sisa - nominal);
+        let { error } = await db.from('riwayat').update({
+            uangdibayarkan: uangBaru, sisa_bayar: sisaBaru
+        }).eq('id', r.id);
+        if (error) { alert('❌ Gagal menyimpan ke cloud: ' + error.message); return; }
+
+        r.uangdibayarkan = uangBaru;
+        r.sisaBayar = sisaBaru;
         tampilkanRiwayat();
         alert(`✅ Pembayaran dicatat!\nSisa sebelumnya: ${formatRupiah(sisa)}\nDibayar: ${formatRupiah(nominal)}\nSisa sekarang: ${formatRupiah(r.sisaBayar)}`);
     }
@@ -1631,18 +1852,20 @@ function terapkanPencarianRiwayat(kataKunci) {
     tampilkanRiwayat();
 }
 
-function gantiSandiLaporan(){
+async function gantiSandiLaporan(){
     let sandiLama = prompt('Masukkan kata sandi laporan lama:');
     if(sandiLama !== kataSandiLaporan) { alert('❌ Sandi lama salah!'); return; }
-    
+
     let baru = prompt('Masukkan kata sandi BARU untuk Laporan:\n(minimal 4 karakter)');
     if(!baru || baru.length < 4) { alert('⚠️ Sandi terlalu pendek!'); return; }
-    
+
     let ulang = prompt('Ulangi kata sandi BARU:');
     if(baru !== ulang) { alert('❌ Sandi tidak cocok!'); return; }
-    
+
+    let { error } = await db.from('pengaturan').update({ kata_sandi_laporan: baru }).eq('id', 1);
+    if(error) { alert('❌ Gagal menyimpan ke cloud: ' + error.message); return; }
+
     kataSandiLaporan = baru;
-    localStorage.setItem('sandiLaporanBengkel', baru);
     alert('✅ Kata sandi laporan berhasil diganti!');
 }
 
@@ -1800,7 +2023,7 @@ function gambarGrafikPenjualan() {
     });
 }
 
-let daftarAbsensi = JSON.parse(localStorage.getItem('bengkelAbsensi') || '[]');
+let daftarAbsensi = []; // dimuat dari cloud saat login, lihat muatDataDariCloud()
 let barisDiedit = null;
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -1836,7 +2059,7 @@ function aturStatusAbsensi(status) {
     alert(`✅ Status dipilih: ${status}\n👉 Klik SIMPAN untuk menyimpan`);
 }
 
-function simpanAbsensi() {
+async function simpanAbsensi() {
     let tgl = document.getElementById('absensiTanggal').value;
     let jamDatang = document.getElementById('absensiJamDatang').value;
     let jamPulang = document.getElementById('absensiJamPulang').value || '';
@@ -1844,7 +2067,7 @@ function simpanAbsensi() {
     let nama = document.getElementById('absensiNama').value.trim();
     let status = window.statusAbsensiSekarang || 'Hadir';
     let ket = document.getElementById('absensiKeterangan').value.trim();
-    
+
     if(!tgl) { alert('⚠️ Pilih Tanggal dulu!'); return; }
     if(!nama) { alert('⚠️ Isi Nama Staff!'); return; }
 
@@ -1862,32 +2085,43 @@ function simpanAbsensi() {
         bulan: tgl.substring(0,7)
     };
 
-    if(barisDiedit) {
-        daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === barisDiedit.tanggal && x.nama === barisDiedit.nama));
-        barisDiedit = null;
-        alert(`✅ Data Diperbarui!\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}`);
+    let pesan;
+    let kunciLama = barisDiedit;
+    if(kunciLama) {
+        pesan = `✅ Data Diperbarui!\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}`;
     } else {
         let idx = daftarAbsensi.findIndex(x => x.tanggal === tgl && x.nama === nama);
         if(idx >= 0) {
             if(!confirm(`⚠️ Data untuk ${nama} tanggal ${tgl} sudah ada!\nIngin PERBARUI dengan yang baru?`)) return;
-            daftarAbsensi.splice(idx, 1);
         }
-        alert(`✅ Absensi Disimpan!\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}`);
+        pesan = `✅ Absensi Disimpan!\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}`;
     }
 
+    // Jika sedang mengedit dan tanggal/nama berubah, hapus dulu baris lama (kunci lama)
+    if(kunciLama && (kunciLama.tanggal !== tgl || kunciLama.nama !== nama)) {
+        let { error: errHapus } = await db.from('absensi').delete().eq('tanggal', kunciLama.tanggal).eq('nama', kunciLama.nama);
+        if(errHapus) { alert('❌ Gagal memperbarui di cloud: ' + errHapus.message); return; }
+        daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === kunciLama.tanggal && x.nama === kunciLama.nama));
+    }
+
+    let { error } = await db.from('absensi').upsert({
+        tanggal: data.tanggal, jam_datang: data.jamDatang, jam_pulang: data.jamPulang,
+        jam_kerja: data.jamKerja, jabatan: data.jabatan, nama: data.nama,
+        status: data.status, keterangan: data.keterangan, bulan: data.bulan
+    }, { onConflict: 'tanggal,nama' });
+    if(error) { alert('❌ Gagal menyimpan ke cloud: ' + error.message); return; }
+
+    barisDiedit = null;
+    daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === tgl && x.nama === nama));
     daftarAbsensi.push(data);
-    simpanAbsensiKePenyimpanan();
     tampilkanRekapAbsensi();
-    
+    alert(pesan);
+
     document.getElementById('absensiNama').value = '';
     document.getElementById('absensiJamPulang').value = '';
     document.getElementById('absensiKeterangan').value = '';
     window.statusAbsensiSekarang = null;
     document.getElementById('absensiJamDatang').value = new Date().toTimeString().substring(0,5);
-}
-
-function simpanAbsensiKePenyimpanan() {
-    localStorage.setItem('bengkelAbsensi', JSON.stringify(daftarAbsensi));
 }
 
 function ambilPeriodeTerpilih() {
@@ -1936,10 +2170,11 @@ function bukaEditAbsensi(tgl, jamDatang, jamPulang, jabatan, nama, status, ket) 
     switchTab('absensi');
 }
 
-function hapusAbsensi(tanggal, nama) {
+async function hapusAbsensi(tanggal, nama) {
     if(!confirm(`⚠️ Hapus permanen?\n📅 ${tanggal}\n👤 ${nama}`)) return;
+    let { error } = await db.from('absensi').delete().eq('tanggal', tanggal).eq('nama', nama);
+    if(error) { alert('❌ Gagal menghapus di cloud: ' + error.message); return; }
     daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === tanggal && x.nama === nama));
-    simpanAbsensiKePenyimpanan();
     tampilkanRekapAbsensi();
 }
 
