@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 Sistem Bengkel - Menu Terstruktur</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: Segoe UI, sans-serif; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body { background: #f0f4f8; }
+        
+        /* ====== NAVIGASI TOP ====== */
+        .navbar {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            padding: 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+
+        .navbar-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+        }
+
+        .navbar-logo {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 12px 0;
+            white-space: nowrap;
+        }
+
+        .navbar-menu {
+            display: flex;
+            list-style: none;
+            gap: 0;
+        }
+
+        .navbar-menu li {
+            margin: 0;
+        }
+
+        .navbar-item {
+            color: white;
+            padding: 15px 16px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .navbar-item:hover {
+            background: rgba(255,255,255,0.1);
+            border-bottom-color: #3498db;
+        }
+
+        .navbar-item.active {
+            background: rgba(52, 152, 219, 0.3);
+            border-bottom-color: #3498db;
+        }
+
+        /* ====== HAMBURGER MENU (MOBILE) ====== */
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 5px;
+        }
+
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: white;
+            border-radius: 2px;
+            transition: 0.3s;
+        }
+
+        /* ====== MAIN CONTENT ====== */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px 15px;
+            min-height: calc(100vh - 60px);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ====== CARD & FORM ====== */
+        h1, h2, h3 { color: #2c3e50; margin-bottom: 12px; }
+        .card { background: white; padding: 18px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 18px; }
+        input, select, button { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; margin: 4px 2px; }
+        input, select { width: calc(50% - 6px); }
+        button { background: #27ae60; color: white; border: none; cursor: pointer; font-weight: 500; }
+        button:hover { opacity: 0.92; }
+        .btn-blue { background: #3498db; }
+        .btn-orange { background: #f39c12; }
+        .btn-red { background: #e74c3c; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px 6px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .angka { text-align: right; }
+        .tengah { text-align: center; }
+        .merah { color: #e74c3c; font-weight: 600; }
+        .hijau { color: #27ae60; }
+        .baris-merah { background: #fff1f1; }
+        .garis { border-bottom: 1px dashed #ccc; margin: 8px 0; }
+        .sembunyi { display: none !important; }
+        .layar-login { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .kotak-login { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
+        .kotak-login input { width: 100%; margin: 15px 0; font-size: 16px; }
+        .kotak-login button { width: 100%; padding: 12px; font-size: 16px; }
+        .edit-mode { background: #fff3cd; padding: 8px; border-radius: 4px; margin-bottom: 10px; color: #856404; }
+        .flex-baris { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .flex-baris label { margin-right: 10px; cursor: pointer; }
+        .lebar-penuh { width: 100%; }
+        .setengah { width: calc(50% - 6px); }
+        .sepertiga { width: calc(33.3% - 8px); }
+        .dua-tiga { width: calc(66.6% - 8px); }
+        .modal-latar { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 8888; }
+        .modal-isi { background: white; padding: 20px; border-radius: 10px; width: 95%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        .modal-isi table { font-size: 13px; }
+        .modal-isi th, .modal-isi td { padding: 6px 4px; }
+
+        /* ====== DASHBOARD SUMMARY ====== */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #3498db;
+        }
+
+        .summary-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+        .summary-value { font-size: 20px; font-weight: bold; color: #2c3e50; }
+
+        /* ====== RESPONSIF MOBILE ====== */
+        @media (max-width: 768px) {
+            .hamburger { display: flex; }
+            .navbar-menu { display: none; flex-direction: column; position: absolute; top: 60px; left: 0; width: 100%; background: #34495e; }
+            .navbar-menu.active { display: flex; }
+            .navbar-item { padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); width: 100%; }
+            .navbar-item.active { border-bottom: 3px solid #3498db; background: rgba(52, 152, 219, 0.2); }
+            
+            input, select { width: 100%; }
+            .setengah, .dua-tiga, .sepertiga { width: 100%; }
+            .card { padding: 12px; }
+            table { font-size: 12px; }
+            th, td { padding: 6px 4px; }
+            
+            .summary-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+            .navbar-item { font-size: 13px; padding: 12px 14px; }
+        }
+
+        @media (max-width: 480px) {
+            .navbar-logo { font-size: 15px; }
+            .navbar-item { font-size: 12px; padding: 10px 12px; }
+            .card { padding: 10px; margin-bottom: 12px; }
+            input, select, button { padding: 8px; font-size: 12px; }
+            table { font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====================================== -->
+<!-- 🔐 LAYAR LOGIN -->
+<!-- ====================================== -->
+<div class="layar-login" id="layarLogin">
+    <div class="kotak-login">
+        <h2>🔐 Masuk Aplikasi Bengkel</h2>
+        <input type="password" id="inputSandi" placeholder="Masukkan Kata Sandi">
+        <button onclick="verifikasiSandi()">MASUK</button>
+        <p style="color:#888; margin-top:15px; font-size:13px;">Kata sandi bawaan: <b>1234</b> — ganti setelah masuk</p>
+        <button class="btn-blue btn-sm" onclick="bukaGantiSandi()" style="width:auto; margin-top:10px;">🔧 Ganti Kata Sandi</button>
+    </div>
+</div>
+
+<!-- ====================================== -->
+<!-- ✅ ISI APLIKASI UTAMA -->
+<!-- ====================================== -->
+<div id="isiAplikasi" class="sembunyi">
+
+    <!-- NAVIGATION BAR -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-logo">📦 BENGKEL MANAGER</div>
+            <ul class="navbar-menu" id="navbarMenu">
+                <li><a class="navbar-item active" data-tab="home" onclick="switchTab('home')">🏠 Beranda</a></li>
+                <li><a class="navbar-item" data-tab="absensi" onclick="switchTab('absensi')">📅 Absensi</a></li>
+                <li><a class="navbar-item" data-tab="stok" onclick="switchTab('stok')">📦 Stok</a></li>
+                <li><a class="navbar-item" data-tab="transaksi" onclick="switchTab('transaksi')">🛒 Transaksi</a></li>
+                <li><a class="navbar-item" data-tab="laporan" onclick="switchTab('laporan')">💰 Laporan</a></li>
+            </ul>
+            <div class="hamburger" onclick="toggleMobileMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-container">
+
+        <!-- ==================== TAB 1: BERANDA (HOME/DASHBOARD) ==================== -->
+        <div class="tab-content active" id="tab-home">
+            <h1 style="text-align:center; margin-bottom:20px;">📊 Dashboard Bengkel</h1>
+            
+            <div class="summary-grid">
+                <div class="summary-card" style="border-left-color: #27ae60;">
+                    <div class="summary-label">💰 Omset Hari Ini</div>
+                    <div class="summary-value" id="dashOmsetHariIni">Rp 0</div>
+                </div>
+                <div class="summary-card" style="border-left-color: #3498db;">
+                    <div class="summary-label">📊 Transaksi Hari Ini</div>
+                    <div class="summary-value" id="dashTransaksiHariIni">0</div>
+                </div>
+                <div class="summary-card" style="border-left-color: #e74c3c;">
+                    <div class="summary-label">👥 Stok Minimal</div>
+                    <div class="summary-value" id="dashStokMinimal">0 item</div>
+                </div>
+                <div class="summary-card" style="border-left-color: #f39c12;">
+                    <div class="summary-label">🔥 Barang Terlaris</div>
+                    <div class="summary-value" id="dashBarangTerlaris">—</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📝 Info Cepat</h2>
+                <p style="line-height: 1.8;">
+                    👋 Selamat datang di <strong>Sistem Manajemen Bengkel</strong>!<br><br>
+                    📍 <strong>Menu Navigasi:</strong><br>
+                    • 📅 <strong>Absensi</strong> - Catat masuk/keluar karyawan<br>
+                    • 📦 <strong>Stok</strong> - Kelola inventaris parts<br>
+                    • 🛒 <strong>Transaksi</strong> - Catat penjualan & service<br>
+                    • 💰 <strong>Laporan</strong> - Lihat analytics & pembagian hasil<br><br>
+                    ⏰ Tanggal: <span id="dashTanggalSekarang" style="font-weight: bold;">—</span><br>
+                    📱 Responsive - Bisa diakses dari desktop, tablet, atau mobile<br>
+                </p>
+            </div>
+
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:15px;">
+                <div class="card">
+                    <h3>🔥 5 Barang Terlaris</h3>
+                    <div id="dashDaftarTerlaris" style="font-size:14px;">Memuat...</div>
+                </div>
+                <div class="card">
+                    <h3>🐢 5 Barang Jarang Terjual</h3>
+                    <div id="dashDaftarJarangLaku" style="font-size:14px;">Memuat...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 2: ABSENSI ==================== -->
+        <div class="tab-content" id="tab-absensi">
+            <h1>📅 Manajemen Absensi Karyawan</h1>
+
+            <div class="card" style="background:#fff9e6; border:2px solid #ffc107;">
+                <h2>📋 Input Absensi Harian</h2>
+                
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center;">
+                    <label style="font-weight:500;">Tanggal:</label>
+                    <input type="date" id="absensiTanggal" style="width:160px; padding:6px;">
+                    <label style="font-weight:500; margin-left:10px;">⏰ Jam Datang:</label>
+                    <input type="time" id="absensiJamDatang" style="width:130px; padding:8px; font-size:15px; font-weight:bold; background:#e8f5e9; border:1px solid #ccc;">
+                    <label style="font-weight:500; margin-left:10px; color:#1565c0;">🏠 Jam Pulang:</label>
+                    <input type="time" id="absensiJamPulang" style="width:130px; padding:8px; font-size:15px; background:#e3f2fd; border:1px solid #ccc;">
+                </div>
+                
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center;">
+                    <label style="font-weight:500;">💼 Jabatan:</label>
+                    <select id="absensiJabatan" style="width:160px; padding:6px; font-size:14px;">
+                        <option value="Mekanik">🔧 Mekanik</option>
+                        <option value="Kasir">💰 Kasir</option>
+                        <option value="Magang">🧑‍🎓 Magang</option>
+                        <option value="Lainnya">📋 Lainnya</option>
+                    </select>
+                    <label style="font-weight:500; margin-left:10px;">👤 Nama Staff:</label>
+                    <input type="text" id="absensiNama" placeholder="Nama Lengkap" style="width:220px; padding:6px;" oninput="kapitalNamaAbsensi(this)">
+                </div>
+                
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                    <button onclick="aturStatusAbsensi('Hadir')" style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">✅ Hadir</button>
+                    <button onclick="aturStatusAbsensi('Setengah Hari')" style="background:#f39c12; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">⛔ ½ Hari</button>
+                    <button onclick="aturStatusAbsensi('Izin')" style="background:#9b59b6; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">📝 Izin</button>
+                    <button onclick="aturStatusAbsensi('Tanpa Keterangan')" style="background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">❌ TanpaKet</button>
+                </div>
+                
+                <div style="margin-bottom:10px;">
+                    <label style="font-weight:500;">📝 Keterangan:</label>
+                    <input type="text" id="absensiKeterangan" placeholder="Alasan izin atau keterangan lain..." style="width:100%; margin-top:4px; padding:6px;">
+                </div>
+                
+                <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
+                    <button onclick="simpanAbsensiDatang()" style="background:#27ae60; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">✅ ABSEN DATANG</button>
+                    <button onclick="isiJamPulangOtomatis()" style="background:#1976d2; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">🏠 ABSEN PULANG</button>
+                    <button onclick="simpanAbsensi()" style="background:#f57c00; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">✅ SIMPAN ABSENSI</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📋 Rekap Absensi Bulan Ini</h2>
+                <div style="overflow-x:auto;">
+                    <table style="font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th style="min-width:100px;">Tanggal</th>
+                                <th style="min-width:80px;">Datang</th>
+                                <th style="min-width:80px;">Pulang</th>
+                                <th style="min-width:70px;">Jam Kerja</th>
+                                <th style="min-width:80px;">Jabatan</th>
+                                <th style="min-width:120px;">Nama Staff</th>
+                                <th style="min-width:100px;">Status</th>
+                                <th style="min-width:60px;">Edit</th>
+                                <th style="min-width:50px;">Hapus</th>
+                            </tr>
+                        </thead>
+                        <tbody id="isiTabelAbsensi">
+                            <tr><td colspan="9" style="padding:12px; text-align:center; color:#888;">Memuat...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="background:#e8f5e9; padding:12px; border-radius:8px; border:1px solid #a5d6a7;">
+                <h4 style="margin:0 0 10px 0; color:#2e7d32;">📊 Ringkasan Kehadiran Per Staff</h4>
+                <div style="overflow-x:auto;">
+                    <table style="font-size:12px;">
+                        <thead>
+                            <tr style="background:#c8e6c9;">
+                                <th style="width:40px;">No</th>
+                                <th>Nama Staff</th>
+                                <th style="width:70px;">Jabatan</th>
+                                <th style="width:50px;">✅Hadir</th>
+                                <th style="width:50px;">⛔½Hari</th>
+                                <th style="width:50px;">📝Izin</th>
+                                <th style="width:60px;">❌TanpaKet</th>
+                                <th style="width:60px;">Total Hari</th>
+                                <th style="width:80px;">Total Jam</th>
+                            </tr>
+                        </thead>
+                        <tbody id="isiRekapStaff">
+                            <tr><td colspan="9" style="padding:10px; text-align:center; color:#666;">Menghitung...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 3: STOK ==================== -->
+        <div class="tab-content" id="tab-stok">
+            <h1>📦 Manajemen Stok Barang</h1>
+
+            <div class="card">
+                <h2>➕ Tambah Barang / Restock / Ubah Data</h2>
+                <div id="infoModeEdit" class="edit-mode sembunyi">✏️ SEDANG MODE EDIT — Ubah data lalu simpan</div>
+                
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Kode Barang</label>
+                    <input type="text" id="kode" placeholder="Kode Barang" oninput="cekKodeBarang(this.value); kapitalKode(this);" style="width:calc(100% - 140px);">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Nama Barang</label>
+                    <input type="text" id="nama" placeholder="Nama Barang" oninput="kapitalNama(this);" style="width:calc(100% - 140px);">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Jenis Motor</label>
+                    <input type="text" id="jenisMotorBarang" placeholder="Contoh: BEAT, SCOOPY" oninput="kapitalNama(this);" style="width:calc(100% - 140px);">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Satuan</label>
+                    <select id="satuan" style="width:calc(100% - 140px);">
+                        <option value="PCS">PCS</option>
+                        <option value="BTL">BOTOL</option>
+                        <option value="SET">SET</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Harga Pokok</label>
+                    <input type="number" id="hargaPokok" placeholder="Harga Modal Beli" oninput="formatAngka(this)" style="width:calc(100% - 140px);">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Harga Jual</label>
+                    <input type="number" id="hargaJual" placeholder="Harga Jual ke Pelanggan" oninput="formatAngka(this)" style="width:calc(100% - 140px);">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Jumlah Stok</label>
+                    <input type="number" id="jumlahStok" placeholder="Jumlah Stok / Restock" oninput="formatAngka(this)" style="width:calc(100% - 140px);">
+                </div>
+                
+                <button onclick="simpanBarang()">✅ Simpan Barang</button>
+                <button class="btn-orange" onclick="kosongkanFormBarang()">🗑️ Kosongkan</button>
+            </div>
+
+            <div class="card">
+                <h2>📋 Daftar Stok Barang &nbsp; <button class="btn-blue btn-sm" onclick="backupKeExcel()">📥 Backup Excel</button></h2>
+                <input type="text" id="cariBarang" placeholder="🔍 Cari Kode / Nama Barang / Motor..." style="width:100%;" oninput="tampilkanTabel()">
+                <div style="overflow-x:auto; width:100%; margin-top:10px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="tengah">No</th>
+                                <th>Kode</th>
+                                <th>Nama Barang</th>
+                                <th>Motor</th>
+                                <th class="tengah">Satuan</th>
+                                <th class="angka">Harga Pokok</th>
+                                <th class="angka">Harga Jual</th>
+                                <th class="angka">Stok</th>
+                                <th class="angka">Terjual</th>
+                                <th class="tengah">Riwayat</th>
+                                <th class="tengah">Ubah</th>
+                                <th class="tengah">Hapus</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelBarangIsi"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 4: TRANSAKSI ==================== -->
+        <div class="tab-content" id="tab-transaksi">
+            <h1>🛒 Manajemen Transaksi & Penjualan</h1>
+
+            <div class="card">
+                <h2>🛒 Input Transaksi Baru</h2>
+
+                <!-- 👤 Data Pelanggan -->
+                <h3 style="font-size:15px; margin:8px 0;">👤 Data Pelanggan</h3>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Nama Pelanggan</label>
+                    <input type="text" id="namaPelanggan" placeholder="Nama Pelanggan" style="width:calc(100% - 140px);" oninput="kapitalNama(this); saranPelanggan(this.value)">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Nomor HP</label>
+                    <input type="text" id="nomorHP" placeholder="📱 Nomor HP / WhatsApp" style="width:calc(100% - 140px);" oninput="isiDataPelangganDariHP(this.value)">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Nomor Plat</label>
+                    <input type="text" id="platKendaraan" placeholder="Contoh: DK 1234 AB" style="width:calc(100% - 140px);" oninput="kapitalSemua(this); saranPlat(this.value)">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Jenis Motor</label>
+                    <input type="text" id="jenisMotor" placeholder="Contoh: HONDA BEAT" style="width:calc(100% - 140px);" oninput="kapitalSemua(this)">
+                </div>
+                <div id="kotakSaranPelanggan" style="margin:8px 0; padding:8px; background:#f0f8ff; border-radius:6px; display:none;"></div>
+
+                <!-- 🔧 Jenis Jasa -->
+                <h3 style="font-size:15px; margin:12px 0 8px 0;">🔧 Jenis Jasa Service</h3>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Pilih Jasa</label>
+                    <select id="jenisJasa" style="width:calc(100% - 140px);" onchange="aturBiayaJasa()">
+                        <option value="">— Pilih Jenis Jasa —</option>
+                        <option value="Service CVT 110-150cc">🔧 Service CVT 110-150cc</option>
+                        <option value="Service CVT 250cc Up">🔧 Service CVT 250cc Up</option>
+                        <option value="Service Mesin Matic 110-150cc">🔧 Service Mesin Matic 110cc-150cc</option>
+                        <option value="Service Mesin Matic 250cc Up">🔧 Service Mesin Matic 250cc Up</option>
+                        <option value="Service Mesin Bebek 110-125cc">🔧 Service Mesin Bebek 110-125cc</option>
+                        <option value="Service Mesin Bebek 150-200cc">🔧 Service Mesin Bebek 150-200cc</option>
+                        <option value="Service Mesin Sport 250-300cc">🔧 Service Mesin Sport 250-300cc</option>
+                        <option value="Service Mesin Sport 400-500cc">🔧 Service Mesin Sport 400-500cc</option>
+                        <option value="Service Mesin Sport 600-1000cc">🔧 Service Mesin Sport 600-1000cc</option>
+                        <option value="Service Mesin Sport 1000cc Up">🔧 Service Mesin Sport 1000cc Up</option>
+                        <option value="Service Karburator/TB Matic">🔧 Service Karburator/TB Matic</option>
+                        <option value="Service Karburator/TB Bebek">🔧 Service Karburator/TB Bebek</option>
+                        <option value="Service Karburator/TB Sport/Moge">🔧 Service Karburator/TB Sport/Moge</option>
+                        <option value="Service Rantai & Gir Bebek">🔧 Service Rantai & Gir Bebek</option>
+                        <option value="Service Rantai & Gir Sport/Moge">🔧 Service Rantai & Gir Sport/Moge</option>
+                        <option value="Service Rem Matic">🔧 Service Rem Matic</option>
+                        <option value="Service Rem Bebek">🔧 Service Rem Bebek</option>
+                        <option value="Service Rem Sport/Moge">🔧 Service Rem Sport/Moge</option>
+                        <option value="Service Shock Dpn Matic">🔧 Service Shock Dpn Matic</option>
+                        <option value="Service Shock Blkg Matic">🔧 Service Shock Blkg Matic</option>
+                        <option value="Service Shock Dpn Bebek">🔧 Service Shock Dpn Bebek</option>
+                        <option value="Service Shock Blkg Bebek">🔧 Service Shock Blkg Bebek</option>
+                        <option value="Service Shock Dpn Sport/Moge">🔧 Service Shock Dpn Sport/Moge</option>
+                        <option value="Service Shock Blkg Sport/Moge">🔧 Service Shock Blkg Sport/Moge</option>
+                        <option value="Jasa Ganti Oli Matic">🔧 Jasa Ganti Oli Matic</option>
+                        <option value="Jasa Ganti Oli Bebek">🔧 Jasa Ganti Oli Bebek</option>
+                        <option value="Jasa Ganti Oli Sport/Moge">🔧 Jasa Ganti Oli Sport/Moge</option>
+                        <option value="Jasa Pasang Part">🔧 Jasa Pasang Part</option>
+                        <option value="Jasa Lainnya">🔧 Jasa Lainnya</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">👨‍🔧 Mekanik</label>
+                    <select id="namaMekanik" style="width:calc(100% - 140px);">
+                        <option value="">— Pilih Mekanik —</option>
+                        <option value="Tegar">👨‍🔧 Tegar</option>
+                        <option value="Widi">👨‍🔧 Widi</option>
+                        <option value="Mekanik 3">👨‍🔧 Mekanik 3</option>
+                        <option value="Semua Mekanik">👨‍🔧 Semua Mekanik</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Biaya Jasa (Rp)</label>
+                    <input type="number" id="biayaJasaTotal" placeholder="0" min="0" style="width:calc(100% - 140px);" oninput="hitungTotalKeranjang(); hitungSisaBayar();">
+                </div>
+
+                <!-- ➕ Tambah Barang ke Keranjang -->
+                <h3 style="font-size:15px; margin:12px 0 8px 0;">➕ Tambah Barang</h3>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Kode Barang</label>
+                    <input type="text" id="kodeJual" placeholder="Kode Barang" style="width:calc(45% - 140px);" oninput="isiDataJualOtomatis(this.value.toUpperCase()); tampilNamaKodeJual(this.value.toUpperCase())">
+                    <span id="namaUntukKodeJual" style="display:inline-block; width:25%; padding:6px 4px; color:#2c3e50; font-weight:500; background:#f0f8ff; border-radius:4px; font-size:12px;"></span>
+                    <input type="number" id="jumlahJual" placeholder="Jumlah" min="1" style="width:26%;" oninput="formatAngka(this)">
+                </div>
+                <button onclick="tambahKeKeranjang()">➕ Tambah ke Keranjang</button>
+
+                <!-- 📋 Uraian Keranjang -->
+                <h3 style="font-size:15px; margin:15px 0 8px 0;">📋 Uraian Barang</h3>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nama Barang</th>
+                                <th class="tengah">Jumlah</th>
+                                <th class="angka">Harga Jual</th>
+                                <th class="angka">Subtotal</th>
+                                <th class="tengah">Hapus</th>
+                            </tr>
+                        </thead>
+                        <tbody id="isiKeranjang"></tbody>
+                    </table>
+                </div>
+
+                <!-- 💰 Ringkasan Total -->
+                <div style="margin-top:12px; padding:10px; background:#f9f9f9; border-radius:6px;">
+                    <p style="font-size:15px; margin:4px 0;"><strong>Total Barang:</strong> <span id="totalBarang">Rp 0</span></p>
+                    <p style="font-size:15px; margin:4px 0;"><strong>Biaya Jasa:</strong> <span id="totalJasa">Rp 0</span></p>
+                    <hr style="margin:8px 0; border:none; border-bottom:1px dashed #ccc;">
+                    <p style="font-size:16px; font-weight:bold; margin:4px 0;">TOTAL BAYAR: <span id="totalBayar">Rp 0</span></p>
+                </div>
+
+                <!-- 💳 Cara Pembayaran & Uang Dibayarkan -->
+                <div style="margin-top:12px; padding:10px; background:#f0f8ff; border-radius:6px;">
+                    <h3 style="font-size:15px; margin:0 0 8px 0;">💳 Cara Pembayaran</h3>
+                    <label style="margin-right:12px; cursor:pointer;"><input type="radio" name="caraBayar" value="Tunai" checked> 💵 Tunai</label>
+                    <label style="margin-right:12px; cursor:pointer;"><input type="radio" name="caraBayar" value="QRIS"> 📱 QRIS</label>
+                    <label style="cursor:pointer;"><input type="radio" name="caraBayar" value="Transfer"> 🏦 Transfer</label>
+
+                    <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #ccc;">
+                        <label style="display:inline-block; width:130px; font-weight:500;">💰 DP / Uang Dibayarkan</label>
+                        <input type="number" id="uangdibayarkan" value="0" min="0" style="width:150px; padding:6px;" oninput="hitungSisaBayar()">
+                        <span style="margin-left:10px;">Sisa Bayar: <strong id="sisaBayar">Rp 0</strong></span>
+                    </div>
+
+                    <!-- Tombol Aksi -->
+                    <div style="margin-top:15px;">
+                        <button class="btn-green" onclick="selesaikanTransaksi()">✅ Selesai & Simpan</button>
+                        <button class="btn-blue" onclick="cetakNotaTerakhir()">🖨️ Cetak Nota Terakhir</button>
+                        <button class="btn-orange" onclick="kosongkanKeranjang()">🗑️ Kosongkan</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIWAYAT PENJUALAN -->
+            <div class="card">
+                <h2>📝 Riwayat Penjualan</h2>
+                <div style="margin-bottom:12px; padding:10px; background:#f0f7ff; border-radius:6px;">
+                    🔍 <strong>Cari Riwayat:</strong>
+                    <input type="text" id="cariRiwayat" placeholder="Ketik Nama / Plat / Nomor HP..." 
+                           style="padding:6px 10px; width:320px; margin-left:8px; border-radius:4px; border:1px solid #ccc;"
+                           oninput="terapkanPencarianRiwayat(this.value)">
+                    <button onclick="document.getElementById('cariRiwayat').value=''; terapkanPencarianRiwayat('')" 
+                            style="padding:6px 10px; margin-left:5px;">↩️ Tampilkan Semua</button>
+                    <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <label>Dari:</label>
+                        <input type="date" id="filterDari" style="width:140px; padding:6px;" onchange="terapkanFilterTanggalRiwayat()">
+                        <label>Sampai:</label>
+                        <input type="date" id="filterSampai" style="width:140px; padding:6px;" onchange="terapkanFilterTanggalRiwayat()">
+                        <button class="btn-blue btn-sm" onclick="resetFilterRiwayat()">↩️ Tampilkan Semua</button>
+                    </div>
+                </div>
+                <div style="overflow-x:auto; width:100%;">
+                    <table style="min-width:1000px; font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th style="min-width:140px;">Tanggal & Waktu</th>
+                                <th style="min-width:160px;">Pelanggan & Plat</th>
+                                <th style="min-width:140px;">Uraian</th>
+                                <th style="min-width:90px;">Mekanik</th>
+                                <th class="angka" style="min-width:100px;">Total Bayar</th>
+                                <th style="min-width:90px;">Pembayaran</th>
+                                <th style="min-width:110px;">Status</th>
+                                <th class="tengah" style="min-width:70px;">Detail</th>
+                                <th class="tengah" style="min-width:70px;">Ubah</th>
+                                <th class="tengah" style="min-width:60px;">Cetak</th>
+                                <th class="tengah" style="min-width:60px;">Hapus</th>
+                            </tr>
+                        </thead>
+                        <tbody id="isiRiwayat"></tbody>
+                    </table>
+                </div>
+                <div style="margin-top:12px; padding:12px; background:#e8f5e9; border-radius:6px; font-weight:bold; line-height:1.8;">
+                    <div>📊 Jumlah Transaksi: <span id="jumlahTransaksi">0</span></div>
+                    <div>💰 Total Semua Bayar: <span id="totalSemuaBayar">Rp 0</span></div>
+                    <div style="margin-top:5px; color:#2e7d32;">
+                        💵 Tunai: <span id="totalTunai">Rp 0</span>
+                        &nbsp;&nbsp;|&nbsp;&nbsp; 📱 QRIS: <span id="totalQris">Rp 0</span>
+                        &nbsp;&nbsp;|&nbsp;&nbsp; 🏦 Transfer: <span id="totalTransfer">Rp 0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 5: LAPORAN ==================== -->
+        <div class="tab-content" id="tab-laporan">
+            <h1>💰 Laporan & Pembagian Hasil (Pemilik)</h1>
+
+            <div class="card">
+                <div id="kunciLaporan" style="background:#fff3cd; padding:15px; border-radius:8px; text-align:center;">
+                    <h3>🔒 Bagian Khusus Pemilik</h3>
+                    <p>Masukkan kata sandi untuk melihat laporan & pengaturan pembagian</p>
+                    <input type="password" id="sandiLaporan" placeholder="Kata Sandi" style="width:220px;" onkeypress="if(event.keyCode===13) bukaLaporan();">
+                    <button onclick="bukaLaporan()">🔓 Buka Akses</button>
+                    <br><button class="btn-orange btn-sm" onclick="gantiSandiLaporan()" style="margin-top:10px; width:auto;">🔧 Ganti Kata Sandi Laporan</button>
+                </div>
+
+                <div id="isiLaporan" class="sembunyi">
+                    <h2>📈 Ringkasan Penjualan & Grafik</h2>
+                    
+                    <!-- Filter Tanggal Laporan -->
+                    <div style="margin:10px 0; padding:10px; background:#f0f8ff; border-radius:6px;">
+                        <strong>📅 Filter Periode Laporan</strong>
+                        <div style="margin-top:8px;">
+                            <label>Dari:</label>
+                            <input type="date" id="laporanDari" style="width:140px; padding:6px;" onchange="hitungUlangLaporan()">
+                            <label>Sampai:</label>
+                            <input type="date" id="laporanSampai" style="width:140px; padding:6px;" onchange="hitungUlangLaporan()">
+                            <button class="btn-blue btn-sm" onclick="resetFilterLaporan()">↩️ Tampilkan Semua</button>
+                            <button class="btn-blue btn-sm" onclick="backupLaporanKeExcel()">📥 Backup Excel</button>
+                        </div>
+                    </div>
+
+                    <!-- Tombol Pilih Tampilan -->
+                    <div style="margin-bottom:15px;">
+                        <button id="btnHarian" onclick="ubahJenisGrafik('harian', this)" style="padding:6px 14px; margin:0 2px; background:#2563eb; color:white; border:none; border-radius:6px; cursor:pointer;">📅 Harian</button>
+                        <button id="btnBulanan" onclick="ubahJenisGrafik('bulanan', this)" style="padding:6px 14px; margin:0 2px; background:#ddd; color:#333; border:none; border-radius:6px; cursor:pointer;">📆 Bulanan</button>
+                        <button id="btnTahunan" onclick="ubahJenisGrafik('tahunan', this)" style="padding:6px 14px; margin:0 2px; background:#ddd; color:#333; border:none; border-radius:6px; cursor:pointer;">🗓️ Tahunan</button>
+                    </div>
+
+                    <!-- Kotak Grafik -->
+                    <div style="background:#fff; padding:15px; border-radius:8px; border:1px solid #e5e7eb; margin-bottom:15px;">
+                        <canvas id="grafikPenjualan" height="280"></canvas>
+                    </div>
+
+                    <!-- Ringkasan Angka -->
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; margin:15px 0;">
+                        <div style="flex:1; min-width:180px; padding:12px; background:#e8f5e9; border-radius:6px;">
+                            <p style="font-size:13px; color:#2e7d32;">Omset Penjualan</p>
+                            <p style="font-size:18px; font-weight:bold; color:#1b5e20;" id="lapOmset">Rp 0</p>
+                        </div>
+                        <div style="flex:1; min-width:180px; padding:12px; background:#e3f2fd; border-radius:6px;">
+                            <p style="font-size:13px; color:#1565c0;">Total Jasa</p>
+                            <p style="font-size:18px; font-weight:bold; color:#0d47a1;" id="lapJasa">Rp 0</p>
+                        </div>
+                        <div style="flex:1; min-width:180px; padding:12px; background:#fff3e0; border-radius:6px;">
+                            <p style="font-size:13px; color:#e65100;">Laba Barang</p>
+                            <p style="font-size:18px; font-weight:bold; color:#e65100;" id="lapLaba">Rp 0</p>
+                        </div>
+                        <div style="flex:1; min-width:180px; padding:12px; background:#f3e5f5; border-radius:6px;">
+                            <p style="font-size:13px; color:#7b1fa2;">Laba Kotor</p>
+                            <p style="font-size:18px; font-weight:bold; color:#4a148c;" id="lapKotor">Rp 0</p>
+                        </div>
+                    </div>
+
+                    <!-- Pengaturan Pembagian Hasil -->
+                    <div style="margin:15px 0; padding:15px; background:#fafafa; border-radius:6px; border:1px solid #e0e0e0;">
+                        <h3 style="margin-bottom:10px;">⚙️ Pengaturan Pembagian Hasil</h3>
+                        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                            <div style="flex:1; min-width:220px;">
+                                <label style="display:block; font-weight:500; margin-bottom:4px;">Operasional (Rp)</label>
+                                <input type="number" id="biayaOperasional" value="0" style="width:100%;" oninput="hitungUlangLaporan()">
+                            </div>
+                            <div style="flex:1; min-width:220px;">
+                                <label style="display:block; font-weight:500; margin-bottom:4px;">Maintenance (Rp)</label>
+                                <input type="number" id="biayaMaintenance" value="0" style="width:100%;" oninput="hitungUlangLaporan()">
+                            </div>
+                            <div style="flex:1; min-width:220px;">
+                                <label style="display:block; font-weight:500; margin-bottom:4px;">% Bagi Hasil Mekanik</label>
+                                <input type="number" id="persenMekanik" value="15" style="width:100%;" oninput="simpanPengaturan(); hitungUlangLaporan()">
+                            </div>
+                            <div style="flex:1; min-width:220px;">
+                                <label style="display:block; font-weight:500; margin-bottom:4px;">% Bagi Hasil Investor</label>
+                                <input type="number" id="persenInvestor" value="15" style="width:100%;" oninput="simpanPengaturan(); hitungUlangLaporan()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rincian Pembagian -->
+                    <div style="margin:15px 0; padding:15px; background:#fff8e1; border-radius:6px;">
+                        <h3 style="margin-bottom:10px;">📊 Rincian Pembagian</h3>
+                        <table>
+                            <tr><td style="width:60%;">💰 Laba Kotor</td><td class="angka" id="rinciKotor">Rp 0</td></tr>
+                            <tr><td>➖ Biaya Operasional</td><td class="angka merah" id="rinciOperasional">Rp 0</td></tr>
+                            <tr><td>➖ Biaya Maintenance</td><td class="angka merah" id="rinciMaintenance">Rp 0</td></tr>
+                            <tr><td>➖ Bagi Hasil Mekanik</td><td class="angka merah" id="rinciMekanik">Rp 0</td></tr>
+                            <tr><td>➖ Bagi Hasil Investor</td><td class="angka merah" id="rinciInvestor">Rp 0</td></tr>
+                            <tr style="font-weight:bold; border-top:2px solid #ccc;">
+                                <td>✅ Laba Bersih Pemilik</td>
+                                <td class="angka hijau" id="rinciBersih">Rp 0</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+// ============ FUNGSI TAB SWITCHING ============
+function switchTab(tabName) {
+    // Sembunyikan semua tab
+    document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.remove('active');
+    });
+    
+    // Tandai menu item aktif sesuai tabName (tidak bergantung pada event klik,
+    // supaya tetap benar saat switchTab() dipanggil dari kode, bukan dari klik)
+    document.querySelectorAll('.navbar-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === tabName);
+    });
+
+    // Tampilkan tab yang dipilih
+    let tab = document.getElementById('tab-' + tabName);
+    if (tab) {
+        tab.classList.add('active');
+    }
+
+    // Tutup mobile menu jika terbuka
+    document.getElementById('navbarMenu').classList.remove('active');
+    
+    // Inisialisasi konten tab jika perlu
+    if (tabName === 'home') {
+        updateDashboard();
+    } else if (tabName === 'absensi') {
+        tampilkanRekapAbsensi();
+    } else if (tabName === 'laporan') {
+        let laporanContent = document.getElementById('kunciLaporan');
+        if (laporanContent && !laporanContent.classList.contains('sembunyi')) {
+            gambarGrafikPenjualan();
+        }
+    }
+}
+
+// ============ HAMBURGER MENU MOBILE ============
+function toggleMobileMenu() {
+    let menu = document.getElementById('navbarMenu');
+    menu.classList.toggle('active');
+}
+
+// ============ CLOSE MOBILE MENU KETIKA RESIZE ============
+window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) {
+        document.getElementById('navbarMenu').classList.remove('active');
+    }
+});
+
+// ============ DASHBOARD UPDATE ============
+function updateDashboard() {
+    let sekarang = new Date();
+    let transaksiHariIni = riwayat.filter(r => {
+        let tglTrx = ambilTanggalDariTeks(r.tgl);
+        return tglTrx && tglTrx.getFullYear() === sekarang.getFullYear() && tglTrx.getMonth() === sekarang.getMonth() && tglTrx.getDate() === sekarang.getDate();
+    });
+    let omsetHariIni = transaksiHariIni.reduce((s, r) => s + (r.totalBayar || 0), 0);
+
+    document.getElementById('dashTanggalSekarang').textContent = sekarang.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    document.getElementById('dashOmsetHariIni').textContent = formatRupiah(omsetHariIni);
+    document.getElementById('dashTransaksiHariIni').textContent = transaksiHariIni.length;
+    
+    let stokMinimalCount = barang.filter(b => (b.stok || 0) <= 3).length;
+    document.getElementById('dashStokMinimal').textContent = stokMinimalCount + ' item';
+    
+    tampilkanBarangTerlaris();
+}
+
+// ============ SEMUA FUNGSI DARI FILE ASLI (DIPINDAHKAN) ============
+let kataSandiAplikasi = localStorage.getItem('sandiAplikasiBengkel') || '1234';
+let kataSandiLaporan = localStorage.getItem('sandiLaporanBengkel') || '1234';
+const stokMinim = 3;
+let barang = [];
+let riwayat = [];
+let dataEdit = null;
+
+document.addEventListener('keypress', function(e){
+    if(e.key === 'Enter' && document.activeElement.id === 'inputSandi') verifikasiSandi();
+});
+
+function verifikasiSandi(){
+    let input = document.getElementById('inputSandi').value;
+    if(input === kataSandiAplikasi){
+        document.getElementById('layarLogin').style.display = 'none';
+        document.getElementById('isiAplikasi').classList.remove('sembunyi');
+        bacaDataDariPenyimpanan();
+        tampilkanTabel();
+        riwayatAsliFilter = [...riwayat];
+        tampilkanRiwayat();
+        tampilkanBarangTerlaris();
+        updateDashboard();
+    }else{
+        alert('❌ Kata sandi salah!');
+        document.getElementById('inputSandi').value = '';
+    }
+}
+
+function bukaGantiSandi(){
+    let sandiLama = prompt('Masukkan kata sandi lama:');
+    if(sandiLama !== kataSandiAplikasi) { alert('❌ Sandi lama salah!'); return; }
+    let baru = prompt('Masukkan kata sandi baru: (minimal 4 karakter)');
+    if(!baru || baru.length < 4) { alert('⚠️ Sandi terlalu pendek!'); return; }
+    let ulang = prompt('Ulangi kata sandi baru:');
+    if(baru !== ulang) { alert('❌ Sandi tidak cocok!'); return; }
+    kataSandiAplikasi = baru;
+    localStorage.setItem('sandiAplikasiBengkel', baru);
+    alert('✅ Kata sandi berhasil diganti!');
+}
+
+function simpanData(){
+    localStorage.setItem('bengkelBarang', JSON.stringify(barang));
+    localStorage.setItem('bengkelRiwayat', JSON.stringify(riwayat));
+}
+
+function bacaDataDariPenyimpanan(){
+    try {
+        let sb = localStorage.getItem('bengkelBarang');
+        let sr = localStorage.getItem('bengkelRiwayat');
+        if(sb) barang = JSON.parse(sb);
+        if(sr) riwayat = JSON.parse(sr);
+    } catch(e) { barang = []; riwayat = []; }
+}
+
+function formatRupiah(angka){
+    return 'Rp ' + Math.round(angka||0).toLocaleString('id-ID');
+}
+function formatAngka(input){
+    input.value = input.value.replace(/^0+/, '') || '0';
+}
+function kapitalKode(input){
+    input.value = input.value.toUpperCase().replace(/\s/g,'');
+}
+function kapitalNama(input){
+    input.value = input.value.replace(/\b\w/g, c=>c.toUpperCase());
+}
+function kapitalSemua(input){
+    input.value = input.value.toUpperCase();
+}
+function updateWaktu(){
+    let d = new Date();
+    return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+function cekKodeBarang(kode){
+    if(!kode || dataEdit) return;
+    let b = barang.find(x=>x.kode === kode.toUpperCase());
+    if(b){
+        document.getElementById('nama').value = b.nama;
+        document.getElementById('jenisMotorBarang').value = b.jenisMotor||'';
+        document.getElementById('satuan').value = b.satuan||'PCS';
+        document.getElementById('hargaPokok').value = b.hargaPokok;
+        document.getElementById('hargaJual').value = b.hargaJual;
+        document.getElementById('jumlahStok').value = b.stok;
+    }
+}
+
+function simpanBarang(){
+    let kode = document.getElementById('kode').value.trim().toUpperCase();
+    let nama = document.getElementById('nama').value.trim();
+    let motor = document.getElementById('jenisMotorBarang').value.trim();
+    let satuan = document.getElementById('satuan').value;
+    let pokok = parseInt(document.getElementById('hargaPokok').value)||0;
+    let jual = parseInt(document.getElementById('hargaJual').value)||0;
+    let jumlah = parseInt(document.getElementById('jumlahStok').value)||0;
+    let waktuSekarang = updateWaktu();
+
+    if(!kode || !nama) { alert('⚠️ Kode & Nama Barang wajib diisi!'); return; }
+
+    let indeks = barang.findIndex(x=>x.kode === kode);
+
+    if(dataEdit){
+        let b = barang[dataEdit];
+        b.kode = kode;
+        b.nama = nama;
+        b.jenisMotor = motor;
+        b.satuan = satuan;
+        b.hargaPokok = pokok;
+        b.hargaJual = jual;
+        b.stok = jumlah;
+        alert('✅ Data barang berhasil diubah!');
+        dataEdit = null;
+        document.getElementById('infoModeEdit').classList.add('sembunyi');
+    }else if(indeks >= 0){
+        barang[indeks].stok = (barang[indeks].stok||0) + jumlah;
+        barang[indeks].restock = (barang[indeks].restock||0) + jumlah;
+        if(!barang[indeks].riwayatRestock) barang[indeks].riwayatRestock = [];
+        barang[indeks].riwayatRestock.push({jumlah: jumlah, tanggal: waktuSekarang});
+        alert(`✅ Restock berhasil!\nJumlah: ${jumlah} ${satuan}\nWaktu: ${waktuSekarang}\nStok Sekarang: ${barang[indeks].stok} ${satuan}`);
+    }else{
+        barang.push({
+            kode:kode, nama:nama, jenisMotor:motor, satuan:satuan,
+            hargaPokok:pokok, hargaJual:jual, stok:jumlah, stokAwal:jumlah,
+            restock:jumlah, terjual:0, tanggalStokAwal:waktuSekarang,
+            riwayatRestock: [{jumlah: jumlah, tanggal: waktuSekarang}]
+        });
+        alert(`✅ Barang baru berhasil ditambahkan!\nWaktu: ${waktuSekarang}`);
+    }
+
+    simpanData();
+    tampilkanTabel();
+    kosongkanFormBarang();
+}
+
+function kosongkanFormBarang(){
+    document.getElementById('kode').value = '';
+    document.getElementById('nama').value = '';
+    document.getElementById('jenisMotorBarang').value = '';
+    document.getElementById('hargaPokok').value = '';
+    document.getElementById('hargaJual').value = '';
+    document.getElementById('jumlahStok').value = '';
+    dataEdit = null;
+    document.getElementById('infoModeEdit').classList.add('sembunyi');
+}
+
+function tampilkanTabel(){
+    let tb = document.getElementById('tabelBarangIsi'); tb.innerHTML = '';
+    let cari = document.getElementById('cariBarang').value.trim().toUpperCase();
+    let hasil = barang;
+    if(cari) hasil = barang.filter(b=> b.kode.includes(cari) || b.nama.toUpperCase().includes(cari) || (b.jenisMotor||'').toUpperCase().includes(cari));
+
+    hasil.forEach((b,i)=>{
+        let no = barang.indexOf(b)+1;
+        let merah = (b.stok||0) <= stokMinim ? 'baris-merah' : '';
+        tb.innerHTML += `<tr class="${merah}"><td class="tengah">${no}</td><td>${b.kode}</td><td>${b.nama}</td><td>${b.jenisMotor||'-'}</td><td class="tengah">${b.satuan||'PCS'}</td><td class="angka">${formatRupiah(b.hargaPokok)}</td><td class="angka">${formatRupiah(b.hargaJual)}</td><td class="angka ${merah?'merah':''}">${b.stok||0}</td><td class="angka">${b.terjual||0}</td><td class="tengah"><button class="btn-blue btn-sm" onclick="lihatRiwayatRestock('${b.kode}')">📋</button></td><td class="tengah"><button class="btn-orange btn-sm" onclick="ambilDataEdit('${b.kode}')">✏️</button></td><td class="tengah"><button class="btn-red btn-sm" onclick="hapusBarang('${b.kode}')">🗑️</button></td></tr>`;
+    });
+}
+
+function ambilDataEdit(kode){
+    let b = barang.find(x=>x.kode === kode);
+    if(!b) return;
+    dataEdit = barang.indexOf(b);
+    document.getElementById('kode').value = b.kode;
+    document.getElementById('nama').value = b.nama;
+    document.getElementById('jenisMotorBarang').value = b.jenisMotor||'';
+    document.getElementById('satuan').value = b.satuan||'PCS';
+    document.getElementById('hargaPokok').value = b.hargaPokok;
+    document.getElementById('hargaJual').value = b.hargaJual;
+    document.getElementById('jumlahStok').value = b.stok;
+    document.getElementById('infoModeEdit').classList.remove('sembunyi');
+    switchTab('stok');
+}
+
+function hapusBarang(kode){
+    if(!confirm(`⚠️ Hapus barang ${kode}?`)) return;
+    barang = barang.filter(x=>x.kode !== kode);
+    simpanData();
+    tampilkanTabel();
+}
+
+function lihatRiwayatRestock(kode){
+    let b = barang.find(x=>x.kode === kode);
+    if(!b) return;
+    let isi = `📋 RIWAYAT RESTOCK — ${b.kode} | ${b.nama}\n\n`;
+    isi += `📅 Stok Awal: ${b.stokAwal||0} ${b.satuan||'PCS'}`;
+    if(b.tanggalStokAwal) isi += `  (${b.tanggalStokAwal})\n`;
+    isi += `📦 Total Restock: ${b.restock||0} ${b.satuan||'PCS'}\n`;
+    isi += `❌ Terjual: ${b.terjual||0}\n`;
+    isi += `✅ Sisa Stok: ${b.stok||0}\n`;
+    if(b.riwayatRestock && b.riwayatRestock.length > 0){
+        isi += `\n📅 DETAIL RESTOCK:\n`;
+        b.riwayatRestock.forEach((r,i)=>{
+            isi += `${i+1}. +${r.jumlah} ${b.satuan||'PCS'} — ${r.tanggal}\n`;
+        });
+    }
+    alert(isi);
+}
+
+function backupKeExcel(){
+    let isi = "Kode\tNama Barang\tJenis Motor\tSatuan\tHarga Pokok\tHarga Jual\tStok Awal\tRestock\tTerjual\tSisa Stok\n";
+    barang.forEach(b=>{
+        isi += `${b.kode}\t${b.nama}\t${b.jenisMotor||'-'}\t${b.satuan||'PCS'}\t${b.hargaPokok}\t${b.hargaJual}\t${b.stokAwal||0}\t${b.restock||0}\t${b.terjual||0}\t${b.stok||0}\n`;
+    });
+    let blob = new Blob([isi], {type:'text/tab-separated-values;charset=utf-8'});
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'DaftarStok_' + updateWaktu().replace(/\//g,'-').replace(/ /g,'_') + '.xls';
+    a.click();
+}
+
+let keranjang = [];
+
+function isiDataJualOtomatis(kode){
+    if(!kode) return;
+    let b = barang.find(x=>x.kode === kode);
+    if(!b) return;
+    document.getElementById('jumlahJual').value = 1;
+}
+
+function tambahKeKeranjang(){
+    let kode = document.getElementById('kodeJual').value.trim().toUpperCase();
+    let jumlah = parseInt(document.getElementById('jumlahJual').value)||0;
+    let b = barang.find(x=>x.kode === kode);
+
+    if(!kode) { alert('⚠️ Masukkan Kode Barang!'); return; }
+    if(!b) { alert('⚠️ Barang tidak ditemukan!'); return; }
+    if(jumlah < 1) { alert('⚠️ Jumlah minimal 1!'); return; }
+    if(jumlah > (b.stok||0)) { alert(`⚠️ Stok tidak cukup! Sisa: ${b.stok||0} ${b.satuan}`); return; }
+
+    let ada = keranjang.findIndex(x=>x.kode === kode);
+    if(ada >= 0){
+        keranjang[ada].jumlah += jumlah;
+        keranjang[ada].subtotal = keranjang[ada].jumlah * keranjang[ada].hargaJual;
+    }else{
+        keranjang.push({
+            kode: b.kode,
+            nama: b.nama,
+            satuan: b.satuan||'PCS',
+            jumlah: jumlah,
+            hargaPokok: b.hargaPokok,
+            hargaJual: b.hargaJual,
+            subtotal: jumlah * b.hargaJual,
+            laba: jumlah * (b.hargaJual - b.hargaPokok)
+        });
+    }
+
+    tampilkanKeranjang();
+    document.getElementById('kodeJual').value = '';
+    document.getElementById('jumlahJual').value = '';
+}
+
+function tampilkanKeranjang(){
+    let tb = document.getElementById('isiKeranjang');
+    tb.innerHTML = '';
+    keranjang.forEach((item,i)=>{
+        tb.innerHTML += `<tr><td>${item.nama}</td><td class="tengah">${item.jumlah} ${item.satuan}</td><td class="angka">${formatRupiah(item.hargaJual)}</td><td class="angka">${formatRupiah(item.subtotal)}</td><td class="tengah"><button class="btn-red btn-sm" onclick="hapusDariKeranjang(${i})">X</button></td></tr>`;
+    });
+    hitungTotalKeranjang();
+}
+
+function hapusDariKeranjang(idx){
+    keranjang.splice(idx,1);
+    tampilkanKeranjang();
+}
+
+function hitungTotalKeranjang(){
+    let totalBrg = keranjang.reduce((s,i)=>s+i.subtotal,0);
+    let jasa = parseInt(document.getElementById('biayaJasaTotal').value)||0;
+    let totalAkhir = totalBrg + jasa;
+
+    document.getElementById('totalBarang').textContent = formatRupiah(totalBrg);
+    document.getElementById('totalJasa').textContent = formatRupiah(jasa);
+    document.getElementById('totalBayar').textContent = formatRupiah(totalAkhir);
+
+    hitungSisaBayar();
+}
+
+function hitungSisaBayar(){
+    let totalBrg = keranjang.reduce((s,i)=>s+i.subtotal,0);
+    let jasa = parseInt(document.getElementById('biayaJasaTotal').value)||0;
+    let totalAkhir = totalBrg + jasa;
+    let dp = parseInt(document.getElementById('uangdibayarkan').value)||0;
+    let sisa = Math.max(0, totalAkhir - dp);
+    document.getElementById('sisaBayar').textContent = formatRupiah(sisa);
+}
+
+function aturBiayaJasa(){
+    let pilih = document.getElementById('jenisJasa').value;
+    let harga = 0;
+
+    if(pilih === 'Service CVT 110-150cc') harga = 80000;
+    else if(pilih === 'Service CVT 250cc Up') harga = 150000;
+    else if(pilih === 'Service Mesin Matic 110-150cc') harga = 150000;
+    else if(pilih === 'Service Mesin Matic 250cc Up') harga = 250000;
+    else if(pilih === 'Service Mesin Bebek 110-125cc') harga = 100000;
+    else if(pilih === 'Service Mesin Bebek 150-200cc') harga = 150000;
+    else if(pilih === 'Service Mesin Sport 250-300cc') harga = 200000;
+    else if(pilih === 'Service Mesin Sport 400-500cc') harga = 300000;
+    else if(pilih === 'Service Mesin Sport 600-1000cc') harga = 450000;
+    else if(pilih === 'Service Mesin Sport 1000cc Up') harga = 600000;
+    else if(pilih === 'Service Karburator/TB Matic') harga = 60000;
+    else if(pilih === 'Service Karburator/TB Bebek') harga = 50000;
+    else if(pilih === 'Service Karburator/TB Sport/Moge') harga = 100000;
+    else if(pilih === 'Service Rantai & Gir Bebek') harga = 40000;
+    else if(pilih === 'Service Rantai & Gir Sport/Moge') harga = 80000;
+    else if(pilih === 'Service Rem Matic') harga = 40000;
+    else if(pilih === 'Service Rem Bebek') harga = 35000;
+    else if(pilih === 'Service Rem Sport/Moge') harga = 60000;
+    else if(pilih === 'Service Shock Dpn Matic') harga = 35000;
+    else if(pilih === 'Service Shock Blkg Matic') harga = 35000;
+    else if(pilih === 'Service Shock Dpn Bebek') harga = 30000;
+    else if(pilih === 'Service Shock Blkg Bebek') harga = 30000;
+    else if(pilih === 'Service Shock Dpn Sport/Moge') harga = 50000;
+    else if(pilih === 'Service Shock Blkg Sport/Moge') harga = 50000;
+    else if(pilih === 'Jasa Ganti Oli Matic') harga = 35000;
+    else if(pilih === 'Jasa Ganti Oli Bebek') harga = 25000;
+    else if(pilih === 'Jasa Ganti Oli Sport/Moge') harga = 50000;
+
+    document.getElementById('biayaJasaTotal').value = harga || '';
+    hitungTotalKeranjang();
+    hitungSisaBayar();
+}
+
+function kosongkanKeranjang(){
+    keranjang = [];
+    tampilkanKeranjang();
+    document.getElementById('biayaJasaTotal').value = '';
+    document.getElementById('jenisJasa').selectedIndex = 0;
+    document.getElementById('uangdibayarkan').value = '0';
+    document.getElementById('sisaBayar').textContent = 'Rp 0';
+    document.getElementById('namaPelanggan').value = '';
+    document.getElementById('nomorHP').value = '';
+    document.getElementById('platKendaraan').value = '';
+    document.getElementById('jenisMotor').value = '';
+}
+
+function selesaikanTransaksi(){
+    let nama = document.getElementById('namaPelanggan').value.trim()||'-';
+    let hp = document.getElementById('nomorHP').value.trim()||'-';
+    let plat = document.getElementById('platKendaraan').value.trim()||'-';
+    let motor = document.getElementById('jenisMotor').value.trim().toUpperCase()||'-';
+    let jasa = parseInt(document.getElementById('biayaJasaTotal').value)||0;
+    let namaJasa = document.getElementById('jenisJasa').value;
+    let namaMekanik = document.getElementById('namaMekanik').value || '-';
+    let tgl = updateWaktu();
+
+    let elemenBayar = document.querySelector('input[name="caraBayar"]:checked');
+    let caraBayarTerpilih = elemenBayar ? elemenBayar.value : 'Tunai';
+
+    let totalBrg = keranjang.reduce((s,i)=>s+i.subtotal,0);
+    let totalModal = keranjang.reduce((s,i)=>s+(i.hargaPokok*i.jumlah),0);
+    let totalLabaBrg = keranjang.reduce((s,i)=>s+i.laba,0);
+    let totalBayar = totalBrg + jasa;
+    let uangdibayarkan = parseInt(document.getElementById('uangdibayarkan').value)||0;
+    let sisaBayar = Math.max(0, totalBayar - uangdibayarkan);
+    let adaBarang = keranjang.length > 0;
+    let adaJasa = jasa > 0;
+
+    if(!adaBarang && !adaJasa) { alert('⚠️ Masukkan barang ATAU pilih jasa!'); return; }
+
+    if(adaBarang){
+        keranjang.forEach(item=>{
+            let b = barang.find(x=>x.kode === item.kode);
+            if(b){
+                b.stok = (b.stok||0) - item.jumlah;
+                b.terjual = (b.terjual||0) + item.jumlah;
+            }
+        });
+    }
+
+    riwayat.unshift({
+        tgl: tgl, namaPelanggan: nama, nomorHP: hp,
+        platKendaraan: plat, jenisMotor: motor,
+        namaJasa: namaJasa, namaMekanik: namaMekanik,
+        biayaJasa: jasa, items: JSON.parse(JSON.stringify(keranjang)),
+        totalBarang: totalBrg, modalKeluar: totalModal, labaBarang: totalLabaBrg,
+        totalBayar: totalBayar, caraBayar: caraBayarTerpilih,
+        uangdibayarkan: uangdibayarkan, sisaBayar: sisaBayar
+    });
+
+    simpanData();
+    riwayatAsliFilter = [...riwayat];  
+    tampilkanRiwayat();               
+    tampilkanTabel();
+    updateDashboard();
+
+    keranjang = [];
+    tampilkanKeranjang();
+    document.getElementById('biayaJasaTotal').value = '';
+    document.getElementById('jenisJasa').selectedIndex = 0;
+    document.getElementById('uangdibayarkan').value = '0';
+    document.getElementById('sisaBayar').textContent = 'Rp 0';
+    document.getElementById('namaPelanggan').value = '';
+    document.getElementById('nomorHP').value = '';
+    document.getElementById('platKendaraan').value = '';
+    document.getElementById('jenisMotor').value = '';
+
+    alert(`✅ SELESAI!\nTotal Bayar: ${formatRupiah(totalBayar)}\nUang Dibayarkan: ${formatRupiah(uangdibayarkan)}\nSisa Bayar: ${formatRupiah(sisaBayar)}\n\n👉 Klik tombol: 🖨️ Cetak Nota Terakhir`);
+}
+
+function cetakNotaTerakhir(){
+    if(riwayat.length === 0) { alert('⚠️ Belum ada data penjualan!'); return; }
+    cetakUlang(0);
+}
+
+function cetakUlang(idx){
+    let data = riwayat[idx];
+    if(!data) return;
+    let nota = `<html><head><style>body{font-family:Courier New; font-size:13px; width:280px; padding:10px; margin:0 auto;}.tengah{text-align:center; white-space:nowrap;}.kanan{text-align:right; white-space:nowrap;}.garis{border-bottom:1px dashed #000; margin:6px 0;}table{width:100%; border-collapse:collapse; font-size:12px;}</style></head><body><div class="tengah"><h3 style="margin:4px 0;">📦 BENGKEL MOTOR</h3><p style="margin:4px 0; font-size:12px;">Jl. Contoh Alamat Denpasar</p><p style="margin:4px 0; font-size:12px;">Telp: 08xx-xxxx-xxxx</p></div><div class="garis"></div><p>Tanggal: ${data.tgl}</p><p>Pelanggan: ${data.namaPelanggan}</p><p>📱 HP: ${data.nomorHP || '-'}</p><p>Plat/Motor: ${data.platKendaraan} / ${data.jenisMotor}</p><div class="garis"></div><table><tr><td><strong>URAIAN</strong></td><td class="tengah"><strong>JUMLAH</strong></td><td class="kanan"><strong>SUBTOTAL</strong></td></tr><tr><td colspan="3"><div class="garis"></div></td></tr>`;
+    
+    data.items.forEach(i=>{
+        nota += `<tr><td>${i.nama}</td><td class="tengah">${i.jumlah} ${i.satuan}</td><td class="kanan">${formatRupiah(i.subtotal)}</td></tr>`;
+    });
+
+    if(data.biayaJasa > 0){
+        nota += `<tr><td>🔧 ${data.namaJasa||'Jasa'}</td><td class="tengah">—</td><td class="kanan">${formatRupiah(data.biayaJasa)}</td></tr>`;
+    }
+
+    nota += `<tr><td colspan="3"><div class="garis"></div></td></tr><tr><td colspan="2"><strong>TOTAL</strong></td><td class="kanan"><strong>${formatRupiah(data.totalBayar)}</strong></td></tr>`;
+
+    if(data.uangdibayarkan > 0){
+        nota += `<tr><td colspan="2">💰 Total Bayar </td><td class="kanan">${formatRupiah(data.uangdibayarkan)}</td></tr><tr><td colspan="2">📉 Sisa Bayar</td><td class="kanan">${formatRupiah(data.sisaBayar)}</td></tr>`;
+    }
+
+    nota += `<tr><td colspan="2">💳 Cara Bayar</td><td class="kanan">${data.caraBayar}</td></tr></table><div class="garis"></div><p class="tengah">Terima Kasih 🙏</p><script>window.onload=function(){ window.print(); }<\/script></body></html>`;
+
+    let win = window.open('', '_blank', 'width=320,height=600');
+    win.document.write(nota);
+    win.document.close();
+}
+
+function ambilDaftarPelanggan(){
+    let daftar = [];
+    riwayat.forEach(r=>{
+        if(r.namaPelanggan && r.namaPelanggan !== '-'){
+            let ada = daftar.find(x=>x.nama === r.namaPelanggan && x.plat === r.platKendaraan);
+            if(!ada){
+                daftar.push({nama: r.namaPelanggan, plat: r.platKendaraan, motor: r.jenisMotor});
+            }
+        }
+    });
+    return daftar;
+}
+
+function saranPelanggan(kata){
+    kata = kata.trim().toUpperCase();
+    let kotak = document.getElementById('kotakSaranPelanggan');
+    if(kata.length < 2) { kotak.style.display='none'; return; }
+
+    let daftar = ambilDaftarPelanggan();
+    let cocok = daftar.filter(x=>x.nama.toUpperCase().includes(kata));
+    if(cocok.length === 0) { kotak.style.display='none'; return; }
+
+    kotak.style.display='block';
+    kotak.innerHTML = '<strong>🔍 Pelanggan Pernah Datang:</strong><br>';
+    cocok.forEach(p=>{
+        kotak.innerHTML += `<div style="padding:4px 8px; margin:2px 0; background:white; border-radius:4px; cursor:pointer;" onclick="pilihPelanggan('${p.nama}','${p.plat}','${p.motor}')"> ${p.nama} — ${p.plat} — ${p.motor} </div>`;
+    });
+}
+
+function saranPlat(kata){
+    kata = kata.trim().toUpperCase();
+    let kotak = document.getElementById('kotakSaranPelanggan');
+    if(kata.length < 2) { kotak.style.display='none'; return; }
+
+    let daftar = ambilDaftarPelanggan();
+    let cocok = daftar.filter(x=>x.plat.toUpperCase().includes(kata));
+    if(cocok.length === 0) { kotak.style.display='none'; return; }
+
+    kotak.style.display='block';
+    kotak.innerHTML = '<strong>🔍 Pelanggan Pernah Datang:</strong><br>';
+    cocok.forEach(p=>{
+        kotak.innerHTML += `<div style="padding:4px 8px; margin:2px 0; background:white; border-radius:4px; cursor:pointer;" onclick="pilihPelanggan('${p.nama}','${p.plat}','${p.motor}')"> ${p.nama} — ${p.plat} — ${p.motor} </div>`;
+    });
+}
+
+function pilihPelanggan(nama, plat, motor){
+    document.getElementById('namaPelanggan').value = nama;
+    document.getElementById('platKendaraan').value = plat;
+    document.getElementById('jenisMotor').value = motor;
+    document.getElementById('kotakSaranPelanggan').style.display='none';
+}
+
+function tampilNamaKodeJual(kode){
+    let kotak = document.getElementById('namaUntukKodeJual');
+    if(!kode || kode.length < 2) {
+        kotak.textContent = '';
+        kotak.style.background = 'transparent';
+        return;
+    }
+    let b = barang.find(x=>x.kode === kode);
+    if(b){
+        kotak.textContent = '✅ ' + b.nama;
+        kotak.style.background = '#e8f8e8';
+    }else{
+        kotak.textContent = '⚠️ Tidak Ditemukan!';
+        kotak.style.background = '#ffe8e8';
+    }
+}
+
+let riwayatAsliFilter = [];
+
+function tampilkanRiwayat() {
+    let tb = document.getElementById('isiRiwayat');
+    if (!tb) return;
+    tb.innerHTML = '';
+    let dataTampil = riwayatAsliFilter.length > 0 ? riwayatAsliFilter : riwayat;
+
+    dataTampil.forEach((r, i) => {
+        let idxAsli = riwayat.indexOf(r);
+        let uraian = r.items.map(x => `${x.nama}×${x.jumlah}`).join(', ') || (r.namaJasa || 'Jasa');
+        let statusBayar = '✅ Lunas';
+        let warnaStatus = 'color:green; font-weight:bold;';
+        if ((r.uangdibayarkan || 0) > 0 && (r.sisaBayar || 0) > 0) {
+            statusBayar = '⚠️ Belum Lunas';
+            warnaStatus = 'color:red; font-weight:bold;';
+        }
+
+        tb.innerHTML += `<tr><td>${r.tgl}</td><td>${r.namaPelanggan}<br><small>${r.platKendaraan}${(r.nomorHP && r.nomorHP !== '-') ? `<br>📱 ${r.nomorHP}` : ''}</small></td><td>${uraian}</td><td>${r.namaMekanik || '-'}</td><td class="angka">${formatRupiah(r.totalBayar || 0)}</td><td>${r.caraBayar || 'Tunai'}${(r.uangdibayarkan||0)>0?`<br><small>${formatRupiah(r.uangdibayarkan)}</small>`:''}</td><td style="${warnaStatus}">${statusBayar}${(r.sisaBayar||0)>0?`<br><small>Sisa: ${formatRupiah(r.sisaBayar)}</small>`:''}</td><td class="tengah"><button class="btn-blue btn-sm" onclick="lihatDetailRiwayat(${idxAsli})">📋</button></td><td class="tengah"><button class="btn-orange btn-sm" onclick="ubahRiwayat(${idxAsli})">✏️</button></td><td class="tengah"><button class="btn-blue btn-sm" onclick="cetakUlang(${idxAsli})">🖨️</button></td><td class="tengah"><button class="btn-red btn-sm" onclick="hapusRiwayat(${idxAsli})">🗑️</button></td></tr>`;
+    });
+
+let sekarang = new Date();
+
+let dataBulanIni = dataTampil.filter(r => {
+    let tglTrx = ambilTanggalDariTeks(r.tgl);
+    return tglTrx && tglTrx.getMonth() === sekarang.getMonth() && tglTrx.getFullYear() === sekarang.getFullYear();
+});
+
+document.getElementById('jumlahTransaksi').textContent = dataBulanIni.length;
+
+let totalSemua = 0, totalTunai = 0, totalQris = 0, totalTransfer = 0;
+dataBulanIni.forEach(r => {
+    let nominal = r.totalBayar || 0;
+    totalSemua += nominal;
+    let cara = (r.caraBayar || '').toUpperCase();
+    if (cara.includes('TUNAI')) totalTunai += nominal;
+    else if (cara.includes('QRIS')) totalQris += nominal;
+    else if (cara.includes('TRANSFER')) totalTransfer += nominal;
+});
+document.getElementById('totalSemuaBayar').textContent = formatRupiah(totalSemua);
+document.getElementById('totalTunai').textContent = formatRupiah(totalTunai);
+document.getElementById('totalQris').textContent = formatRupiah(totalQris);
+document.getElementById('totalTransfer').textContent = formatRupiah(totalTransfer);
+
+tampilkanBarangTerlaris();
+}
+
+function hapusRiwayat(idx) {
+    if (!confirm('⚠️ Hapus riwayat ini?')) return;
+    riwayat.splice(idx, 1);
+    simpanData();
+    riwayatAsliFilter = [...riwayat];
+    tampilkanRiwayat();
+    hitungUlangLaporan();
+}
+
+function ambilTanggalDariTeks(tgl) {
+    if (!tgl) return null;
+    let p = tgl.split(' ')[0].split('/');
+    if (p.length !== 3) return null;
+    return new Date(p[2], p[1] - 1, p[0]);
+}
+
+function terapkanFilterTanggalRiwayat() {
+    let dari = document.getElementById('filterDari').value;
+    let sampai = document.getElementById('filterSampai').value;
+    if (!dari && !sampai) {
+        riwayatAsliFilter = [...riwayat];
+        tampilkanRiwayat();
+        return;
+    }
+    let tglDari = dari ? new Date(dari) : new Date('2000-01-01');
+    let tglSampai = sampai ? new Date(sampai) : new Date();
+    tglSampai.setHours(23, 59, 59);
+    riwayatAsliFilter = riwayat.filter(r => {
+        let tglTrx = ambilTanggalDariTeks(r.tgl);
+        if (!tglTrx) return true;
+        return tglTrx >= tglDari && tglTrx <= tglSampai;
+    });
+    tampilkanRiwayat();
+}
+
+function resetFilterRiwayat() {
+    document.getElementById('filterDari').value = '';
+    document.getElementById('filterSampai').value = '';
+    riwayatAsliFilter = [...riwayat];
+    tampilkanRiwayat();
+}
+
+let pengaturan = { operasional: 0, maintenance: 0, persenMekanik: 15, persenInvestor: 15 };
+
+function simpanPengaturan() {
+    pengaturan.operasional = parseInt(document.getElementById('biayaOperasional').value) || 0;
+    pengaturan.maintenance = parseInt(document.getElementById('biayaMaintenance').value) || 0;
+    pengaturan.persenMekanik = parseInt(document.getElementById('persenMekanik').value) || 0;
+    pengaturan.persenInvestor = parseInt(document.getElementById('persenInvestor').value) || 0;
+    localStorage.setItem('pengaturanPembagian', JSON.stringify(pengaturan));
+}
+
+function muatPengaturan() {
+    let tersimpan = localStorage.getItem('pengaturanPembagian');
+    if (tersimpan) {
+        pengaturan = JSON.parse(tersimpan);
+        document.getElementById('biayaOperasional').value = pengaturan.operasional;
+        document.getElementById('biayaMaintenance').value = pengaturan.maintenance;
+        document.getElementById('persenMekanik').value = pengaturan.persenMekanik;
+        document.getElementById('persenInvestor').value = pengaturan.persenInvestor;
+    }
+}
+
+function bukaLaporan() {
+    let sandi = document.getElementById('sandiLaporan').value;
+    if (sandi === kataSandiLaporan) {
+        document.getElementById('kunciLaporan').classList.add('sembunyi');
+        document.getElementById('isiLaporan').classList.remove('sembunyi');
+        muatPengaturan();
+        hitungUlangLaporan();
+        gambarGrafikPenjualan();
+        tampilkanRekapAbsensi();
+    } else {
+        alert('❌ Kata sandi laporan salah!');
+        document.getElementById('sandiLaporan').value = '';
+    }
+}
+
+function ambilDataFilterLaporan() {
+    let dari = document.getElementById('laporanDari').value;
+    let sampai = document.getElementById('laporanSampai').value;
+    let data = riwayat;
+    if (dari || sampai) {
+        let tglDari = dari ? new Date(dari) : new Date('2000-01-01');
+        let tglSampai = sampai ? new Date(sampai) : new Date();
+        tglSampai.setHours(23, 59, 59);
+        data = riwayat.filter(r => {
+            let tglTrx = ambilTanggalDariTeks(r.tgl);
+            if (!tglTrx) return true;
+            return tglTrx >= tglDari && tglTrx <= tglSampai;
+        });
+    }
+    return data;
+}
+
+function hitungUlangLaporan() {
+    simpanPengaturan();
+    let data = ambilDataFilterLaporan();
+
+    let omset = data.reduce((s, r) => s + (r.totalBarang || 0), 0);
+    let totalJasa = data.reduce((s, r) => s + (r.biayaJasa || 0), 0);
+    let labaBarang = data.reduce((s, r) => s + (r.labaBarang || 0), 0);
+    let labaKotor = labaBarang + totalJasa;
+
+    let biayaOp = pengaturan.operasional;
+    let biayaMt = pengaturan.maintenance;
+    let bagiMekanik = Math.round(totalJasa * pengaturan.persenMekanik / 100);
+    let bagiInvestor = Math.round(labaKotor * pengaturan.persenInvestor / 100);
+    let labaBersih = labaKotor - biayaOp - biayaMt - bagiMekanik - bagiInvestor;
+
+    document.getElementById('lapOmset').textContent = formatRupiah(omset);
+    document.getElementById('lapJasa').textContent = formatRupiah(totalJasa);
+    document.getElementById('lapLaba').textContent = formatRupiah(labaBarang);
+    document.getElementById('lapKotor').textContent = formatRupiah(labaKotor);
+
+    document.getElementById('rinciKotor').textContent = formatRupiah(labaKotor);
+    document.getElementById('rinciOperasional').textContent = formatRupiah(biayaOp);
+    document.getElementById('rinciMaintenance').textContent = formatRupiah(biayaMt);
+    document.getElementById('rinciMekanik').textContent = formatRupiah(bagiMekanik) + ` (${pengaturan.persenMekanik}%)`;
+    document.getElementById('rinciInvestor').textContent = formatRupiah(bagiInvestor) + ` (${pengaturan.persenInvestor}%)`;
+    document.getElementById('rinciBersih').textContent = formatRupiah(Math.max(0, labaBersih));
+
+    gambarGrafikPenjualan();
+}
+
+function resetFilterLaporan() {
+    document.getElementById('laporanDari').value = '';
+    document.getElementById('laporanSampai').value = '';
+    hitungUlangLaporan();
+}
+
+function backupLaporanKeExcel() {
+    let data = ambilDataFilterLaporan();
+    let isi = "Tanggal\tPelanggan\tPlat\tNomor HP\tUraian\tTotal Bayar\tPembayaran\tUang Dibayarkan\tSisa Bayar\tMekanik\n";
+    data.forEach(r => {
+        let uraian = r.items.map(x => `${x.nama}×${x.jumlah}`).join(', ') || (r.namaJasa || 'Jasa');
+        isi += `${r.tgl}\t${r.namaPelanggan}\t${r.platKendaraan}\t${r.nomorHP || '-'}\t${uraian}\t${r.totalBayar || 0}\t${r.caraBayar || 'Tunai'}\t${r.uangdibayarkan || 0}\t${r.sisaBayar || 0}\t${r.namaMekanik || '-'}\n`;
+    });
+    let blob = new Blob([isi], { type: 'text/tab-separated-values;charset=utf-8' });
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'LaporanPenjualan_' + updateWaktu().replace(/\//g, '-').replace(/ /g, '_') + '.xls';
+    a.click();
+}
+
+window.onload = function () {
+    setTimeout(() => {
+        if (riwayat.length > 0) {
+            riwayatAsliFilter = [...riwayat];
+            tampilkanRiwayat();
+        }
+    }, 300);
+};
+
+function isiDataPelangganDariHP(hp) {
+    let kata = hp.trim().replace(/\D/g, '');
+    if (kata.length < 4) return;
+
+    let ditemukan = riwayat.find(r => {
+        let hpLama = (r.nomorHP || '').replace(/\D/g, '');
+        return hpLama && hpLama.includes(kata);
+    });
+
+    if (ditemukan) {
+        if (!document.getElementById('namaPelanggan').value.trim()) {
+            document.getElementById('namaPelanggan').value = ditemukan.namaPelanggan;
+        }
+        if (!document.getElementById('platKendaraan').value.trim()) {
+            document.getElementById('platKendaraan').value = ditemukan.platKendaraan;
+        }
+        if (!document.getElementById('jenisMotor').value.trim()) {
+            document.getElementById('jenisMotor').value = ditemukan.jenisMotor;
+        }
+        document.getElementById('nomorHP').value = ditemukan.nomorHP;
+    }
+}
+
+function lihatDetailRiwayat(idx) {
+    let r = riwayat[idx];
+    if (!r) return;
+
+    let isi = `📋 DETAIL TRANSAKSI\n\n📅 Tanggal: ${r.tgl}\n👤 Pelanggan: ${r.namaPelanggan}\n🚗 Plat/Motor: ${r.platKendaraan} / ${r.jenisMotor}\n📱 HP: ${r.nomorHP || '-'}\n🔧 Mekanik: ${r.namaMekanik || '-'}\n💳 Cara Bayar: ${r.caraBayar || 'Tunai'}\n💰 Total Bayar: ${formatRupiah(r.totalBayar || 0)}\n`;
+    
+    if ((r.uangdibayarkan || 0) > 0) {
+        isi += `💰 Total Uang Dibayarkan: ${formatRupiah(r.uangdibayarkan)}\n📉 Sisa Bayar: ${formatRupiah(r.sisaBayar || 0)}\nStatus: ${(r.sisaBayar||0)>0 ? '⚠️ BELUM LUNAS' : '✅ LUNAS'}\n`;
+    } else {
+        isi += `Status: ✅ LUNAS\n`;
+    }
+    
+    if (r.biayaJasa > 0) {
+        isi += `\n🔧 Jasa: ${r.namaJasa || '-'}\nBiaya Jasa: ${formatRupiah(r.biayaJasa)}\n`;
+    }
+    
+    if (r.items.length > 0) {
+        isi += `\n📦 BARANG:\n`;
+        r.items.forEach(x => {
+            isi += `- ${x.nama} × ${x.jumlah} = ${formatRupiah(x.subtotal)}\n`;
+        });
+    }
+
+    alert(isi);
+}
+
+function ubahRiwayat(idx) {
+    let r = riwayat[idx];
+    if (!r) return;
+
+    let menu = prompt(`PILIH UBAHAN:\n1. Ubah Data Pelanggan\n2. Catat Pelunasan Sisa Bayar\n\nKetik angka pilihan:`, '2');
+    
+    if (menu === '1') {
+        let nama = prompt('Nama Pelanggan:', r.namaPelanggan);
+        let plat = prompt('Nomor Plat:', r.platKendaraan);
+        let motor = prompt('Jenis Motor:', r.jenisMotor);
+        let hp = prompt('Nomor HP:', r.nomorHP || '');
+        let mekanik = prompt('Nama Mekanik:', r.namaMekanik || '');
+        if (nama === null || plat === null) return;
+        
+        r.namaPelanggan = nama;
+        r.platKendaraan = plat;
+        r.jenisMotor = motor;
+        r.nomorHP = hp;
+        r.namaMekanik = mekanik;
+        simpanData();
+        tampilkanRiwayat();
+        alert('✅ Data berhasil diubah!');
+        
+    } else if (menu === '2') {
+        let sisa = r.sisaBayar || 0;
+        if (sisa <= 0) {
+            alert('✅ Transaksi ini SUDAH LUNAS!');
+            return;
+        }
+        let bayar = prompt(`Sisa bayar: ${formatRupiah(sisa)}\nMasukkan uang pelunasan:`, sisa);
+        if (bayar === null) return;
+        let nominal = parseInt(bayar.replace(/\D/g,'')) || 0;
+        if (nominal <= 0) return;
+        
+        r.uangdibayarkan = (r.uangdibayarkan || 0) + nominal;
+        r.sisaBayar = Math.max(0, sisa - nominal);
+        simpanData();
+        tampilkanRiwayat();
+        alert(`✅ Pembayaran dicatat!\nSisa sebelumnya: ${formatRupiah(sisa)}\nDibayar: ${formatRupiah(nominal)}\nSisa sekarang: ${formatRupiah(r.sisaBayar)}`);
+    }
+}
+
+function terapkanPencarianRiwayat(kataKunci) {
+    let kata = kataKunci.trim().toUpperCase();
+
+    if (!kata) {
+        riwayatAsliFilter = [...riwayat];
+        tampilkanRiwayat();
+        return;
+    }
+
+    riwayatAsliFilter = riwayat.filter(function(r) {
+        let nama = (r.namaPelanggan || '').toUpperCase();
+        let plat = (r.platKendaraan || '').toUpperCase();
+        let hp = (r.nomorHP || '').replace(/\D/g, '');
+        let kataAngka = kata.replace(/\D/g, '');
+        let uraian = '';
+        if(r.items && Array.isArray(r.items)) uraian = r.items.map(i=>i.nama).join(', ').toUpperCase();
+        if(r.namaJasa) uraian += (uraian ? ' | ' : '') + r.namaJasa.toUpperCase();
+
+        let cocokNama = nama.includes(kata);
+        let cocokPlat = plat.includes(kata);
+        let cocokHP = (kataAngka.length >= 3) ? hp.includes(kataAngka) : false;
+        let cocokUraian = uraian.includes(kata);
+
+        return cocokNama || cocokPlat || cocokHP || cocokUraian;
+    });
+
+    tampilkanRiwayat();
+}
+
+function gantiSandiLaporan(){
+    let sandiLama = prompt('Masukkan kata sandi laporan lama:');
+    if(sandiLama !== kataSandiLaporan) { alert('❌ Sandi lama salah!'); return; }
+    
+    let baru = prompt('Masukkan kata sandi BARU untuk Laporan:\n(minimal 4 karakter)');
+    if(!baru || baru.length < 4) { alert('⚠️ Sandi terlalu pendek!'); return; }
+    
+    let ulang = prompt('Ulangi kata sandi BARU:');
+    if(baru !== ulang) { alert('❌ Sandi tidak cocok!'); return; }
+    
+    kataSandiLaporan = baru;
+    localStorage.setItem('sandiLaporanBengkel', baru);
+    alert('✅ Kata sandi laporan berhasil diganti!');
+}
+
+function tampilkanBarangTerlaris() {
+    let terjual = {};
+    riwayat.forEach(r => {
+        if(r.items && Array.isArray(r.items)) {
+            r.items.forEach(brg => {
+                let nama = brg.nama || 'Barang Tidak Diketahui';
+                terjual[nama] = (terjual[nama] || 0) + (brg.jumlah || 0);
+            });
+        }
+    });
+
+    let daftar = Object.entries(terjual).sort((a,b) => b[1] - a[1]);
+    let terlaris = daftar.slice(0,5);
+    let elTerlaris = document.getElementById('dashDaftarTerlaris');
+    if(elTerlaris) {
+        if(terlaris.length === 0) {
+            elTerlaris.innerHTML = '<div style="color:#666;">Belum ada data penjualan</div>';
+        } else {
+            elTerlaris.innerHTML = terlaris.map((x,i) => 
+                `<div style="padding:4px 0; border-bottom:1px dashed #bbf7d0;">${i+1}. ${x[0]} <span style="float:right; font-weight:bold;">× ${x[1]}</span></div>`
+            ).join('');
+        }
+    }
+
+    let jarang = daftar.filter(x => x[1] > 0).slice(-5).reverse();
+    let elJarang = document.getElementById('dashDaftarJarangLaku');
+    if(elJarang) {
+        if(jarang.length === 0) {
+            elJarang.innerHTML = '<div style="color:#666;">Belum cukup data</div>';
+        } else {
+            elJarang.innerHTML = jarang.map((x,i) => 
+                `<div style="padding:4px 0; border-bottom:1px dashed #fed7aa;">${i+1}. ${x[0]} <span style="float:right; font-weight:bold;">× ${x[1]}</span></div>`
+            ).join('');
+        }
+    }
+}
+
+let grafikPenjualan = null;
+let jenisGrafikAktif = 'bulanan';
+
+function ubahJenisGrafik(jenis, tombol) {
+    jenisGrafikAktif = jenis;
+    document.querySelectorAll('#btnHarian, #btnBulanan, #btnTahunan').forEach(btn => {
+        btn.style.background = '#ddd';
+        btn.style.color = '#333';
+    });
+    tombol.style.background = '#2563eb';
+    tombol.style.color = 'white';
+    gambarGrafikPenjualan();
+}
+
+function ambilDataRingkasan(jenis) {
+    let data = {};
+    let dataSumber = riwayatAsliFilter.length > 0 ? riwayatAsliFilter : riwayat;
+
+    if (jenis === 'harian') {
+        let urutanJam = ['01:00','02:00','03:00','04:00','05:00','06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00','23:00','00:00'];
+        urutanJam.forEach(jam => {
+            data[jam] = { transaksi:0, penjualan:0, jasa:0, laba:0, urut: jam };
+        });
+
+        dataSumber.forEach(r => {
+            if (!r.tgl) return;
+            let bagian = r.tgl.split(' ');
+            if (bagian.length < 2) return;
+            let jam = bagian[1].substring(0,5);
+            if (data[jam]) {
+                data[jam].transaksi += 1;
+                data[jam].penjualan += r.totalBarang || 0;
+                data[jam].jasa += r.biayaJasa || 0;
+                data[jam].laba += (r.labaBarang || 0) + (r.biayaJasa || 0);
+            }
+        });
+
+        return Object.entries(data).sort((a,b) => {
+            let urutA = urutanJam.indexOf(a[0]);
+            let urutB = urutanJam.indexOf(b[0]);
+            return urutA - urutB;
+        });
+    } else if (jenis === 'bulanan') {
+        for (let tgl = 1; tgl <= 31; tgl++) {
+            let kunci = String(tgl).padStart(2,'0');
+            data[kunci] = { transaksi:0, penjualan:0, jasa:0, laba:0, urut: tgl };
+        }
+
+        dataSumber.forEach(r => {
+            let tglTrx = ambilTanggalDariTeks(r.tgl);
+            if (!tglTrx) return;
+            let hari = String(tglTrx.getDate()).padStart(2,'0');
+            if (data[hari]) {
+                data[hari].transaksi += 1;
+                data[hari].penjualan += r.totalBarang || 0;
+                data[hari].jasa += r.biayaJasa || 0;
+                data[hari].laba += (r.labaBarang || 0) + (r.biayaJasa || 0);
+            }
+        });
+
+        return Object.entries(data).sort((a,b) => a[1].urut - b[1].urut);
+    } else {
+        const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        namaBulan.forEach((nama, idx) => {
+            data[nama] = { transaksi:0, penjualan:0, jasa:0, laba:0, urut: idx+1 };
+        });
+
+        dataSumber.forEach(r => {
+            let tglTrx = ambilTanggalDariTeks(r.tgl);
+            if (!tglTrx) return;
+            let nama = namaBulan[tglTrx.getMonth()];
+            if (data[nama]) {
+                data[nama].transaksi += 1;
+                data[nama].penjualan += r.totalBarang || 0;
+                data[nama].jasa += r.biayaJasa || 0;
+                data[nama].laba += (r.labaBarang || 0) + (r.biayaJasa || 0);
+            }
+        });
+
+        return Object.entries(data).sort((a,b) => a[1].urut - b[1].urut);
+    }
+}
+
+function gambarGrafikPenjualan() {
+    let daftar = ambilDataRingkasan(jenisGrafikAktif);
+    let label = daftar.map(x => x[0]);
+    let dataPenjualan = daftar.map(x => x[1].penjualan);
+    let dataJasa = daftar.map(x => x[1].jasa);
+    let jumlahTransaksi = daftar.map(x => x[1].transaksi);
+    let labelPenuh = label.map((l, i) => `${l}\n(${jumlahTransaksi[i]})`);
+
+    if (grafikPenjualan) grafikPenjualan.destroy();
+
+    let ctx = document.getElementById('grafikPenjualan');
+    if (!ctx) return;
+
+    grafikPenjualan = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labelPenuh,
+            datasets: [
+                { label: 'Penjualan Barang', data: dataPenjualan, backgroundColor: '#22c55e', borderRadius: 4 },
+                { label: 'Biaya Jasa', data: dataJasa, backgroundColor: '#3b82f6', borderRadius: 4 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: { callbacks: { label: function(i) { return `${i.dataset.label}: ${formatRupiah(i.raw)}`; } } }
+            },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 500000, callback: function(v) { if (v === 0) return 'Rp 0'; if (v < 1000000) return 'Rp ' + (v/1000).toFixed(0) + 'rb'; return 'Rp ' + (v/1000000).toFixed(1) + ' Jt'; } } } }
+        }
+    });
+}
+
+let daftarAbsensi = JSON.parse(localStorage.getItem('bengkelAbsensi') || '[]');
+let barisDiedit = null;
+
+document.addEventListener('DOMContentLoaded', function(){
+    let sekarang = new Date();
+    let tgl = sekarang.toISOString().split('T')[0];
+    let jam = sekarang.toTimeString().substring(0,5);
+    
+    let elTgl = document.getElementById('absensiTanggal');
+    let elJamDatang = document.getElementById('absensiJamDatang');
+    
+    if(elTgl && !elTgl.value) elTgl.value = tgl;
+    if(elJamDatang && !elJamDatang.value) elJamDatang.value = jam;
+});
+
+function kapitalNamaAbsensi(el) {
+    let teks = el.value;
+    el.value = teks.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function hitungJamKerja(jamDatang, jamPulang) {
+    if(!jamDatang || !jamPulang) return '-';
+    let [j1, m1] = jamDatang.split(':').map(Number);
+    let [j2, m2] = jamPulang.split(':').map(Number);
+    let menit = (j2*60+m2) - (j1*60+m1);
+    if(menit < 0) menit += 24*60;
+    let jam = Math.floor(menit/60);
+    let sisa = menit%60;
+    return jam > 0 ? `${jam}j ${sisa}m` : `${sisa}m`;
+}
+
+function aturStatusAbsensi(status) {
+    window.statusAbsensiSekarang = status;
+    alert(`✅ Status dipilih: ${status}\n👉 Klik SIMPAN untuk menyimpan`);
+}
+
+function simpanAbsensi() {
+    let tgl = document.getElementById('absensiTanggal').value;
+    let jamDatang = document.getElementById('absensiJamDatang').value;
+    let jamPulang = document.getElementById('absensiJamPulang').value || '';
+    let jabatan = document.getElementById('absensiJabatan').value;
+    let nama = document.getElementById('absensiNama').value.trim();
+    let status = window.statusAbsensiSekarang || 'Hadir';
+    let ket = document.getElementById('absensiKeterangan').value.trim();
+    
+    if(!tgl) { alert('⚠️ Pilih Tanggal dulu!'); return; }
+    if(!nama) { alert('⚠️ Isi Nama Staff!'); return; }
+
+    let jamKerja = hitungJamKerja(jamDatang, jamPulang);
+
+    let data = {
+        tanggal: tgl,
+        jamDatang: jamDatang,
+        jamPulang: jamPulang,
+        jamKerja: jamKerja,
+        jabatan: jabatan,
+        nama: nama,
+        status: status,
+        keterangan: ket,
+        bulan: tgl.substring(0,7)
+    };
+
+    if(barisDiedit) {
+        daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === barisDiedit.tanggal && x.nama === barisDiedit.nama));
+        barisDiedit = null;
+        alert(`✅ Data Diperbarui!\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}`);
+    } else {
+        let idx = daftarAbsensi.findIndex(x => x.tanggal === tgl && x.nama === nama);
+        if(idx >= 0) {
+            if(!confirm(`⚠️ Data untuk ${nama} tanggal ${tgl} sudah ada!\nIngin PERBARUI dengan yang baru?`)) return;
+            daftarAbsensi.splice(idx, 1);
+        }
+        alert(`✅ Absensi Disimpan!\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}`);
+    }
+
+    daftarAbsensi.push(data);
+    simpanAbsensiKePenyimpanan();
+    tampilkanRekapAbsensi();
+    
+    document.getElementById('absensiNama').value = '';
+    document.getElementById('absensiJamPulang').value = '';
+    document.getElementById('absensiKeterangan').value = '';
+    window.statusAbsensiSekarang = null;
+    document.getElementById('absensiJamDatang').value = new Date().toTimeString().substring(0,5);
+}
+
+function simpanAbsensiKePenyimpanan() {
+    localStorage.setItem('bengkelAbsensi', JSON.stringify(daftarAbsensi));
+}
+
+function ambilPeriodeTerpilih() {
+    let sekarang = new Date();
+    return sekarang.getFullYear() + '-' + String(sekarang.getMonth() + 1).padStart(2, '0');
+}
+
+function tampilkanRekapAbsensi() {
+    let tb = document.getElementById('isiTabelAbsensi');
+    if(!tb) return;
+
+    let bulanFilter = ambilPeriodeTerpilih();
+    let dataTampil = daftarAbsensi.filter(x => x.bulan === bulanFilter);
+
+    if(dataTampil.length === 0) {
+        tb.innerHTML = '<tr><td colspan="10" style="padding:15px; text-align:center; color:#888;">📭 Belum ada data absensi bulan ini</td></tr>';
+        return;
+    }
+
+    dataTampil.sort((a,b) => b.tanggal.localeCompare(a.tanggal));
+
+    tb.innerHTML = '';
+    dataTampil.forEach(r => {
+        let tampilStatus = r.status;
+        let warnaStatus = '';
+        if(r.status === 'Hadir')           { tampilStatus='✅ Hadir'; warnaStatus='color:green;'; }
+        else if(r.status === 'Setengah Hari') { tampilStatus='⛔ ½ Hari'; warnaStatus='color:orange;'; }
+        else if(r.status === 'Izin')        { tampilStatus='📝 Izin'; warnaStatus='color:purple;'; }
+        else if(r.status === 'Tanpa Keterangan') { tampilStatus='❌ TanpaKet'; warnaStatus='color:red;'; }
+
+        tb.innerHTML += `<tr><td style="white-space:nowrap;">${r.tanggal}</td><td style="text-align:center; font-weight:bold;">${r.jamDatang||'—'}</td><td style="text-align:center; font-weight:bold;">${r.jamPulang||'—'}</td><td style="text-align:center; color:#2563eb; font-weight:bold;">${r.jamKerja||'—'}</td><td style="text-align:center;">${r.jabatan}</td><td>${r.nama}</td><td style="${warnaStatus} font-weight:bold;">${tampilStatus}</td><td>${r.keterangan||'—'}</td><td class="tengah"><button class="btn-blue btn-sm" onclick="bukaEditAbsensi('${r.tanggal}','${r.jamDatang||''}','${r.jamPulang||''}','${r.jabatan}','${r.nama.replace(/'/g,"\\'")}','${r.status}','${(r.keterangan||'').replace(/'/g,"\\'")}')">✏️</button></td><td class="tengah"><button class="btn-red btn-sm" onclick="hapusAbsensi('${r.tanggal}','${r.nama.replace(/'/g,"\\'")}')">🗑️</button></td></tr>`;
+    });
+	tampilkanRekapPerStaff();
+}
+
+function bukaEditAbsensi(tgl, jamDatang, jamPulang, jabatan, nama, status, ket) {
+    document.getElementById('absensiTanggal').value = tgl;
+    document.getElementById('absensiJamDatang').value = jamDatang;
+    document.getElementById('absensiJamPulang').value = jamPulang;
+    document.getElementById('absensiJabatan').value = jabatan;
+    document.getElementById('absensiNama').value = nama;
+    document.getElementById('absensiKeterangan').value = ket;
+    window.statusAbsensiSekarang = status;
+    barisDiedit = { tanggal:tgl, nama:nama };
+    alert(`✏️ Edit Data:\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}\n👉 Ubah lalu klik [SIMPAN ABSENSI]`);
+    switchTab('absensi');
+}
+
+function hapusAbsensi(tanggal, nama) {
+    if(!confirm(`⚠️ Hapus permanen?\n📅 ${tanggal}\n👤 ${nama}`)) return;
+    daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === tanggal && x.nama === nama));
+    simpanAbsensiKePenyimpanan();
+    tampilkanRekapAbsensi();
+}
+
+function simpanAbsensiDatang() {
+    document.getElementById('absensiJamPulang').value = '';
+    simpanAbsensi();
+}
+
+function isiJamPulangOtomatis() {
+    let sekarang = new Date();
+    let jamSekarang = sekarang.toTimeString().substring(0,5);
+    document.getElementById('absensiJamPulang').value = jamSekarang;
+    alert(`✅ Jam Pulang terisi: ${jamSekarang}\n👉 Cek Nama lalu klik [SIMPAN ABSENSI]`);
+}
+
+function tampilkanRekapPerStaff() {
+    let bulanFilter = ambilPeriodeTerpilih();
+    let tb = document.getElementById('isiRekapStaff');
+    let labelBulan = document.getElementById('labelBulanRekap');
+    
+    if(!tb) return;
+    
+    if(labelBulan) {
+        let [thn, bln] = bulanFilter.split('-');
+        let namaBln = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        labelBulan.textContent = `${namaBln[parseInt(bln)-1]} ${thn}`;
+    }
+
+    let dataBulanIni = daftarAbsensi.filter(x => x.bulan === bulanFilter);
+    
+    if(dataBulanIni.length === 0) {
+        tb.innerHTML = '<tr><td colspan="10" style="padding:12px; text-align:center; color:#888;">📭 Belum ada data absensi bulan ini</td></tr>';
+        return;
+    }
+
+    let rekap = {};
+    dataBulanIni.forEach(r => {
+        let kunci = r.nama + '|' + r.jabatan;
+        if(!rekap[kunci]) {
+            rekap[kunci] = {
+                nama: r.nama,
+                jabatan: r.jabatan,
+                hadir: 0,
+                setengah: 0,
+                izin: 0,
+                tanpaKet: 0,
+                totalMenit: 0
+            };
+        }
+
+        let s = r.status;
+        if(s === 'Hadir') rekap[kunci].hadir++;
+        else if(s === 'Setengah Hari') rekap[kunci].setengah++;
+        else if(s === 'Izin') rekap[kunci].izin++;
+        else if(s === 'Tanpa Keterangan') rekap[kunci].tanpaKet++;
+
+        if(r.jamDatang && r.jamPulang) {
+            let [j1, m1] = r.jamDatang.split(':').map(Number);
+            let [j2, m2] = r.jamPulang.split(':').map(Number);
+            let menit = (j2*60+m2) - (j1*60+m1);
+            if(menit < 0) menit += 24*60;
+            rekap[kunci].totalMenit += menit;
+        }
+    });
+
+    let daftar = Object.values(rekap).sort((a,b) => a.nama.localeCompare(b.nama));
+
+    tb.innerHTML = '';
+    daftar.forEach((r, i) => {
+        let totalHari = r.hadir + r.setengah + r.izin + r.tanpaKet;
+        let jam = Math.floor(r.totalMenit / 60);
+        let menit = r.totalMenit % 60;
+        let teksJam = r.totalMenit > 0 ? `${jam}j ${menit}m` : '—';
+
+        tb.innerHTML += `<tr><td class="tengah">${i+1}</td><td>${r.nama}</td><td class="tengah">${r.jabatan}</td><td class="tengah" style="color:green; font-weight:bold;">${r.hadir}</td><td class="tengah" style="color:orange; font-weight:bold;">${r.setengah}</td><td class="tengah" style="color:purple; font-weight:bold;">${r.izin}</td><td class="tengah" style="color:red; font-weight:bold;">${r.tanpaKet}</td><td class="tengah" style="font-weight:bold;">${totalHari}</td><td class="tengah" style="color:#2563eb; font-weight:bold;">${teksJam}</td></tr>`;
+    });
+}
+
+</script>
+</body>
+</html>
