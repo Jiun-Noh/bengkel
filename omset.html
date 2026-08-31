@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Laporan & Pembagian Hasil Bengkel</title>
+    <style>
+        * { box-sizing: border-box; font-family: Segoe UI, sans-serif; margin: 0; padding: 0; }
+        body { background: #f0f4f8; padding: 15px; max-width: 1400px; margin: 0 auto; font-size: 14px; }
+        h1, h2, h3 { color: #2c3e50; margin-bottom: 12px; }
+        .card { background: white; padding: 18px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 18px; }
+        input, select, button { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; margin: 2px 4px; }
+        button { cursor: pointer; font-weight: 500; }
+        .btn-green { background: #4caf50; color: white; border: none; }
+        .btn-blue { background: #2196f3; color: white; border: none; }
+        .btn-red { background: #f44336; color: white; border: none; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 600; }
+        .angka { text-align: right; }
+        .tengah { text-align: center; }
+        .baris-merah { background: #ffebee; }
+        .sembunyi { display: none !important; }
+        .edit-mode { background: #fff3cd; padding: 8px; border-radius: 6px; margin-bottom: 10px; font-weight: 500; }
+        .garis-bawah { border-bottom: 1px dashed #ccc; margin: 10px 0; }
+        .kotak-input { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+        label { font-weight: 500; }
+        input[type="number"] { width: 100px; }
+        input.editable { background: #fffde7; border: 1px dashed #f57c00; }
+    </style>
+</head>
+<body>
+
+<h1 style="text-align:center;">📊 LAPORAN & PEMBAGIAN HASIL BENGKEL</h1>
+
+<!-- ====================================== -->
+<!-- 🔒 LAYAR MASUK LAPORAN -->
+<!-- ====================================== -->
+<div class="card" id="kunciLaporan">
+    <h2>🔒 Masuk Bagian Laporan & Pembagian Hasil</h2>
+    <p>Masukkan kata sandi laporan untuk melanjutkan:</p>
+    <input type="password" id="sandiLaporan" placeholder="Kata Sandi Laporan" onkeydown="if(event.key==='Enter') bukaLaporan()">
+    <button onclick="bukaLaporan()">MASUK</button>
+    <p style="color:#888; margin-top:8px; font-size:13px;">Kata sandi bawaan: <b>laporan123</b> — bisa diubah di bagian pengaturan</p>
+</div>
+
+<!-- ====================================== -->
+<!-- ✅ ISI LAPORAN — TERKUNCI SAMPAI LOGIN -->
+<!-- ====================================== -->
+<div id="isiLaporan" class="sembunyi">
+
+<!-- 📅 FILTER PERIODE -->
+<div class="card">
+    <h2>📅 Periode Laporan</h2>
+    <div class="kotak-input">
+        <label>Bulan & Tahun:</label>
+        <input type="month" id="periodeLaporan" onchange="terapkanPeriodeLaporan()">
+        <button onclick="ambilPeriodeSekarang()">🔄 Bulan Ini</button>
+        <span style="color:#666; font-size:13px;">Data bulan lalu tetap tersimpan, tidak terhapus</span>
+    </div>
+</div>
+
+<!-- 📈 RINGKASAN BULAN INI -->
+<div class="card">
+    <h2>📈 Ringkasan Bulan Ini</h2>
+    <table>
+        <tr><td>💰 Omset Penjualan</td><td class="angka" id="omsetPenjualan">Rp 0</td></tr>
+        <tr><td>🔧 Total Jasa</td><td class="angka" id="totalJasa">Rp 0</td></tr>
+        <tr><td>📦 Laba Barang</td><td class="angka" id="labaBarang">Rp 0</td></tr>
+        <tr><td>📊 Laba Kotor</td><td class="angka" id="labaKotor">Rp 0</td></tr>
+        <tr><td>➖ Total Gaji Staf</td><td class="angka" id="totalGajiStaf">Rp 0</td></tr>
+        <tr><td>➖ Total Uang Saku Magang</td><td class="angka" id="totalMagang">Rp 0</td></tr>
+        <tr><td>➖ Biaya Operasional</td><td class="angka" id="biayaOperasional">Rp 0</td></tr>
+        <tr><td>➖ Biaya Maintenance</td><td class="angka" id="biayaMaintenance">Rp 0</td></tr>
+        <tr><td>➖ Bagi Hasil Mekanik</td><td class="angka" id="bagiHasilMekanik">Rp 0</td></tr>
+        <tr style="font-weight:bold; background:#e3f2fd;"><td>✅ LABA BERSIH</td><td class="angka" id="labaBersih">Rp 0</td></tr>
+    </table>
+</div>
+
+<!-- 🔧 BAGIAN 1 — DAFTAR GAJI STAF / MEKANIK & KASIR -->
+<div class="card">
+    <h2>🔧 Daftar Gaji Staf / Mekanik & Kasir</h2>
+    <div class="kotak-input" style="margin-bottom:10px;">
+        <label>Persentase Bagi Hasil Jasa:</label>
+        <input type="number" id="persenBagiHasil" value="15" min="0" max="100" style="width:60px;" oninput="hitungUlangLaporan()"> %
+        <span style="color:#666; font-size:13px;">Bisa diubah kapan saja</span>
+    </div>
+    <div id="daftarStafGaji">
+        <table>
+            <thead>
+                <tr>
+                    <th class="tengah" style="width:40px;">No</th>
+                    <th>Nama Staf</th>
+                    <th>Jabatan</th>
+                    <th class="angka">Gaji Pokok</th>
+                    <th class="tengah">Jasa Dilayani</th>
+                    <th class="angka">Bagi Hasil</th>
+                    <th class="tengah">Jam Lembur</th>
+                    <th class="angka">Nominal Lembur</th>
+                    <th class="angka">Total Diterima</th>
+                    <th class="tengah" style="width:140px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="isiTabelStafGaji"></tbody>
+            <tfoot id="totalBarisStafGaji" style="font-weight:bold; background:#f5f5f5;"></tfoot>
+        </table>
+    </div>
+    <button class="btn-green" onclick="tambahBarisStafGaji()">➕ Tambah Staf</button>
+</div>
+
+<!-- 🧑‍🎓 BAGIAN 2 — DAFTAR STAF MAGANG -->
+<div class="card">
+    <h2>🧑‍🎓 Daftar Staf Magang</h2>
+    <div id="daftarStafMagang">
+        <table>
+            <thead>
+                <tr>
+                    <th class="tengah" style="width:40px;">No</th>
+                    <th>Nama Magang</th>
+                    <th>Tgl Masuk</th>
+                    <th>Tgl Selesai</th>
+                    <th class="angka">Uang Makan</th>
+                    <th class="angka">Uang Bensin</th>
+                    <th class="tengah">Jam Lembur</th>
+                    <th class="angka">Nominal Lembur</th>
+                    <th class="angka">Total</th>
+                    <th class="tengah" style="width:180px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="isiTabelStafMagang"></tbody>
+            <tfoot id="totalBarisStafMagang" style="font-weight:bold; background:#f5f5f5;"></tfoot>
+        </table>
+    </div>
+    <button class="btn-green" onclick="tambahBarisStafMagang()">➕ Tambah Magang</button>
+</div>
+
+<!-- 💧 BAGIAN 3 — BIAYA OPERASIONAL -->
+<div class="card">
+    <h2>💧 Biaya Operasional Bulanan</h2>
+    <div id="daftarBiayaOperasional">
+        <table>
+            <thead><tr><th class="tengah" style="width:40px;">No</th><th class="angka" style="width:150px;">Nominal</th><th>Keterangan / Penggunaan</th><th class="tengah" style="width:80px;">Aksi</th></tr></thead>
+            <tbody id="isiTabelOperasional"></tbody>
+            <tfoot style="font-weight:bold; background:#f5f5f5;"><tr><td colspan="2" class="angka" id="totalOperasional">Rp 0</td><td colspan="2">💰 Total Operasional</td></tr></tfoot>
+        </table>
+    </div>
+    <button class="btn-green" onclick="tambahBarisOperasional()">➕ Tambah Biaya</button>
+</div>
+
+<!-- 🔩 BAGIAN 4 — BIAYA MAINTENANCE -->
+<div class="card">
+    <h2>🔩 Biaya Maintenance</h2>
+    <div id="daftarBiayaMaintenance">
+        <table>
+            <thead><tr><th class="tengah" style="width:40px;">No</th><th class="angka" style="width:150px;">Nominal</th><th>Keterangan / Penggunaan</th><th class="tengah" style="width:80px;">Aksi</th></tr></thead>
+            <tbody id="isiTabelMaintenance"></tbody>
+            <tfoot style="font-weight:bold; background:#f5f5f5;"><tr><td colspan="2" class="angka" id="totalMaintenance">Rp 0</td><td colspan="2">💰 Total Maintenance</td></tr></tfoot>
+        </table>
+    </div>
+    <button class="btn-green" onclick="tambahBarisMaintenance()">➕ Tambah Biaya</button>
+</div>
+
+<!-- 💰 BAGIAN 5 — PEMBAGIAN LABA BERSIH -->
+<div class="card">
+    <h2>💰 Pembagian Laba Bersih</h2>
+    <h4 style="margin:8px 0;">👤 Bagian Pemilik</h4>
+    <div class="kotak-input">
+        <label>Persentase Pemilik:</label>
+        <input type="number" id="persenPemilik" value="60" min="0" max="100" style="width:60px;" oninput="hitungUlangLaporan()"> %
+        <span class="angka" style="margin-left:20px;">Nominal: <strong id="nominalPemilik">Rp 0</strong></span>
+    </div>
+
+    <h4 style="margin:15px 0 8px;">🤝 Daftar Investor</h4>
+    <div id="daftarInvestor">
+        <table>
+            <thead><tr><th class="tengah" style="width:40px;">No</th><th>Nama Investor</th><th class="tengah" style="width:100px;">% Bagian</th><th class="angka" style="width:150px;">Nominal</th><th class="tengah" style="width:140px;">Aksi</th></tr></thead>
+            <tbody id="isiTabelInvestor"></tbody>
+            <tfoot style="font-weight:bold; background:#f5f5f5;"><tr><td colspan="2">Total Investor</td><td class="tengah" id="totalPersenInvestor">0 %</td><td class="angka" id="totalNominalInvestor">Rp 0</td><td></td></tr></tfoot>
+        </table>
+    </div>
+    <button class="btn-green" onclick="tambahBarisInvestor()">➕ Tambah Investor</button>
+
+    <h4 style="margin:15px 0 8px;">📦 Dana Cadangan / Lainnya</h4>
+    <div class="kotak-input">
+        <label>Persentase Dana Cadangan:</label>
+        <input type="number" id="persenCadangan" value="15" min="0" max="100" style="width:60px;" oninput="hitungUlangLaporan()"> %
+        <span class="angka" style="margin-left:20px;">Nominal: <strong id="nominalCadangan">Rp 0</strong></span>
+    </div>
+
+    <div style="margin-top:15px; padding:10px; background:#e8f5e9; border-radius:6px; font-weight:bold;">
+        ✅ Keseimbangan: Total <span id="totalPersenSemua">100%</span> | Sisa <span id="sisaPersen">0%</span>
+    </div>
+</div>
+
+<!-- 📅 BAGIAN 6 — ABSENSI KEHADIRAN -->
+<div class="card">
+    <h2>📅 Absensi Kehadiran</h2>
+    <div style="margin-bottom:10px; padding:8px; background:#f5f5f5; border-radius:6px;">
+        <label>Tanggal Absen:</label>
+        <input type="date" id="tanggalAbsen" onchange="tampilkanAbsenTanggal()">
+        <button onclick="isiTanggalHariIni()">🕐 Hari Ini</button>
+        <span style="color:#666; font-size:13px;"> — Pilih tanggal lalu isi kehadiran</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Nama</th>
+                <th>Jabatan</th>
+                <th class="tengah">✅ Hadir</th>
+                <th class="tengah">⛔ ½ Hari</th>
+                <th class="tengah">🏖️ Libur</th>
+                <th class="tengah">📝 Izin</th>
+                <th class="tengah">❌ Tanpa Kabar</th>
+                <th>Keterangan Izin</th>
+            </tr>
+        </thead>
+        <tbody id="isiTabelAbsen"></tbody>
+    </table>
+    <button class="btn-green" onclick="simpanAbsenHariIni()">💾 Simpan Absen Hari Ini</button>
+
+    <div class="garis-bawah"></div>
+    <h3 style="margin:10px 0;">📊 Rekap Absensi Bulan Ini</h3>
+    <button onclick="tampilkanRekapAbsenBulanIni()">📋 Tampilkan Semua Hari</button>
+    <div id="isiRekapAbsenBulan" style="margin-top:10px; overflow-x:auto;"></div>
+</div>
+
+<!-- 💾 TOMBOL SIMPAN & HITUNG ULANG -->
+<div class="card">
+    <button class="btn-green" style="padding:10px 20px; font-size:15px;" onclick="simpanSemuaPengaturan()">💾 SIMPAN SEMUA BULAN INI</button>
+    <button class="btn-blue" style="padding:10px 20px; font-size:15px;" onclick="hitungUlangLaporan()">📊 HITUNG ULANG SEMUA</button>
+    <button class="btn-red btn-sm" style="float:right;" onclick="ubahSandiLaporan()">🔧 Ubah Kata Sandi Laporan</button>
+</div>
+
+</div> <!-- === AKHIR ISI LAPORAN === -->
+
+<script>
+// ==============================================
+// ⚙️ KONFIGURASI & VARIABEL
+// ==============================================
+let kataSandiLaporan = localStorage.getItem('sandiLaporanBengkel') || 'laporan123';
+let periodeAktif = '';
+let pengaturan = {};
+
+// ==============================================
+// 📐 FUNGSI FORMAT RUPIAH
+// ==============================================
+function formatRupiah(angka) {
+    if(angka === null || angka === undefined) angka = 0;
+    return 'Rp ' + parseInt(angka).toLocaleString('id-ID');
+}
+function ambilAngka(v) {
+    return parseInt(v) || 0;
+}
+function ambilPeriodeSekarang() {
+    let d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function ambilNamaBulan(bulan) {
+    let nama = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    return nama[parseInt(bulan)-1]||'';
+}
+
+// ==============================================
+// 🔑 BUKA LAPORAN
+// ==============================================
+function bukaLaporan() {
+    let input = document.getElementById('sandiLaporan').value;
+    if(input === kataSandiLaporan) {
+        document.getElementById('kunciLaporan').classList.add('sembunyi');
+        document.getElementById('isiLaporan').classList.remove('sembunyi');
+        document.getElementById('periodeLaporan').value = ambilPeriodeSekarang();
+        periodeAktif = ambilPeriodeSekarang();
+        muatPengaturan();
+        hitungUlangLaporan();
+    } else {
+        alert('❌ Kata sandi salah!');
+        document.getElementById('sandiLaporan').value = '';
+    }
+}
+function ubahSandiLaporan() {
+    let s1 = prompt('Masukkan kata sandi baru untuk Laporan:');
+    if(!s1) return;
+    let s2 = prompt('Ulangi kata sandi baru:');
+    if(s1 !== s2) { alert('❌ Kata sandi tidak sama!'); return; }
+    kataSandiLaporan = s1;
+    localStorage.setItem('sandiLaporanBengkel', s1);
+    alert('✅ Kata sandi laporan berhasil diubah!');
+}
+
+// ==============================================
+// 📅 PERIODE
+// ==============================================
+function ambilPeriodeSekarang() {
+    let d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function ambilPeriodeSebelumnya() {
+    let p = document.getElementById('periodeLaporan').value;
+    if(!p) return ambilPeriodeSekarang();
+    let [thn, bln] = p.split('-').map(Number);
+    bln--;
+    if(bln < 1) { bln=12; thn--; }
+    return thn + '-' + String(bln).padStart(2,'0');
+}
+function terapkanPeriodeLaporan() {
+    periodeAktif = document.getElementById('periodeLaporan').value;
+    muatPengaturan();
+    hitungUlangLaporan();
+}
+function ambilPeriodeSekarangBtn() {
+    document.getElementById('periodeLaporan').value = ambilPeriodeSekarang();
+    terapkanPeriodeLaporan();
+}
+
+// ==============================================
+// 💾 PENYIMPANAN PER PERIODE
+// ==============================================
+function kunciPenyimpanan(jenis) {
+    return 'laporan_' + jenis + '_' + periodeAktif;
+}
+function simpanPengaturan() {
+    localStorage.setItem(kunciPenyimpanan('stafGaji'), JSON.stringify(pengaturan.stafGaji||[]));
+    localStorage.setItem(kunciPenyimpanan('stafMagang'), JSON.stringify(pengaturan.stafMagang||[]));
+    localStorage.setItem(kunciPenyimpanan('operasional'), JSON.stringify(pengaturan.operasional||[]));
+    localStorage.setItem(kunciPenyimpanan('maintenance'), JSON.stringify(pengaturan.maintenance||[]));
+    localStorage.setItem(kunciPenyimpanan('investor'), JSON.stringify(pengaturan.investor||[]));
+    localStorage.setItem(kunciPenyimpanan('absensi'), JSON.stringify(pengaturan.absensi||{}));
+    localStorage.setItem(kunciPenyimpanan('persen'), JSON.stringify({
+        bagiHasil: document.getElementById('persenBagiHasil').value,
+        pemilik: document.getElementById('persenPemilik').value,
+        cadangan: document.getElementById('persenCadangan').value
+    }));
+    alert('✅ Semua data bulan ini tersimpan!');
+}
+function muatPengaturan() {
+    pengaturan.stafGaji = JSON.parse(localStorage.getItem(kunciPenyimpanan('stafGaji'))) || [];
+    pengaturan.stafMagang = JSON.parse(localStorage.getItem(kunciPenyimpanan('stafMagang'))) || [];
+    pengaturan.operasional = JSON.parse(localStorage.getItem(kunciPenyimpanan('operasional'))) || [];
+    pengaturan.maintenance = JSON.parse(localStorage.getItem(kunciPenyimpanan('maintenance'))) || [];
+    pengaturan.investor = JSON.parse(localStorage.getItem(kunciPenyimpanan('investor'))) || [];
+    pengaturan.absensi = JSON.parse(localStorage.getItem(kunciPenyimpanan('absensi'))) || {};
+    let persen = JSON.parse(localStorage.getItem(kunciPenyimpanan('persen'))) || {};
+    if(persen.bagiHasil) document.getElementById('persenBagiHasil').value = persen.bagiHasil;
+    if(persen.pemilik) document.getElementById('persenPemilik').value = persen.pemilik;
+    if(persen.cadangan) document.getElementById('persenCadangan').value = persen.cadangan;
+    tampilkanTabelStafGaji();
+    tampilkanTabelStafMagang();
+    tampilkanTabelOperasional();
+    tampilkanTabelMaintenance();
+    tampilkanTabelInvestor();
+}
+
+// ==============================================
+// 🔧 STAF GAJI
+// ==============================================
+function tampilkanTabelStafGaji() {
+    let tb = document.getElementById('isiTabelStafGaji');
+    tb.innerHTML = '';
+    pengaturan.stafGaji.forEach((s,i)=>{
+        tb.innerHTML += `<tr>
+            <td class="tengah">${i+1}</td>
+            <td><input type="text" value="${s.nama||''}" onchange="pengaturan.stafGaji[${i}].nama=this.value"></td>
+            <td><input type="text" value="${s.jabatan||''}" onchange="pengaturan.stafGaji[${i}].jabatan=this.value"></td>
+            <td class="angka"><input type="number" value="${s.gajiPokok||0}" min="0" style="width:110px;" oninput="pengaturan.stafGaji[${i}].gajiPokok=ambilAngka(this.value); hitungUlangLaporan()"></td>
+            <td class="tengah"><input type="number" value="${s.jasa||0}" min="0" style="width:60px;" oninput="pengaturan.stafGaji[${i}].jasa=ambilAngka(this.value); hitungUlangLaporan()"></td>
+            <td class="angka" id="bg-${i}">Rp 0</td>
+            <td class="tengah"><input type="number" value="${s.lembur||0}" min="0" style="width:60px;" oninput="pengaturan.stafGaji[${i}].lembur=ambilAngka(this.value); hitungUlangLaporan()"></td>
+            <td class="angka" id="lb-${i}">Rp 0</td>
+            <td class="angka" id="tt-${i}">Rp 0</td>
+            <td class="tengah">
+                <button class="btn-green btn-sm" onclick="cetakSlipGaji(${i})">🖨️ Slip</button>
+                <button class="btn-blue btn-sm" onclick="cetakSlipGajiA4(${i})">📄 A4</button>
+                <button class="btn-red btn-sm" onclick="hapusBarisStafGaji(${i})">✕</button>
+            </td>
+        </tr>`;
+    });
+    hitungUlangLaporan();
+}
+function tambahBarisStafGaji() {
+    pengaturan.stafGaji.push({nama:'', jabatan:'Mekanik', gajiPokok:0, jasa:0, lembur:0});
+    tampilkanTabelStafGaji();
+}
+function hapusBarisStafGaji(i) {
+    if(confirm('Hapus staf ini?')) { pengaturan.stafGaji.splice(i,1); tampilkanTabelStafGaji(); }
+}
+
+// ==============================================
+// 🧑‍🎓 STAF MAGANG
+// ==============================================
+function tampilkanTabelStafMagang() {
+    let tb = document.getElementById('isiTabelStafMagang');
+    tb.innerHTML = '';
+    pengaturan.stafMagang.forEach((m,i)=>{
+        tb.innerHTML += `<tr>
+            <td class="tengah">${i+1}</td>
+            <td><input type="text" value="${m.nama||''}" onchange="pengaturan.stafMagang[${i}].nama=this.value"></td>
+            <td><input type="date" value="${m.tglMasuk||''}" onchange="pengaturan.stafMagang[${i}].tglMasuk=this.value"></td>
+            <td><input type="date" value="${m.tglSelesai||''}" onchange="pengaturan.stafMagang[${i}].tglSelesai=this.value"></td>
+            <td class="angka"><input type="number" value="${m.uangMakan||0}" min="0" style="width:110px;" oninput="pengaturan.stafMagang[${i}].uangMakan=ambilAngka(this.value); hitungUlangLaporan()"></td>
+            <td class="angka"><input type="number" value="${m.uangBensin||0}" min="0" style="width:110px;" oninput="pengaturan.stafMagang[${i}].uangBensin=ambilAngka(this.value); hitungUlangLaporan()"></td>
+            <td class="tengah"><input type="number" value="${m.lembur||0}" min="0" style="width:60px;" oninput="pengaturan.stafMagang[${i}].lembur=ambilAngka(this.value); hitungUlangLaporan()"></td>
+            <td class="angka" id="mlb-${i}">Rp 0</td>
+            <td class="angka" id="mtt-${i}">Rp 0</td>
+            <td class="tengah">
+                <button class="btn-green btn-sm" onclick="cetakSlipMagang(${i})">🖨️ Slip</button>
+                <button class="btn-blue btn-sm" onclick="cetakSlipMagangA4(${i})">📄 A4</button>
+                <button class="btn-blue btn-sm" onclick="cetakSuratMagang(${i})">📄 Surat</button>
+                <button class="btn-red btn-sm" onclick="hapusBarisStafMagang(${i})">✕</button>
+            </td>
+        </tr>`;
+    });
+    hitungUlangLaporan();
+}
+function tambahBarisStafMagang() {
+    pengaturan.stafMagang.push({nama:'', tglMasuk:'', tglSelesai:'', uangMakan:0, uangBensin:0, lembur:0});
+    tampilkanTabelStafMagang();
+}
+function hapusBarisStafMagang(i) {
+    if(confirm('Hapus magang ini?')) { pengaturan.stafMagang.splice(i,1); tampilkanTabelStafMagang(); }
+}
+
+// ==============================================
+// 💧 BIAYA OPERASIONAL
+// ==============================================
+function tampilkanTabelOperasional() {
+    let tb = document.getElementById('isiTabelOperasional');
+    tb.innerHTML = '';
+    let total=0;
+    pengaturan.operasional.forEach((b,i)=>{
+        total += b.nominal||0;
+        tb.innerHTML += `<tr>
+            <td class="tengah">${i+1}</td>
+            <td class="angka"><input type="number" value="${b.nominal||0}" min="0" style="width:120px;" oninput="pengaturan.operasional[${i}].nominal=ambilAngka(this.value); tampilkanTabelOperasional();"></td>
+            <td><input type="text" value="${b.keterangan||''}" style="width:100%;" onchange="pengaturan.operasional[${i}].keterangan=this.value"></td>
+            <td class="tengah"><button class="btn-red btn-sm" onclick="hapusBarisOperasional(${i})">✕</button></td>
+        </tr>`;
+    });
+    document.getElementById('totalOperasional').textContent = formatRupiah(total);
+    hitungUlangLaporan();
+}
+function tambahBarisOperasional() {
+    pengaturan.operasional.push({nominal:0, keterangan:''});
+    tampilkanTabelOperasional();
+}
+function hapusBarisOperasional(i) {
+    if(confirm('Hapus biaya ini?')) { pengaturan.operasional.splice(i,1); tampilkanTabelOperasional(); }
+}
+
+// ==============================================
+// 🔩 BIAYA MAINTENANCE
+// ==============================================
+function tampilkanTabelMaintenance() {
+    let tb = document.getElementById('isiTabelMaintenance');
+    tb.innerHTML = '';
+    let total=0;
+    pengaturan.maintenance.forEach((b,i)=>{
+        total += b.nominal||0;
+        tb.innerHTML += `<tr>
+            <td class="tengah">${i+1}</td>
+            <td class="angka"><input type="number" value="${b.nominal||0}" min="0" style="width:120px;" oninput="pengaturan.maintenance[${i}].nominal=ambilAngka(this.value); tampilkanTabelMaintenance();"></td>
+            <td><input type="text" value="${b.keterangan||''}" style="width:100%;" onchange="pengaturan.maintenance[${i}].keterangan=this.value"></td>
+            <td class="tengah"><button class="btn-red btn-sm" onclick="hapusBarisMaintenance(${i})">✕</button></td>
+        </tr>`;
+    });
+    document.getElementById('totalMaintenance').textContent = formatRupiah(total);
+    hitungUlangLaporan();
+}
+function tambahBarisMaintenance() {
+    pengaturan.maintenance.push({nominal:0, keterangan:''});
+    tampilkanTabelMaintenance();
+}
+function hapusBarisMaintenance(i) {
+    if(confirm('Hapus biaya ini?')) { pengaturan.maintenance.splice(i,1); tampilkanTabelMaintenance(); }
+}
+
+// ==============================================
+// 🤝 INVESTOR
+// ==============================================
+function tampilkanTabelInvestor() {
+    let tb = document.getElementById('isiTabelInvestor');
+    tb.innerHTML = '';
+    let totalPersen=0, totalNominal=0;
+    let labaBersih = hitungLabaBersih();
+    pengaturan.investor.forEach((inv,i)=>{
+        let nominal = Math.round(labaBersih * (inv.persen||0) / 100);
+        totalPersen += inv.persen||0;
+        totalNominal += nominal;
+        tb.innerHTML += `<tr>
+            <td class="tengah">${i+1}</td>
+            <td><input type="text" value="${inv.nama||''}" onchange="pengaturan.investor[${i}].nama=this.value"></td>
+            <td class="tengah"><input type="number" value="${inv.persen||0}" min="0" max="100" style="width:70px;" oninput="pengaturan.investor[${i}].persen=ambilAngka(this.value); hitungUlangLaporan()"> %</td>
+            <td class="angka">${formatRupiah(nominal)}</td>
+            <td class="tengah">
+                <button class="btn-green btn-sm" onclick="cetakSlipInvestor(${i})">🖨️ A4</button>
+                <button class="btn-red btn-sm" onclick="hapusBarisInvestor(${i})">✕</button>
+            </td>
+        </tr>`;
+    });
+    document.getElementById('totalPersenInvestor').textContent = totalPersen + ' %';
+    document.getElementById('totalNominalInvestor').textContent = formatRupiah(totalNominal);
+    hitungKeseimbanganLaba();
+}
+function tambahBarisInvestor() {
+    pengaturan.investor.push({nama:'', persen:0});
+    tampilkanTabelInvestor();
+}
+function hapusBarisInvestor(i) {
+    if(confirm('Hapus investor ini?')) { pengaturan.investor.splice(i,1); tampilkanTabelInvestor(); }
+}
+
+// ==============================================
+// 📊 PERHITUNGAN UTAMA
+// ==============================================
+function hitungLabaBersih() {
+    let totalGaji = pengaturan.stafGaji.reduce((s,x)=>s+(x.gajiPokok||0),0);
+    let totalMagang = pengaturan.stafMagang.reduce((s,x)=>s+(x.uangMakan||0)+(x.uangBensin||0),0);
+    let totalOp = pengaturan.operasional.reduce((s,x)=>s+(x.nominal||0),0);
+    let totalMt = pengaturan.maintenance.reduce((s,x)=>s+(x.nominal||0),0);
+    let persenMek = ambilAngka(document.getElementById('persenBagiHasil').value);
+    let totalJasa = pengaturan.stafGaji.reduce((s,x)=>s+(x.jasa||0),0) * 17500; // asumsi rata-rata nilai jasa
+    let bagiMekanik = Math.round(totalJasa * persenMek / 100);
+    let labaKotor = totalJasa + 1400000; // contoh laba barang
+    return Math.round(labaKotor - totalGaji - totalMagang - totalOp - totalMt - bagiMekanik);
+}
+function hitungUlangLaporan() {
+    let persenMek = ambilAngka(document.getElementById('persenBagiHasil').value);
+    let totalGaji = pengaturan.stafGaji.reduce((s,x)=>s+(x.gajiPokok||0),0);
+    let totalJasaNilai = pengaturan.stafGaji.reduce((s,x)=>s+(x.jasa||0),0) * 17500;
+    let bagiMekanik = Math.round(totalJasaNilai * persenMek / 100);
+    let totalMagang = pengaturan.stafMagang.reduce((s,x)=>s+(x.uangMakan||0)+(x.uangBensin||0),0);
+    let totalOp = pengaturan.operasional.reduce((s,x)=>s+(x.nominal||0),0);
+    let totalMt = pengaturan.maintenance.reduce((s,x)=>s+(x.nominal||0),0);
+    let labaKotor = totalJasaNilai + 1400000;
+    let labaBersih = Math.round(labaKotor - totalGaji - totalMagang - totalOp - totalMt - bagiMekanik);
+
+    document.getElementById('omsetPenjualan').textContent = formatRupiah(labaBersih + totalGaji + totalMagang + totalOp + totalMt + bagiMekanik - 1400000);
+    document.getElementById('totalJasa').textContent = formatRupiah(totalJasaNilai);
+    document.getElementById('labaBarang').textContent = formatRupiah(1400000);
+    document.getElementById('labaKotor').textContent = formatRupiah(labaKotor);
+    document.getElementById('totalGajiStaf').textContent = formatRupiah(totalGaji);
+    document.getElementById('totalMagang').textContent = formatRupiah(totalMagang);
+    document.getElementById('biayaOperasional').textContent = formatRupiah(totalOp);
+    document.getElementById('biayaMaintenance').textContent = formatRupiah(totalMt);
+    document.getElementById('bagiHasilMekanik').textContent = formatRupiah(bagiMekanik);
+    document.getElementById('labaBersih').textContent = formatRupiah(Math.max(0, labaBersih));
+
+    // Hitung per staf gaji
+    let totalBG=0, totalLB=0, totalTT=0;
+    pengaturan.stafGaji.forEach((s,i)=>{
+        let bg = Math.round((s.jasa||0)*17500 * persenMek / 100);
+        let gajiPerHari = Math.round((s.gajiPokok||0) / 26);
+        let lb = Math.round(gajiPerHari / 8 * 1.5 * (s.lembur||0));
+        let potong = hitungPotonganAbsen(s.nama||'');
+        let tt = (s.gajiPokok||0) - potong + bg + lb;
+        totalBG += bg; totalLB += lb; totalTT += tt;
+        if(document.getElementById('bg-'+i)) document.getElementById('bg-'+i).textContent = formatRupiah(bg);
+        if(document.getElementById('lb-'+i)) document.getElementById('lb-'+i).textContent = formatRupiah(lb);
+        if(document.getElementById('tt-'+i)) document.getElementById('tt-'+i).textContent = formatRupiah(Math.max(0,tt));
+    });
+    document.getElementById('totalBarisStafGaji').innerHTML = `<tr><td colspan="3">💰 TOTAL SEMUA STAF</td><td class="angka">${formatRupiah(totalGaji)}</td><td class="tengah">${pengaturan.stafGaji.reduce((s,x)=>s+(x.jasa||0),0)} Kali</td><td class="angka">${formatRupiah(totalBG)}</td><td class="tengah">${pengaturan.stafGaji.reduce((s,x)=>s+(x.lembur||0),0)} Jam</td><td class="angka">${formatRupiah(totalLB)}</td><td class="angka">${formatRupiah(totalTT)}</td><td></td></tr>`;
+
+    // Hitung per magang
+    let totalMLB=0, totalMTT=0;
+    pengaturan.stafMagang.forEach((m,i)=>{
+        let hariHadir = hitungHariHadir(m.nama||'');
+        let hariAbsen = 26 - hariHadir;
+        let potongMakan = Math.round((m.uangMakan||0)/26) * hariAbsen;
+        let potongBensin = Math.round((m.uangBensin||0)/26) * hariAbsen;
+        let umbPerHari = Math.round(((m.uangMakan||0)+(m.uangBensin||0))/26);
+        let lb = Math.round(umbPerHari / 8 * 1.5 * (m.lembur||0));
+        let tt = (m.uangMakan||0) + (m.uangBensin||0) - potongMakan - potongBensin + lb;
+        totalMLB += lb; totalMTT += tt;
+        if(document.getElementById('mlb-'+i)) document.getElementById('mlb-'+i).textContent = formatRupiah(lb);
+        if(document.getElementById('mtt-'+i)) document.getElementById('mtt-'+i).textContent = formatRupiah(Math.max(0,tt));
+    });
+    document.getElementById('totalBarisStafMagang').innerHTML = `<tr><td colspan="4">💰 TOTAL SEMUA MAGANG</td><td class="angka">${formatRupiah(pengaturan.stafMagang.reduce((s,x)=>s+(x.uangMakan||0),0))}</td><td class="angka">${formatRupiah(pengaturan.stafMagang.reduce((s,x)=>s+(x.uangBensin||0),0))}</td><td class="tengah">${pengaturan.stafMagang.reduce((s,x)=>s+(x.lembur||0),0)} Jam</td><td class="angka">${formatRupiah(totalMLB)}</td><td class="angka">${formatRupiah(totalMTT)}</td><td></td></tr>`;
+
+    // Hitung pembagian laba
+    hitungPembagianLaba(Math.max(0,labaBersih));
+    tampilkanTabelInvestor();
+}
+function hitungPotonganAbsen(nama) {
+    let absen = pengaturan.absensi||{};
+    let hariTidakHadir = 0;
+    Object.keys(absen).forEach(tgl=>{
+        let d = absen[tgl];
+        if(d.nama === nama && d.status === 'tanpaKabar') hariTidakHadir++;
+    });
+    let staf = pengaturan.stafGaji.find(x=>x.nama===nama);
+    if(!staf) staf = pengaturan.stafMagang.find(x=>x.nama===nama);
+    if(!staf) return 0;
+    let dasar = staf.gajiPokok || ((staf.uangMakan||0)+(staf.uangBensin||0));
+    return Math.round(dasar / 26 * hariTidakHadir);
+}
+function hitungHariHadir(nama) {
+    let absen = pengaturan.absensi||{};
+    let hadir=0;
+    Object.keys(absen).forEach(tgl=>{
+        let d = absen[tgl];
+        if(d.nama === nama && (d.status==='hadir'||d.status==='setengah')) hadir++;
+    });
+    return hadir;
+}
+function hitungPembagianLaba(labaBersih) {
+    let pPemilik = ambilAngka(document.getElementById('persenPemilik').value);
+    let pCadangan = ambilAngka(document.getElementById('persenCadangan').value);
+    let pInvestor = pengaturan.investor.reduce((s,x)=>s+(x.persen||0),0);
+    document.getElementById('nominalPemilik').textContent = formatRupiah(Math.round(labaBersih * pPemilik / 100));
+    document.getElementById('nominalCadangan').textContent = formatRupiah(Math.round(labaBersih * pCadangan / 100));
+    hitungKeseimbanganLaba();
+}
+function hitungKeseimbanganLaba() {
+    let pPemilik = ambilAngka(document.getElementById('persenPemilik').value);
+    let pCadangan = ambilAngka(document.getElementById('persenCadangan').value);
+    let pInvestor = pengaturan.investor.reduce((s,x)=>s+(x.persen||0),0);
+    let total = pPemilik + pInvestor + pCadangan;
+    document.getElementById('totalPersenSemua').textContent = total + '%';
+    document.getElementById('sisaPersen').textContent = (100-total) + '%';
+}
+
+// ==============================================
+// 📅 ABSENSI
+// ==============================================
+function isiTanggalHariIni() {
+    document.getElementById('tanggalAbsen').value = new Date().toISOString().split('T')[0];
+    tampilkanAbsenTanggal();
+}
+function tampilkanAbsenTanggal() {
+    let tgl = document.getElementById('tanggalAbsen').value;
+    if(!tgl) return;
+    let tb = document.getElementById('isiTabelAbsen');
+    tb.innerHTML = '';
+    let semuaNama = [];
+    pengaturan.stafGaji.forEach(x=>{ if(x.nama) semuaNama.push({nama:x.nama, jabatan:x.jabatan||'Staf'}) });
+    pengaturan.stafMagang.forEach(x=>{ if(x.nama) semuaNama.push({nama:x.nama, jabatan:'Magang'}) });
+    semuaNama.forEach((org,i)=>{
+        let d = (pengaturan.absensi[tgl]||[]).find(x=>x.nama===org.nama) || {status:'hadir', keterangan:''};
+        tb.innerHTML += `<tr data-tgl="${tgl}" data-nama="${org.nama}">
+            <td>${org.nama}</td>
+            <td>${org.jabatan}</td>
+            <td class="tengah"><input type="radio" name="abs-${tgl}-${i}" value="hadir" ${d.status==='hadir'?'checked':''} onchange="simpanAbsenSementara(this)"></td>
+            <td class="tengah"><input type="radio" name="abs-${tgl}-${i}" value="setengah" ${d.status==='setengah'?'checked':''} onchange="simpanAbsenSementara(this)"></td>
+            <td class="tengah"><input type="radio" name="abs-${tgl}-${i}" value="libur" ${d.status==='libur'?'checked':''} onchange="simpanAbsenSementara(this)"></td>
+            <td class="tengah"><input type="radio" name="abs-${tgl}-${i}" value="izin" ${d.status==='izin'?'checked':''} onchange="simpanAbsenSementara(this)"></td>
+            <td class="tengah"><input type="radio" name="abs-${tgl}-${i}" value="tanpaKabar" ${d.status==='tanpaKabar'?'checked':''} onchange="simpanAbsenSementara(this)"></td>
+            <td><input type="text" class="ketAbsen" placeholder="Keterangan..." value="${d.keterangan||''}" style="width:100%;"></td>
+        </tr>`;
+    });
+}
+function simpanAbsenSementara(elm) {
+    let tr = elm.closest('tr');
+    let tgl = tr.dataset.tgl;
+    let nama = tr.dataset.nama;
+    let ket = tr.querySelector('.ketAbsen').value;
+    if(!pengaturan.absensi[tgl]) pengaturan.absensi[tgl] = [];
+    let arr = pengaturan.absensi[tgl];
+    let idx = arr.findIndex(x=>x.nama===nama);
+    let data = {nama:nama, status:elm.value, keterangan:ket};
+    if(idx >=0) arr[idx] = data; else arr.push(data);
+}
+function simpanAbsenHariIni() {
+    let tgl = document.getElementById('tanggalAbsen').value;
+    if(!tgl) { alert('⚠️ Pilih tanggal terlebih dahulu!'); return; }
+    let trs = document.querySelectorAll('#isiTabelAbsen tr');
+    pengaturan.absensi[tgl] = [];
+    trs.forEach(tr=>{
+        let nama = tr.dataset.nama;
+        let elm = tr.querySelector('input[type="radio"]:checked');
+        let ket = tr.querySelector('.ketAbsen').value;
+        if(elm) {
+            pengaturan.absensi[tgl].push({
+                nama: nama,
+                status: elm.value,
+                keterangan: ket
+            });
+        }
+    });
+    alert('✅ Absensi tanggal ' + tgl + ' tersimpan!');
+    hitungUlangLaporan();
+}
+
+function tampilkanRekapAbsenBulanIni() {
+    let tb = document.getElementById('isiRekapAbsenBulan');
+    tb.innerHTML = '';
+    let semuaNama = [];
+    pengaturan.stafGaji.forEach(x=>{ if(x.nama) semuaNama.push({nama:x.nama, jabatan:x.jabatan||'Staf'}) });
+    pengaturan.stafMagang.forEach(x=>{ if(x.nama) semuaNama.push({nama:x.nama, jabatan:'Magang'}) });
+    
+    let html = '<table><thead><tr><th>Nama</th><th>✅ Hadir</th><th>⛔ ½ Hari</th><th>🏖️ Libur</th><th>📝 Izin</th><th>❌ Tanpa Kabar</th></tr></thead><tbody>';
+    semuaNama.forEach(org=>{
+        let hadir=0, setengah=0, libur=0, izin=0, tanpaKabar=0;
+        Object.keys(pengaturan.absensi).forEach(tgl=>{
+            let d = (pengaturan.absensi[tgl]||[]).find(x=>x.nama===org.nama);
+            if(!d) return;
+            if(d.status==='hadir') hadir++;
+            else if(d.status==='setengah') setengah++;
+            else if(d.status==='libur') libur++;
+            else if(d.status==='izin') izin++;
+            else if(d.status==='tanpaKabar') tanpaKabar++;
+        });
+        html += `<tr><td>${org.nama}</td><td class="tengah">${hadir}</td><td class="tengah">${setengah}</td><td class="tengah">${libur}</td><td class="tengah">${izin}</td><td class="tengah" style="color:red; font-weight:bold;">${tanpaKabar}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    tb.innerHTML = html;
+}
+
+// ==============================================
+// 🖨️ CETAK SLIP & SURAT
+// ==============================================
+function ambilRekapAbsenNama(nama) {
+    let hadir=0, setengah=0, libur=0, izin=0, tanpaKabar=0;
+    Object.keys(pengaturan.absensi).forEach(tgl=>{
+        let d = (pengaturan.absensi[tgl]||[]).find(x=>x.nama===nama);
+        if(!d) return;
+        if(d.status==='hadir') hadir++;
+        else if(d.status==='setengah') setengah++;
+        else if(d.status==='libur') libur++;
+        else if(d.status==='izin') izin++;
+        else if(d.status==='tanpaKabar') tanpaKabar++;
+    });
+    return {hadir, setengah, libur, izin, tanpaKabar};
+}
+
+function cetakSlipGaji(i) {
+    let s = pengaturan.stafGaji[i];
+    let rekap = ambilRekapAbsenNama(s.nama);
+    let persenMek = ambilAngka(document.getElementById('persenBagiHasil').value);
+    let bagiHasil = Math.round((s.jasa||0)*17500 * persenMek / 100);
+    let gajiPerHari = Math.round((s.gajiPokok||0)/26);
+    let lembur = Math.round(gajiPerHari/8 * 1.5 * (s.lembur||0));
+    let potong = rekap.tanpaKabar * gajiPerHari;
+    let total = (s.gajiPokok||0) - potong + bagiHasil + lembur;
+    let periode = document.getElementById('periodeLaporan').value;
+    let [thn, bln] = periode.split('-');
+    let namaBulan = ambilNamaBulan(bln);
+
+    let nota = `
+<html>
+<head>
+<style>
+body{font-family:Courier New; font-size:13px; width:260px; padding:5px; margin:0 auto;}
+.tengah{text-align:center;}
+.kanan{text-align:right;}
+.garis{border-bottom:1px dashed #000; margin:4px 0;}
+</style>
+</head>
+<body>
+<div class="tengah">
+<b>📄 SLIP GAJI & BAGI HASIL</b><br>
+<b>BENGKEL MOTOR</b><br>
+Periode: ${namaBulan} ${thn}
+</div>
+<div class="garis"></div>
+Nama: ${s.nama||'-'}<br>
+Jabatan: ${s.jabatan||'Mekanik'}<br>
+<div class="garis"></div>
+✅ Hadir: ${rekap.hadir} Hari | ⛔ ½: ${rekap.setengah} Hari<br>
+🏖️ Libur: ${rekap.libur} Hari | 📝 Izin: ${rekap.izin} Hari<br>
+❌ Tanpa Kabar: ${rekap.tanpaKabar} Hari
+<div class="garis"></div>
+💰 Gaji Pokok: ${formatRupiah(s.gajiPokok||0)}<br>
+➖ Potongan: ${formatRupiah(potong)}<br>
+🔧 Bagi Hasil: ${formatRupiah(bagiHasil)}<br>
+⏰ Lembur: ${formatRupiah(lembur)}<br>
+<div class="garis"></div>
+<b>✅ DITERIMA: ${formatRupiah(Math.max(0,total))}</b>
+<div class="garis"></div>
+Dibuat: Denpasar, ${new Date().getDate()} ${namaBulan} ${thn}<br>
+<br><br>
+Penerima: ____________________
+</body>
+</html>`;
+    let w = window.open('','_blank');
+    w.document.write(nota);
+    w.document.close();
+    w.print();
+}
+
+function cetakSlipGajiA4(i) {
+    let s = pengaturan.stafGaji[i];
+    let rekap = ambilRekapAbsenNama(s.nama);
+    let persenMek = ambilAngka(document.getElementById('persenBagiHasil').value);
+    let bagiHasil = Math.round((s.jasa||0)*17500 * persenMek / 100);
+    let gajiPerHari = Math.round((s.gajiPokok||0)/26);
+    let lembur = Math.round(gajiPerHari/8 * 1.5 * (s.lembur||0));
+    let potong = rekap.tanpaKabar * gajiPerHari;
+    let total = (s.gajiPokok||0) - potong + bagiHasil + lembur;
+    let periode = document.getElementById('periodeLaporan').value;
+    let [thn, bln] = periode.split('-');
+    let namaBulan = ambilNamaBulan(bln);
+    let tglCetak = new Date().getDate() + ' ' + namaBulan + ' ' + thn;
+
+    let nota = `
+<html>
+<head>
+<style>
+body{font-family:Arial; font-size:14px; padding:30px; max-width:700px; margin:0 auto;}
+h2{text-align:center; margin-bottom:20px;}
+.garis{border-bottom:1px dashed #000; margin:10px 0;}
+.tabel{width:100%; border-collapse:collapse; margin:10px 0;}
+.tabel td{padding:6px;}
+.ttd{margin-top:40px; width:100%;}
+.ttd td{text-align:center; padding-top:60px; border-top:1px solid #000;}
+</style>
+</head>
+<body>
+<h2>📄 SLIP PEMBAYARAN GAJI & BAGI HASIL</h2>
+<div class="tabel">
+<tr><td>Nama Lengkap</td><td>: ${s.nama||'-'}</td></tr>
+<tr><td>Jabatan</td><td>: ${s.jabatan||'Mekanik'}</td></tr>
+<tr><td>Periode</td><td>: ${namaBulan} ${thn}</td></tr>
+</div>
+<div class="garis"></div>
+<h3>📊 REKAP KEHADIRAN</h3>
+✅ Hadir Penuh : ${rekap.hadir} Hari<br>
+⛔ ½ Hari      : ${rekap.setengah} Hari (Dibayar 50%)<br>
+🏖️ Libur Resmi : ${rekap.libur} Hari (Tidak Dipotong)<br>
+📝 Izin        : ${rekap.izin} Hari (Tidak Dipotong)<br>
+❌ Tanpa Kabar : ${rekap.tanpaKabar} Hari (Dipotong Penuh)
+<div class="garis"></div>
+<h3>💰 RINCIAN PEMBAYARAN</h3>
+💰 Gaji Pokok         : ${formatRupiah(s.gajiPokok||0)}<br>
+➖ POTONGAN           : ${formatRupiah(potong)}<br>
+🔧 Bagi Hasil Jasa    : ${formatRupiah(bagiHasil)}<br>
+⏰ Uang Lembur (${s.lembur||0} Jam) : ${formatRupiah(lembur)}<br>
+<div class="garis"></div>
+<h3>✅ JUMLAH DITERIMA: ${formatRupiah(Math.max(0,total))}</h3>
+<div class="garis"></div>
+Terbilang: ${terbilang(Math.max(0,total))} Rupiah
+<div style="margin-top:30px;">Dibuat di: Denpasar &nbsp;&nbsp; Tanggal: ${tglCetak}</div>
+<table class="ttd">
+<tr><td>Pemilik Bengkel</td><td>Penerima</td></tr>
+<tr><td>(____________________)</td><td>(${s.nama||'____________________'})</td></tr>
+</table>
+</body>
+</html>`;
+    let w = window.open('','_blank');
+    w.document.write(nota);
+    w.document.close();
+    w.print();
+}
+
+function cetakSlipMagang(i) {
+    let m = pengaturan.stafMagang[i];
+    let rekap = ambilRekapAbsenNama(m.nama);
+    let umPerHari = Math.round(((m.uangMakan||0)+(m.uangBensin||0))/26);
+    let potongMakan = rekap.tanpaKabar * Math.round((m.uangMakan||0)/26);
+    let potongBensin = rekap.tanpaKabar * Math.round((m.uangBensin||0)/26);
+    let lembur = Math.round(umPerHari/8 * 1.5 * (m.lembur||0));
+    let total = (m.uangMakan||0)+(m.uangBensin||0)-potongMakan-potongBensin+lembur;
+    let periode = document.getElementById('periodeLaporan').value;
+    let [thn, bln] = periode.split('-');
+    let namaBulan = ambilNamaBulan(bln);
+
+    let nota = `
+<html>
+<head>
+<style>
+body{font-family:Courier New; font-size:13px; width:260px; padding:5px; margin:0 auto;}
+.tengah{text-align:center;}
+.garis{border-bottom:1px dashed #000; margin:4px 0;}
+</style>
+</head>
+<body>
+<div class="tengah">
+<b>📄 SLIP UANG SAKU MAGANG</b><br>
+<b>BENGKEL MOTOR</b><br>
+Periode: ${namaBulan} ${thn}
+</div>
+<div class="garis"></div>
+Nama: ${m.nama||'-'}<br>
+Mulai: ${m.tglMasuk||'-'} | Selesai: ${m.tglSelesai||'-'}<br>
+<div class="garis"></div>
+✅ Hadir: ${rekap.hadir} | ⛔ ½: ${rekap.setengah}<br>
+🏖️ Libur: ${rekap.libur} | 📝 Izin: ${rekap.izin}<br>
+❌ Tanpa Kabar: ${rekap.tanpaKabar}
+<div class="garis"></div>
+🍽️ Uang Makan: ${formatRupiah(m.uangMakan||0)}<br>
+➖ Potong: ${formatRupiah(potongMakan)}<br>
+🛵 Bensin: ${formatRupiah(m.uangBensin||0)}<br>
+➖ Potong: ${formatRupiah(potongBensin)}<br>
+⏰ Lembur: ${formatRupiah(lembur)}<br>
+<div class="garis"></div>
+<b>✅ DITERIMA: ${formatRupiah(Math.max(0,total))}</b>
+<div class="garis"></div>
+Penerima: ____________________
+</body>
+</html>`;
+    let w = window.open('','_blank');
+    w.document.write(nota);
+    w.document.close();
+    w.print();
+}
+
+function cetakSlipMagangA4(i) {
+    let m = pengaturan.stafMagang[i];
+    let rekap = ambilRekapAbsenNama(m.nama);
+    let umPerHari = Math.round(((m.uangMakan||0)+(m.uangBensin||0))/26);
+    let potongMakan = rekap.tanpaKabar * Math.round((m.uangMakan||0)/26);
+    let potongBensin = rekap.tanpaKabar * Math.round((m.uangBensin||0)/26);
+    let lembur = Math.round(umPerHari/8 * 1.5 * (m.lembur||0));
+    let total = (m.uangMakan||0)+(m.uangBensin||0)-potongMakan-potongBensin+lembur;
+    let periode = document.getElementById('periodeLaporan').value;
+    let [thn, bln] = periode.split('-');
+    let namaBulan = ambilNamaBulan(bln);
+    let tglCetak = new Date().getDate() + ' ' + namaBulan + ' ' + thn;
+
+    let nota = `
+<html>
+<head>
+<style>
+body{font-family:Arial; font-size:14px; padding:30px; max-width:700px; margin:0 auto;}
+h2{text-align:center; margin-bottom:20px;}
+.garis{border-bottom:1px dashed #000; margin:10px 0;}
+.ttd{margin-top:40px; width:100%;}
+.ttd td{text-align:center; padding-top:60px; border-top:1px solid #000;}
+</style>
+</head>
+<body>
+<h2>📄 SLIP UANG SAKU & BIAYA MAGANG</h2>
+<div>Nama: ${m.nama||'-'}</div>
+<div>Periode Magang: ${m.tglMasuk||'-'} s.d ${m.tglSelesai||'-'}</div>
+<div>Periode Pembayaran: ${namaBulan} ${thn}</div>
+<div class="garis"></div>
+<h3>📊 REKAP KEHADIRAN</h3>
+✅ Hadir Penuh : ${rekap.hadir} Hari<br>
+⛔ ½ Hari      : ${rekap.setengah} Hari (Dibayar 50%)<br>
+🏖️ Libur Resmi : ${rekap.libur} Hari (Tidak Dipotong)<br>
+📝 Izin        : ${rekap.izin} Hari (Tidak Dipotong)<br>
+❌ Tanpa Kabar : ${rekap.tanpaKabar} Hari (Dipotong Penuh)
+<div class="garis"></div>
+<h3>💰 RINCIAN PEMBAYARAN</h3>
+🍽️ Uang Makan         : ${formatRupiah(m.uangMakan||0)}<br>
+➖ POTONGAN           : ${formatRupiah(potongMakan)}<br>
+🛵 Uang Bensin/Transport: ${formatRupiah(m.uangBensin||0)}<br>
+➖ POTONGAN           : ${formatRupiah(potongBensin)}<br>
+⏰ Uang Lembur (${m.lembur||0} Jam) : ${formatRupiah(lembur)}<br>
+<div class="garis"></div>
+<h3>✅ JUMLAH DITERIMA: ${formatRupiah(Math.max(0,total))}</h3>
+<div class="garis"></div>
+Terbilang: ${terbilang(Math.max(0,total))} Rupiah
+<div style="margin-top:30px;">Dibuat di: Denpasar &nbsp;&nbsp; Tanggal: ${tglCetak}</div>
+<table class="ttd">
+<tr><td>Pemilik Bengkel</td><td>Penerima</td></tr>
+<tr><td>(____________________)</td><td>(${m.nama||'____________________'})</td></tr>
+</table>
+</body>
+</html>`;
+    let w = window.open('','_blank');
+    w.document.write(nota);
+    w.document.close();
+    w.print();
+}
+
+function cetakSuratMagang(i) {
+    let m = pengaturan.stafMagang[i];
+    let rekap = ambilRekapAbsenNama(m.nama);
+    let tglAkhir = m.tglSelesai||'';
+    let thnAkhir = tglAkhir? tglAkhir.substring(0,4) : '';
+    let blnAkhir = tglAkhir? ambilNamaBulan(tglAkhir.substring(5,7)) : '';
+    let tglCetak = new Date().getDate() + ' ' + blnAkhir + ' ' + thnAkhir;
+
+    let surat = `
+<html>
+<head>
+<style>
+body{font-family:Arial; font-size:14px; padding:40px; max-width:750px; margin:0 auto; line-height:1.6;}
+h2{text-align:center; margin-bottom:30px; text-decoration:underline;}
+.bold{font-weight:bold;}
+.ket{margin-left:20px;}
+.ttd{margin-top:60px;}
+</style>
+</head>
+<body>
+<h2>SURAT KETERANGAN PRAKTIK KERJA MAGANG</h2>
+
+<p>Yang bertanda tangan di bawah ini:</p>
+<div class="ket">
+Nama Bengkel &nbsp;: <b>BENGKEL MOTOR</b><br>
+Alamat &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Jl. Contoh Alamat, Denpasar, Bali<br>
+Telp &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: 08xx-xxxx-xxxx
+</div>
+
+<p>Menerangkan dengan sesungguhnya bahwa:</p>
+<div class="ket">
+Nama Lengkap &nbsp;: <b>${m.nama||'-'}</b><br>
+Asal Sekolah &nbsp;&nbsp;: SMK / Sekolah Teknik<br>
+Jurusan &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: Teknik Sepeda Motor
+</div>
+
+<p>Telah melaksanakan Praktik Kerja Magang di bengkel kami selama:</p>
+<div class="ket">
+Mulai Tanggal &nbsp;&nbsp;: ${m.tglMasuk||'-'}<br>
+Selesai Tanggal &nbsp;: ${m.tglSelesai||'-'}<br>
+Lama Magang &nbsp;&nbsp;&nbsp;&nbsp;: ${rekap.hadir + rekap.setengah} Hari Kerja
+</div>
+
+<p><b>📊 REKAP KEHADIRAN SELAMA MAGANG:</b></p>
+<div class="ket">
+✅ Hadir Penuh &nbsp;&nbsp;&nbsp;&nbsp;: ${rekap.hadir} Hari<br>
+⛔ Hadir ½ Hari &nbsp;&nbsp;&nbsp;: ${rekap.setengah} Hari<br>
+🏖️ Libur Resmi &nbsp;&nbsp;&nbsp;&nbsp;: ${rekap.libur} Hari<br>
+📝 Izin &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${rekap.izin} Hari<br>
+❌ Tanpa Kabar &nbsp;&nbsp;&nbsp;: ${rekap.tanpaKabar} Hari
+</div>
+
+<p>Selama melaksanakan magang, yang bersangkutan menunjukkan sikap yang baik, rajin, disiplin, cepat memahami arahan, dan sopan santun kepada sesama rekan kerja maupun pelanggan bengkel.</p>
+
+<p>Demikian surat keterangan ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.</p>
+
+<div class="ttd">
+Dibuat di &nbsp;&nbsp;&nbsp;&nbsp;: Denpasar<br>
+Tanggal Dikeluarkan : ${tglCetak}
+<br><br><br><br>
+<b>( Nama Pemilik Bengkel )</b>
+</div>
+
+</body>
+</html>`;
+    let w = window.open('','_blank');
+    w.document.write(surat);
+    w.document.close();
+    w.print();
+}
+
+function cetakSlipInvestor(i) {
+    let inv = pengaturan.investor[i];
+    let labaBersih = hitungLabaBersih();
+    let nominal = Math.round(labaBersih * (inv.persen||0)/100);
+    let periode = document.getElementById('periodeLaporan').value;
+    let [thn, bln] = periode.split('-');
+    let namaBulan = ambilNamaBulan(bln);
+    let tglCetak = new Date().getDate() + ' ' + namaBulan + ' ' + thn;
+
+    let nota = `
+<html>
+<head>
+<style>
+body{font-family:Arial; font-size:14px; padding:30px; max-width:700px; margin:0 auto;}
+h2{text-align:center; margin-bottom:20px;}
+.garis{border-bottom:1px dashed #000; margin:10px 0;}
+.ttd{margin-top:40px; width:100%;}
+.ttd td{text-align:center; padding-top:60px; border-top:1px solid #000;}
+</style>
+</head>
+<body>
+<h2>📄 BUKTI PEMBAGIAN LABA BERSIH INVESTOR</h2>
+<div>Nama Investor &nbsp;&nbsp;: ${inv.nama||'-'}</div>
+<div>Periode &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${namaBulan} ${thn}</div>
+<div class="garis"></div>
+<h3>📊 RINCIAN PERHITUNGAN</h3>
+📊 Laba Bersih Bulan Ini &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${formatRupiah(labaBersih)}<br>
+🤝 Persentase Bagian Anda &nbsp;&nbsp;&nbsp;&nbsp;: ${inv.persen||0} %<br>
+<div class="garis"></div>
+<h3>✅ JUMLAH DITERIMA: ${formatRupiah(nominal)}</h3>
+<div class="garis"></div>
+Terbilang: ${terbilang(nominal)} Rupiah<br>
+Keterangan: Pembagian laba bersih sesuai kesepakatan investasi.
+<div style="margin-top:30px;">Dibuat di: Denpasar &nbsp;&nbsp; Tanggal: ${tglCetak}</div>
+<table class="ttd">
+<tr><td>Pemilik Bengkel</td><td>Penerima</td></tr>
+<tr><td>(____________________)</td><td>(${inv.nama||'____________________'})</td></tr>
+</table>
+</body>
+</html>`;
+    let w = window.open('','_blank');
+    w.document.write(nota);
+    w.document.close();
+    w.print();
+}
+
+// ==============================================
+// 🔢 FUNGSI TERBILANG
+// ==============================================
+function terbilang(angka) {
+    angka = Math.abs(parseInt(angka)||0);
+    var huruf = ['','Satu','Dua','Tiga','Empat','Lima','Enam','Tujuh','Delapan','Sembilan','Sepuluh','Sebelas'];
+    var satuan = ['','Ribu','Juta','Miliar','Triliun'];
+    if(angka === 0) return 'Nol';
+    if(angka < 12) return huruf[angka];
+    let hasil = '';
+    let i = 0;
+    while(angka > 0) {
+        let ratus = angka % 1000;
+        let r = terbilangRatus(ratus);
+        if(r !== '') hasil = r + ' ' + satuan[i] + ' ' + hasil;
+        angka = Math.floor(angka / 1000);
+        i++;
+    }
+    return hasil.trim() + ' Rupiah';
+}
+function terbilangRatus(n) {
+    let h = ['','Satu','Dua','Tiga','Empat','Lima','Enam','Tujuh','Delapan','Sembilan'];
+    if(n < 10) return h[n];
+    if(n < 20) return n===10?'Sepuluh':'Sebelas';
+    if(n < 100) return h[Math.floor(n/10)] + ' Puluh ' + h[n%10];
+    if(n === 100) return 'Seratus';
+    return (n<200?'Seratus ':h[Math.floor(n/100)]+' Ratus ') + terbilangRatus(n%100);
+}
+
+// ==============================================
+// 💾 SIMPAN SEMUA
+// ==============================================
+function simpanSemuaPengaturan() {
+    simpanPengaturan();
+    alert('✅ SEMUA DATA BERHASIL DISIMPAN! Data aman tersimpan di browser.');
+}
+
+// ==============================================
+// 🚀 SAAT PERTAMA DIBUKA
+// ==============================================
+window.onload = function() {
+    document.getElementById('sandiLaporan').value = '';
+    document.getElementById('kunciLaporan').classList.remove('sembunyi');
+    document.getElementById('isiLaporan').classList.add('sembunyi');
+};
+
+</script>
+</body>
+</html>

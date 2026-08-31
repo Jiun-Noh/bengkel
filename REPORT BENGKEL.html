@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 Stok & Penjualan Bengkel</title>
+    <style>
+        * { box-sizing: border-box; font-family: Segoe UI, sans-serif; margin: 0; padding: 0; }
+        body { background: #f0f4f8; padding: 15px; max-width: 1400px; margin: 0 auto; font-size: 14px; }
+        h1, h2, h3 { color: #2c3e50; margin-bottom: 12px; }
+        .card { background: white; padding: 18px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        button { padding: 8px 14px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        .btn-blue { background: #2563eb; color: white; }
+        .btn-green { background: #16a34a; color: white; }
+        .btn-orange { background: #f97316; color: white; }
+        .btn-red { background: #dc2626; color: white; }
+        .btn-sm { padding: 3px 8px; font-size: 12px; }
+        input, select { padding: 7px; border: 1px solid #ccc; border-radius: 4px; margin: 3px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { border: 1px solid #ddd; padding: 7px; text-align: left; font-size: 13px; }
+        th { background: #e2e8f0; }
+        .tengah { text-align: center; }
+        .angka { text-align: right; font-family: monospace; font-size: 13px; }
+        .sembunyi { display: none !important; }
+        .layar-login { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; }
+        .kotak-login { background: white; padding: 30px; border-radius: 10px; text-align: center; width: 320px; }
+        .kotak-login input { width: 100%; padding: 10px; margin: 10px 0; font-size: 16px; }
+        .kotak-login button { width: 100%; padding: 10px; font-size: 16px; font-weight: bold; }
+        .baris { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 5px 0; }
+        label { font-weight: 500; }
+        .btn-aktif { background: #2563eb; color: white; font-weight: bold; }
+        hr { border: none; border-top: 1px solid #ddd; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+<!-- ============================================== -->
+<!-- 🔐 LAYAR LOGIN -->
+<!-- ============================================== -->
+<div class="layar-login" id="layarLogin">
+    <div class="kotak-login">
+        <h2>🔐 Masuk Aplikasi Bengkel</h2>
+        <input type="password" id="inputSandi" placeholder="Masukkan Kata Sandi" onkeypress="if(event.keyCode===13)verifikasiSandi()">
+        <button onclick="verifikasiSandi()">MASUK</button>
+        <p style="color:#888; margin-top:10px; font-size:13px;">Sandi bawaan: <b>1234</b></p>
+        <button class="btn-orange btn-sm" onclick="bukaGantiSandi()" style="margin-top:5px;">🔧 Ganti Kata Sandi</button>
+    </div>
+</div>
+
+<!-- ============================================== -->
+<!-- 📱 ISI APLIKASI UTAMA -->
+<!-- ============================================== -->
+<div id="isiAplikasi" class="sembunyi">
+
+    <!-- 📦 TAMBAH BARANG / STOK -->
+    <div class="card">
+        <h2>➕ Tambah Barang / Restock</h2>
+        <div class="baris">
+            <label>Kode:</label><input type="text" id="kodeBarang" placeholder="OL001" style="width:100px;">
+            <label>Nama Barang:</label><input type="text" id="namaBarang" placeholder="Nama Barang" style="width:220px;">
+            <label>Jenis Motor:</label><input type="text" id="jenisMotorBarang" placeholder="Semua Motor" style="width:150px;">
+            <label>Satuan:</label>
+            <select id="satuanBarang">
+                <option value="Liter">Liter</option>
+                <option value="Botol">Botol</option>
+                <option value="Pcs">Pcs</option>
+                <option value="Set">Set</option>
+                <option value="Buah">Buah</option>
+            </select>
+            <label>Modal:</label><input type="number" id="modalBarang" placeholder="0" style="width:110px;">
+            <label>Harga Jual:</label><input type="number" id="jualBarang" placeholder="0" style="width:110px;">
+            <label>Jumlah:</label><input type="number" id="jumlahBarang" value="1" min="1" style="width:70px;">
+            <button class="btn-green" onclick="simpanBarang()">✅ Simpan</button>
+            <button class="btn-red sembunyi" id="btnBatalEdit" onclick="batalEdit()">❌ Batal Edit</button>
+        </div>
+    </div>
+
+    <!-- 📋 DAFTAR STOK -->
+    <div class="card">
+        <h2>📋 Daftar Stok</h2>
+        <label>Cari Barang:</label>
+        <input type="text" id="cariBarang" placeholder="Cari kode/nama..." oninput="tampilkanTabel()">
+        <table>
+            <thead>
+                <tr>
+                    <th class="tengah">No</th>
+                    <th class="tengah">Kode</th>
+                    <th>Nama Barang</th>
+                    <th>Jenis Motor</th>
+                    <th class="tengah">Satuan</th>
+                    <th class="angka">Modal</th>
+                    <th class="angka">Jual</th>
+                    <th class="tengah">Stok</th>
+                    <th class="tengah">Terjual</th>
+                    <th class="tengah">Ubah</th>
+                    <th class="tengah">Hapus</th>
+                </tr>
+            </thead>
+            <tbody id="isiTabelBarang"></tbody>
+        </table>
+    </div>
+
+    <!-- 🛒 TRANSAKSI PENJUALAN -->
+    <div class="card">
+        <h2>🛒 Transaksi Penjualan</h2>
+        <div class="baris">
+            <label>Pilih Barang:</label>
+            <select id="pilihBarang" onchange="isiHargaDariStok()">
+                <option value="">— Pilih Barang —</option>
+            </select>
+            <label>Harga Jual:</label><input type="number" id="hargaJualKeranjang" placeholder="0" style="width:100px;">
+            <label>Jumlah:</label><input type="number" id="jumlahBeli" value="1" min="1" style="width:70px;">
+            <button class="btn-green" onclick="masukkanKeranjang()">➕ Masuk Keranjang</button>
+        </div>
+        <hr>
+        <div class="baris">
+            <label>Nama Pelanggan:</label><input type="text" id="namaPelanggan" placeholder="Nama">
+            <label>No HP:</label><input type="text" id="nomorHP" placeholder="08...">
+            <label>Plat:</label><input type="text" id="platKendaraan" placeholder="B 1234 CD">
+            <label>Jenis Motor:</label><input type="text" id="jenisMotor" placeholder="Beat FI">
+        </div>
+        <div class="baris">
+            <label>Jenis Jasa:</label>
+            <select id="jenisJasa">
+                <option value="Ganti Oli">Ganti Oli</option>
+                <option value="Servis Ringan">Servis Ringan</option>
+                <option value="Servis Lengkap">Servis Lengkap</option>
+                <option value="Turun Mesin">Turun Mesin</option>
+                <option value="Ganti Ban">Ganti Ban</option>
+                <option value="Lain-lain">Lain-lain</option>
+            </select>
+            <label>Mekanik:</label><input type="text" id="namaMekanik" placeholder="Nama Mekanik">
+            <label>Biaya Jasa:</label><input type="number" id="biayaJasaTotal" value="0" min="0" style="width:100px;" oninput="hitungTotalKeranjang()">
+        </div>
+        <div class="baris">
+            <label>Uang Muka/Dibayar:</label><input type="number" id="uangMuka" value="0" min="0" style="width:120px;" oninput="hitungSisaBayar()">
+            <span>Sisa Bayar: <strong id="sisaBayar">Rp 0</strong></span>
+            <span style="color:red;">Kembalian: <strong id="uangKembalian">Rp 0</strong></span>
+        </div>
+        <div class="baris">
+            <label>Bayar:</label>
+            <label><input type="radio" name="caraBayar" value="Tunai" checked> Tunai</label>
+            <label><input type="radio" name="caraBayar" value="QRIS"> QRIS</label>
+            <label><input type="radio" name="caraBayar" value="Transfer"> Transfer</label>
+        </div>
+        <h4>📦 Keranjang</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nama Barang</th>
+                    <th class="tengah">Jumlah</th>
+                    <th class="angka">Harga</th>
+                    <th class="angka">Subtotal</th>
+                    <th class="tengah">Hapus</th>
+                </tr>
+            </thead>
+            <tbody id="isiKeranjang"></tbody>
+            <tfoot>
+                <tr style="font-weight:bold; background:#f0f8ff;">
+                    <td colspan="2">Total Barang: <span id="totalBarang">Rp 0</span> | Jasa: <span id="totalJasa">Rp 0</span></td>
+                    <td colspan="3">Total Bayar: <span id="totalBayar">Rp 0</span></td>
+                </tr>
+            </tfoot>
+        </table>
+        <br>
+        <button class="btn-green" style="font-size:16px; padding:10px 25px;" onclick="selesaikanTransaksi()">✅ SIMPAN TRANSAKSI</button>
+    </div>
+
+    <!-- 📝 RIWAYAT PENJUALAN -->
+    <div class="card">
+        <h2>📝 Riwayat Penjualan</h2>
+        <label>Cari Riwayat:</label>
+        <input type="text" id="cariRiwayat" placeholder="Nama/Plat/Mekanik/Jasa..." oninput="tampilkanRiwayat()">
+        <button class="btn-blue btn-sm" onclick="tampilkanRiwayat()">↩️ Tampilkan Semua</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tanggal</th>
+                    <th>Pelanggan / Plat</th>
+                    <th>Uraian</th>
+                    <th>Mekanik</th>
+                    <th class="angka">Total</th>
+                    <th class="tengah">Bayar</th>
+                    <th class="tengah">Status</th>
+                    <th class="tengah">Hapus</th>
+                </tr>
+            </thead>
+            <tbody id="isiRiwayat"></tbody>
+        </table>
+    </div>
+
+    <!-- 🔥 BARANG TERLARIS & JARANG TERJUAL -->
+    <div class="card" style="columns: 2;">
+        <div>
+            <h3>🔥 5 Barang Terlaris</h3>
+            <div id="isiTerlaris"></div>
+        </div>
+        <div>
+            <h3>🐢 5 Barang Jarang Terjual</h3>
+            <div id="isiJarang"></div>
+        </div>
+    </div>
+
+    <!-- 📅 ABSENSI HARIAN -->
+    <div class="card">
+        <h2>📅 Absensi Harian</h2>
+        <div class="baris">
+            <label>Tanggal:</label><input type="date" id="absensiTanggal">
+            <button class="btn-green btn-sm" onclick="absensiDatang()">🕐 Absen Datang</button>
+            <label>Jam Datang:</label><input type="time" id="absensiJamDatang">
+            <button class="btn-orange btn-sm" onclick="absensiPulang()">🕔 Absen Pulang</button>
+            <label>Jam Pulang:</label><input type="time" id="absensiJamPulang">
+        </div>
+        <div class="baris">
+            <label>Nama Staff:</label><input type="text" id="absensiNama" placeholder="Nama Lengkap">
+            <label>Jabatan:</label>
+            <select id="absensiJabatan">
+                <option value="Mekanik">Mekanik</option>
+                <option value="Kasir">Kasir</option>
+                <option value="Magang">Magang</option>
+                <option value="Pemilik">Pemilik</option>
+            </select>
+        </div>
+        <div class="baris">
+            <label>Status:</label>
+            <button class="btn-aktif btn-sm" onclick="window.statusAbsensiSekarang='Hadir'; setStatusAbsensi(this)">✅ Hadir</button>
+            <button class="btn-sm" onclick="window.statusAbsensiSekarang='Setengah Hari'; setStatusAbsensi(this)">⛔ Setengah Hari</button>
+            <button class="btn-sm" onclick="window.statusAbsensiSekarang='Izin'; setStatusAbsensi(this)">📝 Izin</button>
+            <button class="btn-sm" onclick="window.statusAbsensiSekarang='Tanpa Keterangan'; setStatusAbsensi(this)">❌ Tanpa Ket</button>
+            <label>Keterangan:</label><input type="text" id="absensiKeterangan" placeholder="Alasan izin/dll">
+            <button class="btn-green" onclick="simpanAbsensi()">✅ Simpan Absensi</button>
+        </div>
+        <script>function setStatusAbsensi(b){document.querySelectorAll('.baris button').forEach(x=>{if(x.textContent.includes('Hadir')||x.textContent.includes('½')||x.textContent.includes('Izin')||x.textContent.includes('Tanpa'))x.classList.remove('btn-aktif');}); b.classList.add('btn-aktif');}</script>
+    </div>
+
+    <!-- 📋 REKAP ABSENSI -->
+    <div class="card">
+        <h2>📋 Rekap Absensi & Edit Data</h2>
+        <label>Filter Bulan:</label>
+        <input type="month" id="filterAbsensiBulan" onchange="tampilkanRekapAbsensi(); tampilkanRekapPerStaff();">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tanggal</th>
+                    <th class="tengah">Jam Datang</th>
+                    <th class="tengah">Jam Pulang</th>
+                    <th class="tengah">Jam Kerja</th>
+                    <th>Jabatan</th>
+                    <th>Nama</th>
+                    <th class="tengah">Status</th>
+                    <th>Keterangan</th>
+                    <th class="tengah">Edit</th>
+                    <th class="tengah">Hapus</th>
+                </tr>
+            </thead>
+            <tbody id="isiTabelAbsensi"></tbody>
+        </table>
+    </div>
+
+    <!-- 📊 REKAP PER STAFF -->
+    <div class="card">
+        <h2>📊 Ringkasan Kehadiran Per Staff — Bulan: <span id="labelBulanRekap"></span></h2>
+        <table>
+            <thead>
+                <tr>
+                    <th class="tengah">No</th>
+                    <th>Nama Staff</th>
+                    <th class="tengah">Jabatan</th>
+                    <th class="tengah">✅ Hadir</th>
+                    <th class="tengah">⛔ ½ Hari</th>
+                    <th class="tengah">📝 Izin</th>
+                    <th class="tengah">❌ Tanpa Ket</th>
+                    <th class="tengah">Total Hari</th>
+                    <th class="tengah">Total Jam</th>
+                </tr>
+            </thead>
+            <tbody id="isiRekapStaff"></tbody>
+        </table>
+    </div>
+
+    <!-- 💰 LAPORAN & PEMBAGIAN HASIL -->
+    <div class="card">
+        <h2>💰 Laporan & Pembagian Hasil</h2>
+        <div id="kunciLaporan" style="background:#fff3cd; padding:15px; border-radius:8px; text-align:center;">
+            <h3>🔒 Bagian Khusus Pemilik</h3>
+            <p>Masukkan kata sandi untuk melihat laporan & pengaturan</p>
+            <input type="password" id="sandiLaporan" placeholder="Kata Sandi" style="width:220px;" onkeypress="if(event.keyCode===13)bukaLaporan()">
+            <br><button onclick="bukaLaporan()">🔓 Buka Akses</button>
+            <br><button class="btn-orange btn-sm" onclick="gantiSandiLaporan()" style="margin-top:10px;">🔧 Ganti Kata Sandi Laporan</button>
+        </div>
+
+        <div id="isiLaporan" class="sembunyi">
+            <div class="baris" style="background:#f0f8ff; padding:10px; border-radius:6px; margin-bottom:10px;">
+                <button class="btn-sm" id="btnHarian" onclick="ubahJenisGrafik('harian', this)">📅 Harian</button>
+                <button class="btn-sm btn-aktif" id="btnBulanan" onclick="ubahJenisGrafik('bulanan', this)">📆 Bulanan</button>
+                <button class="btn-sm" id="btnTahunan" onclick="ubahJenisGrafik('tahunan', this)">🗓️ Tahunan</button>
+            </div>
+            <div class="baris">
+                <label>Filter Tanggal:</label>
+                <input type="date" id="laporanDari" onchange="hitungUlangLaporan()">
+                <label>s/d</label>
+                <input type="date" id="laporanSampai" onchange="hitungUlangLaporan()">
+                <button class="btn-blue btn-sm" onclick="document.getElementById('laporanDari').value=''; document.getElementById('laporanSampai').value=''; hitungUlangLaporan();">↩️ Tampilkan Semua</button>
+            </div>
+            <div class="baris" style="margin:10px 0; padding:10px; background:#f9fafb; border-radius:6px;">
+                <strong>Ringkasan:</strong>
+                Omset: <span id="lapOmset">Rp 0</span> |
+                Jasa: <span id="lapJasa">Rp 0</span> |
+                Laba Barang: <span id="lapLabaBarang">Rp 0</span> |
+                Laba Kotor: <span id="lapLabaKotor">Rp 0</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Periode</th>
+                        <th class="tengah">Transaksi</th>
+                        <th class="angka">Penjualan</th>
+                        <th class="angka">Jasa</th>
+                        <th class="angka">Laba Kotor</th>
+                    </tr>
+                </thead>
+                <tbody id="isiTabelGrafik"></tbody>
+            </table>
+
+            <h3 style="margin-top:20px;">🔧 Daftar Staf / Mekanik & Kasir</h3>
+            <div class="baris">
+                <label>Nama:</label><input type="text" id="stafNama" placeholder="Nama Lengkap">
+                <label>Jabatan:</label>
+                <select id="stafJabatan">
+                    <option value="Mekanik">Mekanik</option>
+                    <option value="Kasir">Kasir</option>
+                    <option value="Magang">Magang</option>
+                </select>
+                <label>Gaji Pokok:</label><input type="number" id="stafGaji" placeholder="0" style="width:120px;">
+                <button class="btn-green" onclick="simpanStaf()">✅ Tambah Staf</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="tengah">No</th>
+                        <th>Nama Staf</th>
+                        <th class="tengah">Jabatan</th>
+                        <th class="angka">Gaji Pokok</th>
+                        <th class="tengah">Jasa Dilayani</th>
+                        <th class="angka">Bagi Hasil</th>
+                        <th class="angka">Total Diterima</th>
+                        <th class="tengah">Hapus</th>
+                    </tr>
+                </thead>
+                <tbody id="isiTabelStaf"></tbody>
+            </table>
+
+            <h3 style="margin-top:20px;">💧 Biaya Bulanan</h3>
+            <div class="baris">
+                <label>Operasional (Rp):</label><input type="number" id="biayaOperasional" value="0" style="width:140px;" oninput="hitungUlangLaporan()">
+                <label>Maintenance (Rp):</label><input type="number" id="biayaMaintenance" value="0" style="width:140px;" oninput="hitungUlangLaporan()">
+            </div>
+
+            <h3 style="margin-top:20px;">🤝 Daftar Investor</h3>
+            <button class="btn-green btn-sm" onclick="tambahInvestor()">➕ Tambah Investor</button>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="tengah">No</th>
+                        <th>Nama Investor</th>
+                        <th class="tengah">% Saham</th>
+                        <th class="angka">Hak Diterima</th>
+                    </tr>
+                </thead>
+                <tbody id="isiTabelInvestor"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ==============================================
+// 🔑 KATA SANDI & VARIABEL
+// ==============================================
+let kataSandiAplikasi = localStorage.getItem('sandiAplikasiBengkel') || '1234';
+let kataSandiLaporan = localStorage.getItem('sandiLaporanBengkel') || '1234';
+const stokMinim = 3;
+
+let barang = [];
+let riwayat = [];
+let daftarAbsensi = [];
+let daftarStaf = [];
+let daftarInvestor = [];
+let dataEdit = null;
+let keranjang = [];
+let jenisGrafikAktif = 'bulanan';
+window.statusAbsensiSekarang = 'Hadir';
+
+// ==============================================
+// 🔐 LOGIN
+// ==============================================
+function verifikasiSandi(){
+    let input = document.getElementById('inputSandi').value;
+    if(input === kataSandiAplikasi){
+        document.getElementById('layarLogin').style.display = 'none';
+        document.getElementById('isiAplikasi').classList.remove('sembunyi');
+        bacaDataDariPenyimpanan();
+        tampilkanTabel();
+        tampilkanRiwayat();
+        tampilkanBarangTerlaris();
+    }else{
+        alert('❌ Kata sandi salah!');
+        document.getElementById('inputSandi').value = '';
+    }
+}
+function bukaGantiSandi(){
+    let lama = prompt('Masukkan sandi lama:');
+    if(lama !== kataSandiAplikasi) { alert('❌ Sandi lama salah!'); return; }
+    let baru = prompt('Masukkan sandi baru:');
+    if(!baru || baru.length < 3) { alert('⚠️ Sandi terlalu pendek!'); return; }
+    let ulang = prompt('Ulangi sandi baru:');
+    if(baru !== ulang) { alert('❌ Sandi tidak cocok!'); return; }
+    kataSandiAplikasi = baru;
+    localStorage.setItem('sandiAplikasiBengkel', baru);
+    alert('✅ Sandi berhasil diganti!');
+}
+
+// ==============================================
+// 💾 SIMPAN & BACA DATA
+// ==============================================
+function simpanData(){
+    localStorage.setItem('dataBarangBengkel', JSON.stringify(barang));
+    localStorage.setItem('dataRiwayatBengkel', JSON.stringify(riwayat));
+    localStorage.setItem('dataAbsensiBengkel', JSON.stringify(daftarAbsensi));
+    localStorage.setItem('dataStafBengkel', JSON.stringify(daftarStaf));
+    localStorage.setItem('dataInvestorBengkel', JSON.stringify(daftarInvestor));
+}
+function bacaDataDariPenyimpanan(){
+    let b = localStorage.getItem('dataBarangBengkel');
+    let r = localStorage.getItem('dataRiwayatBengkel');
+    let a = localStorage.getItem('dataAbsensiBengkel');
+    let s = localStorage.getItem('dataStafBengkel');
+    let i = localStorage.getItem('dataInvestorBengkel');
+    if(b) barang = JSON.parse(b);
+    if(r) riwayat = JSON.parse(r);
+    if(a) daftarAbsensi = JSON.parse(a);
+    if(s) daftarStaf = JSON.parse(s);
+    if(i) daftarInvestor = JSON.parse(i);
+}
+
+// ==============================================
+// 🔧 FORMAT RUPIAH & TANGGAL
+// ==============================================
+function formatRupiah(angka){
+    if(angka === null || angka === undefined) angka = 0;
+    return 'Rp ' + parseInt(angka).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+function updateWaktu(){
+    let d = new Date();
+    let hari = String(d.getDate()).padStart(2,'0');
+    let bln = String(d.getMonth()+1).padStart(2,'0');
+    let thn = d.getFullYear();
+    let jam = String(d.getHours()).padStart(2,'0');
+    let mnt = String(d.getMinutes()).padStart(2,'0');
+    return `${hari}/${bln}/${thn} ${jam}:${mnt}`;
+}
+
+// ==============================================
+// 📅 ABSENSI
+// ==============================================
+function absensiDatang(){
+    let d = new Date();
+    document.getElementById('absensiTanggal').value = d.toISOString().substring(0,10);
+    document.getElementById('absensiJamDatang').value = d.toTimeString().substring(0,5);
+}
+function absensiPulang(){
+    document.getElementById('absensiJamPulang').value = new Date().toTimeString().substring(0,5);
+}
+function simpanAbsensi(){
+    let tgl = document.getElementById('absensiTanggal').value;
+    let jamDatang = document.getElementById('absensiJamDatang').value || '';
+    let jamPulang = document.getElementById('absensiJamPulang').value || '';
+    let jabatan = document.getElementById('absensiJabatan').value;
+    let nama = document.getElementById('absensiNama').value.trim();
+    let status = window.statusAbsensiSekarang || 'Hadir';
+    let ket = document.getElementById('absensiKeterangan').value.trim();
+    if(!tgl) { alert('⚠️ Pilih Tanggal!'); return; }
+    if(!nama) { alert('⚠️ Isi Nama Staff!'); return; }
+
+    let jamKerja = '';
+    if(jamDatang && jamPulang){
+        let [j1,m1] = jamDatang.split(':').map(Number);
+        let [j2,m2] = jamPulang.split(':').map(Number);
+        let menit = (j2*60+m2) - (j1*60+m1);
+        if(menit < 0) menit += 24*60;
+        jamKerja = `${Math.floor(menit/60)}j ${menit%60}m`;
+    }
+    let bulan = tgl.substring(0,7);
+    let idx = daftarAbsensi.findIndex(x => x.tanggal === tgl && x.nama === nama);
+    let data = {tanggal:tgl, bulan, nama, jabatan, jamDatang, jamPulang, jamKerja, status, keterangan:ket};
+    if(idx >= 0) daftarAbsensi[idx] = data;
+    else daftarAbsensi.push(data);
+
+    simpanData();
+    tampilkanRekapAbsensi();
+    tampilkanRekapPerStaff();
+    document.getElementById('absensiNama').value = '';
+    document.getElementById('absensiJamDatang').value = '';
+    document.getElementById('absensiJamPulang').value = '';
+    document.getElementById('absensiKeterangan').value = '';
+    alert('✅ Absensi Tersimpan!');
+}
+function tampilkanRekapAbsensi(){
+    let tb = document.getElementById('isiTabelAbsensi');
+    let elFilter = document.getElementById('filterAbsensiBulan');
+    if(!tb) return;
+    let bulanFilter;
+    if(elFilter && elFilter.value) bulanFilter = elFilter.value;
+    else {
+        let d = new Date();
+        bulanFilter = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+        if(elFilter) elFilter.value = bulanFilter;
+    }
+    let dataTampil = daftarAbsensi.filter(x => x.bulan === bulanFilter);
+    if(dataTampil.length === 0){
+        tb.innerHTML = '<tr><td colspan="10" style="padding:15px; text-align:center; color:#888;">📭 Belum ada data absensi</td></tr>';
+        return;
+    }
+    dataTampil.sort((a,b) => b.tanggal.localeCompare(a.tanggal));
+    tb.innerHTML = '';
+    dataTampil.forEach(r => {
+        let tampilStatus = r.status, warna='';
+        if(r.status==='Hadir'){tampilStatus='✅ Hadir';warna='color:green;';}
+        else if(r.status==='Setengah Hari'){tampilStatus='⛔ ½ Hari';warna='color:orange;';}
+        else if(r.status==='Izin'){tampilStatus='📝 Izin';warna='color:purple;';}
+        else if(r.status==='Tanpa Keterangan'){tampilStatus='❌ TanpaKet';warna='color:red;';}
+        tb.innerHTML += `<tr><td>${r.tanggal}</td><td class="tengah">${r.jamDatang||'—'}</td><td class="tengah">${r.jamPulang||'—'}</td><td class="tengah" style="color:blue;">${r.jamKerja||'—'}</td><td>${r.jabatan}</td><td>${r.nama}</td><td class="tengah" style="${warna} font-weight:bold;">${tampilStatus}</td><td>${r.keterangan||'—'}</td><td class="tengah"><button class="btn-blue btn-sm" onclick="bukaEditAbsensi('${r.tanggal}','${r.jamDatang}','${r.jamPulang}','${r.jabatan}','${r.nama.replace(/'/g,"\\'")}','${r.status}','${(r.keterangan||'').replace(/'/g,"\\'")}')">✏️</button></td><td class="tengah"><button class="btn-red btn-sm" onclick="hapusAbsensi('${r.tanggal}','${r.nama.replace(/'/g,"\\'")}')">🗑️</button></td></tr>`;
+    });
+}
+function bukaEditAbsensi(tgl, jmDtg, jmPlg, jab, nm, st, ket){
+    document.getElementById('absensiTanggal').value = tgl;
+    document.getElementById('absensiJamDatang').value = jmDtg;
+    document.getElementById('absensiJamPulang').value = jmPlg;
+    document.getElementById('absensiJabatan').value = jab;
+    document.getElementById('absensiNama').value = nm;
+    document.getElementById('absensiKeterangan').value = ket;
+    window.statusAbsensiSekarang = st;
+}
+function hapusAbsensi(tgl, nama){
+    if(confirm(`⚠️ Hapus absensi:\n${nama}\nTanggal: ${tgl}`)){
+        daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal===tgl && x.nama===nama));
+        simpanData();
+        tampilkanRekapAbsensi();
+        tampilkanRekapPerStaff();
+    }
+}
+function tampilkanRekapPerStaff(){
+    let elFilter = document.getElementById('filterAbsensiBulan');
+    let tb = document.getElementById('isiRekapStaff');
+    let labelBulan = document.getElementById('labelBulanRekap');
+    if(!tb) return;
+    let bulanFilter;
+    if(elFilter && elFilter.value) bulanFilter = elFilter.value;
+    else {
+        let d = new Date();
+        bulanFilter = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    }
+    if(labelBulan){
+        let [thn,bln] = bulanFilter.split('-');
+        let namaBln = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        labelBulan.textContent = `${namaBln[parseInt(bln)-1]} ${thn}`;
+    }
+    let dataBulanIni = daftarAbsensi.filter(x => x.bulan === bulanFilter);
+    if(dataBulanIni.length === 0){
+        tb.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:#888;">📭 Belum ada data</td></tr>';
+        return;
+    }
+    let rekap = {};
+    dataBulanIni.forEach(r => {
+        let kunci = r.nama+'|'+r.jabatan;
+        if(!rekap[kunci]) rekap[kunci]={nama:r.nama,jabatan:r.jabatan,hadir:0,setengah:0,izin:0,tanpaKet:0,totalMenit:0};
+        if(r.status==='Hadir') rekap[kunci].hadir++;
+        else if(r.status==='Setengah Hari') rekap[kunci].setengah++;
+        else if(r.status==='Izin') rekap[kunci].izin++;
+        else if(r.status==='Tanpa Keterangan') rekap[kunci].tanpaKet++;
+        if(r.jamDatang && r.jamPulang){
+            let [j1,m1]=r.jamDatang.split(':').map(Number);
+            let [j2,m2]=r.jamPulang.split(':').map(Number);
+            let menit=(j2*60+m2)-(j1*60+m1);
+            if(menit<0) menit+=24*60;
+            rekap[kunci].totalMenit+=menit;
+        }
+    });
+    let daftar=Object.values(rekap).sort((a,b)=>a.nama.localeCompare(b.nama));
+    tb.innerHTML='';
+    daftar.forEach((r,i)=>{
+        let totalHari=r.hadir+r.setengah+r.izin+r.tanpaKet;
+        let jm=Math.floor(r.totalMenit/60), mn=r.totalMenit%60;
+        let teksJam=r.totalMenit>0?`${jm}j ${mn}m`:'—';
+        tb.innerHTML+=`<tr><td class="tengah">${i+1}</td><td>${r.nama}</td><td class="tengah">${r.jabatan}</td><td class="tengah" style="color:green;">${r.hadir}</td><td class="tengah" style="color:orange;">${r.setengah}</td><td class="tengah" style="color:purple;">${r.izin}</td><td class="tengah" style="color:red;">${r.tanpaKet}</td><td class="tengah">${totalHari}</td><td class="tengah" style="color:blue;">${teksJam}</td></tr>`;
+    });
+}
+
+// ==============================================
+// 📦 BARANG & STOK
+// ==============================================
+function simpanBarang(){
+    let kode=document.getElementById('kodeBarang').value.trim().toUpperCase();
+    let nama=document.getElementById('namaBarang').value.trim();
+    let jenisMotor=document.getElementById('jenisMotorBarang').value.trim()||'Semua Motor';
+    let satuan=document.getElementById('satuanBarang').value;
+    let modal=parseInt(document.getElementById('modalBarang').value)||0;
+    let jual=parseInt(document.getElementById('jualBarang').value)||0;
+    let jumlah=parseInt(document.getElementById('jumlahBarang').value)||0;
+    if(!nama||!kode){alert('⚠️ Isi Nama & Kode Barang!');return;}
+    let idxEdit=dataEdit;
+    let ada=barang.findIndex((b,i)=>b.kode===kode && i!==idxEdit);
+    if(ada>=0){alert('⚠️ Kode Sudah Ada!');return;}
+    if(idxEdit!==null){
+        barang[idxEdit].kode=kode;
+        barang[idxEdit].nama=nama;
+        barang[idxEdit].jenisMotor=jenisMotor;
+        barang[idxEdit].satuan=satuan;
+        barang[idxEdit].modal=modal;
+        barang[idxEdit].jual=jual;
+        barang[idxEdit].stok=(barang[idxEdit].stok||0)+jumlah;
+        alert('✅ Diperbarui!');
+        dataEdit=null;
+        document.getElementById('btnBatalEdit').classList.add('sembunyi');
+    }else{
+        barang.push({kode,nama,jenisMotor,satuan,modal,jual,stok:jumlah,terjual:0});
+        alert('✅ Tersimpan!');
+    }
+    simpanData();
+    tampilkanTabel();
+    isiPilihanBarang();
+    document.getElementById('kodeBarang').value='';
+    document.getElementById('namaBarang').value='';
+    document.getElementById('jenisMotorBarang').value='';
+    document.getElementById('modalBarang').value='';
+    document.getElementById('jualBarang').value='';
+    document.getElementById('jumlahBarang').value='1';
+}
+function tampilkanTabel(){
+    let tb=document.getElementById('isiTabelBarang');
+    let cari=(document.getElementById('cariBarang')?.value||'').trim().toUpperCase();
+    if(!tb)return;
+    let tampil=!cari?barang:barang.filter(b=>b.nama.toUpperCase().includes(cari)||b.kode.toUpperCase().includes(cari));
+    if(tampil.length===0){tb.innerHTML='<tr><td colspan="11" style="padding:15px; text-align:center; color:#888;">📭 Barang tidak ditemukan</td></tr>';return;}
+    tb.innerHTML='';
+    tampil.forEach(b=>{
+        let no=barang.indexOf(b)+1;
+        let warna=b.stok<=stokMinim?'color:red; font-weight:bold;':'';
+        tb.innerHTML+=`<tr><td class="tengah">${no}</td><td class="tengah">${b.kode}</td><td>${b.nama}</td><td>${b.jenisMotor}</td><td class="tengah">${b.satuan}</td><td class="angka">${formatRupiah(b.modal)}</td><td class="angka">${formatRupiah(b.jual)}</td><td class="tengah" style="${warna}">${b.stok}</td><td class="tengah">${b.terjual||0}</td><td class="tengah"><button class="btn-orange btn-sm" onclick="editBarang(${barang.indexOf(b)})">✏️</button></td><td class="tengah"><button class="btn-red btn-sm" onclick="hapusBarang(${barang.indexOf(b)})">🗑️</button></td></tr>`;
+    });
+    isiPilihanBarang();
+}
+function editBarang(idx){
+    let b=barang[idx];
+    document.getElementById('kodeBarang').value=b.kode;
+    document.getElementById('namaBarang').value=b.nama;
+    document.getElementById('jenisMotorBarang').value=b.jenisMotor||'';
+    document.getElementById('satuanBarang').value=b.satuan;
+    document.getElementById('modalBarang').value=b.modal;
+    document.getElementById('jualBarang').value=b.jual;
+    document.getElementById('jumlahBarang').value=0;
+    dataEdit=idx;
+    document.getElementById('btnBatalEdit').classList.remove('sembunyi');
+}
+function batalEdit(){
+    dataEdit=null;
+    document.getElementById('btnBatalEdit').classList.add('sembunyi');
+    document.getElementById('kodeBarang').value='';
+    document.getElementById('namaBarang').value='';
+    document.getElementById('jenisMotorBarang').value='';
+    document.getElementById('modalBarang').value='';
+    document.getElementById('jualBarang').value='';
+    document.getElementById('jumlahBarang').value='1';
+}
+function hapusBarang(idx){
+    if(confirm(`⚠️ Hapus:\n${barang[idx].kode} — ${barang[idx].nama}`)){
+        barang.splice(idx,1);
+        simpanData();
+        tampilkanTabel();
+    }
+}
+function isiPilihanBarang(){
+    let sel=document.getElementById('pilihBarang');
+    if(!sel)return;
+    sel.innerHTML='<option value="">— Pilih Barang —</option>';
+    barang.forEach((b,i)=>sel.innerHTML+=`<option value="${i}">${b.kode} — ${b.nama} (Stok:${b.stok})</option>`);
+}
+function isiHargaDariStok(){
+    let sel=document.getElementById('pilihBarang');
+    let idx=sel.value;
+    if(idx!=='' && barang[idx]) document.getElementById('hargaJualKeranjang').value=barang[idx].jual;
+}
+// ==============================================
+// 🛒 KERANJANG & TRANSAKSI
+// ==============================================
+function masukkanKeranjang(){
+    let sel = document.getElementById('pilihBarang');
+    let idx = sel.value;
+    let harga = parseInt(document.getElementById('hargaJualKeranjang').value) || 0;
+    let jumlah = parseInt(document.getElementById('jumlahBeli').value) || 1;
+    if(idx === ''){ alert('⚠️ Pilih Barang Dulu!'); return; }
+    if(harga <= 0){ alert('⚠️ Isi Harga!'); return; }
+    if(jumlah <= 0){ alert('⚠️ Jumlah Salah!'); return; }
+    let b = barang[idx];
+    if(b.stok < jumlah){ alert(`⚠️ Stok Kurang! Tersedia: ${b.stok}`); return; }
+    keranjang.push({kode:b.kode, nama:b.nama, satuan:b.satuan, hargaModal:b.modal, hargaJual:harga, jumlah:jumlah, subtotal:harga*jumlah});
+    tampilkanKeranjang();
+    document.getElementById('jumlahBeli').value = '1';
+}
+function tampilkanKeranjang(){
+    let tb = document.getElementById('isiKeranjang');
+    if(!tb) return;
+    tb.innerHTML = '';
+    if(keranjang.length === 0){
+        tb.innerHTML = '<tr><td colspan="5" style="padding:10px; text-align:center; color:#888;">Keranjang Kosong</td></tr>';
+    } else {
+        keranjang.forEach((item,i) => {
+            tb.innerHTML += `<tr>
+                <td>${item.nama}</td>
+                <td class="tengah">${item.jumlah} ${item.satuan}</td>
+                <td class="angka">${formatRupiah(item.hargaJual)}</td>
+                <td class="angka">${formatRupiah(item.subtotal)}</td>
+                <td class="tengah"><button class="btn-red btn-sm" onclick="hapusDariKeranjang(${i})">🗑️</button></td>
+            </tr>`;
+        });
+    }
+    hitungTotalKeranjang();
+}
+function hapusDariKeranjang(i){
+    keranjang.splice(i,1);
+    tampilkanKeranjang();
+}
+function hitungTotalKeranjang(){
+    let totalBrg = keranjang.reduce((s,i) => s + i.subtotal, 0);
+    let jasa = parseInt(document.getElementById('biayaJasaTotal').value) || 0;
+    document.getElementById('totalBarang').textContent = formatRupiah(totalBrg);
+    document.getElementById('totalJasa').textContent = formatRupiah(jasa);
+    document.getElementById('totalBayar').textContent = formatRupiah(totalBrg + jasa);
+    hitungSisaBayar();
+}
+function hitungSisaBayar(){
+    let totalBrg = keranjang.reduce((s,i) => s + i.subtotal, 0);
+    let jasa = parseInt(document.getElementById('biayaJasaTotal').value) || 0;
+    let totalAkhir = totalBrg + jasa;
+    let dp = parseInt(document.getElementById('uangMuka').value) || 0;
+    let sisa = Math.max(0, totalAkhir - dp);
+    document.getElementById('sisaBayar').textContent = formatRupiah(sisa);
+    document.getElementById('uangKembalian').textContent = dp > totalAkhir ? formatRupiah(dp - totalAkhir) : 'Rp 0';
+}
+function selesaikanTransaksi(){
+    let nama = document.getElementById('namaPelanggan').value.trim() || '-';
+    let hp = document.getElementById('nomorHP').value.trim() || '-';
+    let plat = document.getElementById('platKendaraan').value.trim() || '-';
+    let motor = document.getElementById('jenisMotor').value.trim().toUpperCase() || '-';
+    let jasa = parseInt(document.getElementById('biayaJasaTotal').value) || 0;
+    let jenisJasa = document.getElementById('jenisJasa').value;
+    let mekanik = document.getElementById('namaMekanik').value.trim() || '-';
+    let caraBayar = (document.querySelector('input[name="caraBayar"]:checked')||{}).value || 'Tunai';
+    let uangDibayar = parseInt(document.getElementById('uangMuka').value) || 0;
+    let totalBrg = keranjang.reduce((s,i) => s + i.subtotal, 0);
+    let totalAkhir = totalBrg + jasa;
+    let labaBrg = keranjang.reduce((s,i) => s + ((i.hargaJual - i.hargaModal) * i.jumlah), 0);
+    let sisaBayar = Math.max(0, totalAkhir - uangDibayar);
+    let statusBayar = sisaBayar <= 0 ? '✅ Lunas' : '⚠️ Belum Lunas';
+
+    if(keranjang.length === 0 && jasa === 0){ alert('⚠️ Isi barang atau jasa dulu!'); return; }
+
+    // Kurangi stok
+    keranjang.forEach(item => {
+        let idx = barang.findIndex(b => b.kode === item.kode);
+        if(idx >= 0){
+            barang[idx].stok -= item.jumlah;
+            barang[idx].terjual = (barang[idx].terjual || 0) + item.jumlah;
+        }
+    });
+
+    // Simpan riwayat
+    riwayat.unshift({
+        tgl: updateWaktu(), nama, hp, plat, motor,
+        items: JSON.parse(JSON.stringify(keranjang)),
+        jenisJasa, mekanik, biayaJasa:jasa,
+        totalBarang:totalBrg, labaBarang:labaBrg,
+        totalAkhir, uangDibayar, sisaBayar, statusBayar, caraBayar
+    });
+
+    simpanData();
+    tampilkanTabel();
+    tampilkanRiwayat();
+    tampilkanBarangTerlaris();
+
+    // Kosongkan form
+    keranjang = []; tampilkanKeranjang();
+    document.getElementById('namaPelanggan').value='';
+    document.getElementById('nomorHP').value='';
+    document.getElementById('platKendaraan').value='';
+    document.getElementById('jenisMotor').value='';
+    document.getElementById('biayaJasaTotal').value='0';
+    document.getElementById('jenisJasa').selectedIndex=0;
+    document.getElementById('namaMekanik').value='';
+    document.getElementById('uangMuka').value='0';
+    alert('✅ Transaksi Tersimpan!');
+}
+
+// ==============================================
+// 📝 RIWAYAT PENJUALAN
+// ==============================================
+function tampilkanRiwayat(){
+    let tb = document.getElementById('isiRiwayat');
+    let cari = (document.getElementById('cariRiwayat')?.value||'').trim().toUpperCase();
+    if(!tb) return;
+    let tampil = riwayat;
+    if(cari){
+        tampil = riwayat.filter(r =>
+            r.nama.toUpperCase().includes(cari) ||
+            r.plat.toUpperCase().includes(cari) ||
+            r.mekanik.toUpperCase().includes(cari) ||
+            r.jenisJasa.toUpperCase().includes(cari)
+        );
+    }
+    if(tampil.length === 0){
+        tb.innerHTML = '<tr><td colspan="8" style="padding:15px; text-align:center; color:#888;">📭 Belum ada riwayat</td></tr>';
+        return;
+    }
+    tb.innerHTML = '';
+    tampil.forEach((r,i) => {
+        let uraian = r.items.map(x => `${x.nama}×${x.jumlah}`).join(', ') || r.jenisJasa;
+        if(r.biayaJasa > 0) uraian += (uraian?', ':'') + r.jenisJasa;
+        tb.innerHTML += `<tr>
+            <td style="font-size:12px;">${r.tgl}</td>
+            <td>${r.nama} / ${r.plat}</td>
+            <td style="font-size:12px;">${uraian}</td>
+            <td>${r.mekanik}</td>
+            <td class="angka">${formatRupiah(r.totalAkhir)}</td>
+            <td class="tengah">${r.caraBayar}<br>${formatRupiah(r.uangDibayar)}</td>
+            <td class="tengah" style="${r.sisaBayar>0?'color:red;':'color:green;'} font-weight:bold;">${r.statusBayar}</td>
+            <td class="tengah"><button class="btn-red btn-sm" onclick="hapusRiwayat(${riwayat.indexOf(r)})">🗑️</button></td>
+        </tr>`;
+    });
+}
+function hapusRiwayat(idx){
+    if(confirm('⚠️ Hapus riwayat ini?\n⚠️ Stok barang TIDAK dikembalikan otomatis!')){
+        riwayat.splice(idx,1);
+        simpanData();
+        tampilkanRiwayat();
+        tampilkanBarangTerlaris();
+    }
+}
+
+// ==============================================
+// 🔥 BARANG TERLARIS & JARANG TERJUAL
+// ==============================================
+function tampilkanBarangTerlaris(){
+    let terjual = {};
+    riwayat.forEach(r => {
+        if(r.items && Array.isArray(r.items)){
+            r.items.forEach(brg => {
+                terjual[brg.nama] = (terjual[brg.nama] || 0) + (brg.jumlah || 0);
+            });
+        }
+    });
+    let daftar = Object.entries(terjual).sort((a,b) => b[1]-a[1]);
+    let terlaris = daftar.slice(0,5);
+    let jarang = daftar.slice(-5).reverse();
+
+    let elTerlaris = document.getElementById('isiTerlaris');
+    let elJarang = document.getElementById('isiJarang');
+    if(elTerlaris){
+        elTerlaris.innerHTML = terlaris.length===0 ? '<p style="color:#888;">Belum ada data</p>' :
+            terlaris.map((x,i) => `${i+1}. ${x[0]} × ${x[1]}`).join('<br>');
+    }
+    if(elJarang){
+        elJarang.innerHTML = jarang.length===0 ? '<p style="color:#888;">Belum ada data</p>' :
+            jarang.map((x,i) => `${i+1}. ${x[0]} × ${x[1]}`).join('<br>');
+    }
+}
+
+// ==============================================
+// 💰 LAPORAN & PEMBAGIAN HASIL
+// ==============================================
+function bukaLaporan(){
+    let sandi = document.getElementById('sandiLaporan').value;
+    if(sandi === kataSandiLaporan){
+        document.getElementById('kunciLaporan').style.display = 'none';
+        document.getElementById('isiLaporan').classList.remove('sembunyi');
+        ubahJenisGrafik('bulanan', document.getElementById('btnBulanan'));
+    } else {
+        alert('❌ Kata sandi salah!');
+        document.getElementById('sandiLaporan').value = '';
+    }
+}
+function gantiSandiLaporan(){
+    let lama = prompt('Masukkan sandi lama:');
+    if(lama !== kataSandiLaporan){ alert('❌ Sandi lama salah!'); return; }
+    let baru = prompt('Masukkan sandi baru:');
+    if(!baru || baru.length<3){ alert('⚠️ Sandi terlalu pendek!'); return; }
+    let ulang = prompt('Ulangi sandi baru:');
+    if(baru !== ulang){ alert('❌ Sandi tidak cocok!'); return; }
+    kataSandiLaporan = baru;
+    localStorage.setItem('sandiLaporanBengkel', baru);
+    alert('✅ Sandi Laporan berhasil diganti!');
+}
+function ubahJenisGrafik(jenis, tombol){
+    jenisGrafikAktif = jenis;
+    document.querySelectorAll('#btnHarian,#btnBulanan,#btnTahunan').forEach(b=>{b.style.background=''; b.style.color='';});
+    tombol.style.background='#2563eb';
+    tombol.style.color='white';
+    hitungUlangLaporan();
+}
+function ambilDataFilterLaporan(){
+    let dari = document.getElementById('laporanDari').value;
+    let sampai = document.getElementById('laporanSampai').value;
+    let data = riwayat;
+    if(dari || sampai){
+        let tglDari = dari ? new Date(dari+'T00:00:00') : new Date('2000-01-01');
+        let tglSampai = sampai ? new Date(sampai+'T23:59:59') : new Date();
+        data = riwayat.filter(r => {
+            let tgl = r.tgl.split(' ')[0].split('/');
+            let trx = new Date(`${tgl[2]}-${tgl[1]}-${tgl[0]}`);
+            return trx >= tglDari && trx <= tglSampai;
+        });
+    }
+    return data;
+}
+function hitungUlangLaporan(){
+    let data = ambilDataFilterLaporan();
+    let omset = data.reduce((s,r) => s + (r.totalBarang||0), 0);
+    let totalJasa = data.reduce((s,r) => s + (r.biayaJasa||0), 0);
+    let labaBarang = data.reduce((s,r) => s + (r.labaBarang||0), 0);
+    let labaKotor = labaBarang + totalJasa;
+    let biayaOp = parseInt(document.getElementById('biayaOperasional').value) || 0;
+    let biayaMt = parseInt(document.getElementById('biayaMaintenance').value) || 0;
+    let labaBersih = labaKotor - biayaOp - biayaMt;
+
+    document.getElementById('lapOmset').textContent = formatRupiah(omset);
+    document.getElementById('lapJasa').textContent = formatRupiah(totalJasa);
+    document.getElementById('lapLabaBarang').textContent = formatRupiah(labaBarang);
+    document.getElementById('lapLabaKotor').textContent = formatRupiah(labaKotor);
+
+    // Tampil tabel grafik sesuai jenis
+    tampilkanTabelLaporan(data);
+}
+function tampilkanTabelLaporan(data){
+    let tb = document.getElementById('isiTabelGrafik');
+    if(!tb) return;
+    let kelompok = {};
+    data.forEach(r => {
+        let tgl = r.tgl.split(' ')[0].split('/');
+        let trx = new Date(`${tgl[2]}-${tgl[1]}-${tgl[0]}`);
+        let kunci;
+        if(jenisGrafikAktif === 'harian'){
+            kunci = `${String(trx.getDate()).padStart(2,'0')}/${String(trx.getMonth()+1).padStart(2,'0')} ${r.tgl.split(' ')[1].substring(0,2)}`;
+        } else if(jenisGrafikAktif === 'bulanan'){
+            let bln = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            kunci = `${bln[trx.getMonth()]} ${trx.getFullYear()}`;
+        } else {
+            kunci = `${trx.getFullYear()}`;
+        }
+        if(!kelompok[kunci]) kelompok[kunci] = {trx:0, penjualan:0, jasa:0, laba:0};
+        kelompok[kunci].trx++;
+        kelompok[kunci].penjualan += r.totalBarang||0;
+        kelompok[kunci].jasa += r.biayaJasa||0;
+        kelompok[kunci].laba += (r.labaBarang||0) + (r.biayaJasa||0);
+    });
+    tb.innerHTML = '';
+    if(Object.keys(kelompok).length === 0){
+        tb.innerHTML = '<tr><td colspan="5" style="padding:10px; text-align:center; color:#888;">📭 Tidak ada data</td></tr>';
+        return;
+    }
+    Object.entries(kelompok).forEach(([k,v]) => {
+        tb.innerHTML += `<tr>
+            <td>${k}</td>
+            <td class="tengah">${v.trx}</td>
+            <td class="angka">${formatRupiah(v.penjualan)}</td>
+            <td class="angka">${formatRupiah(v.jasa)}</td>
+            <td class="angka">${formatRupiah(v.laba)}</td>
+        </tr>`;
+    });
+}
+
+// ==============================================
+// 🔧 DAFTAR STAF
+// ==============================================
+function simpanStaf(){
+    let nama = document.getElementById('stafNama').value.trim();
+    let jabatan = document.getElementById('stafJabatan').value;
+    let gaji = parseInt(document.getElementById('stafGaji').value) || 0;
+    if(!nama){ alert('⚠️ Isi Nama Staf!'); return; }
+    daftarStaf.push({nama, jabatan, gajiPokok:gaji, jasa:0, bagiHasil:0});
+    simpanData();
+    tampilkanTabelStaf();
+    document.getElementById('stafNama').value='';
+    document.getElementById('stafGaji').value='';
+}
+function tampilkanTabelStaf(){
+    let tb = document.getElementById('isiTabelStaf');
+    if(!tb) return;
+    tb.innerHTML = '';
+    if(daftarStaf.length === 0){
+        tb.innerHTML = '<tr><td colspan="8" style="padding:10px; text-align:center; color:#888;">📭 Belum ada staf</td></tr>';
+        return;
+    }
+    daftarStaf.forEach((s,i) => {
+        let total = s.gajiPokok + s.bagiHasil;
+        tb.innerHTML += `<tr>
+            <td class="tengah">${i+1}</td>
+            <td>${s.nama}</td>
+            <td class="tengah">${s.jabatan}</td>
+            <td class="angka">${formatRupiah(s.gajiPokok)}</td>
+            <td class="tengah">${s.jasa} kali</td>
+            <td class="angka">${formatRupiah(s.bagiHasil)}</td>
+            <td class="angka" style="font-weight:bold;">${formatRupiah(total)}</td>
+            <td class="tengah"><button class="btn-red btn-sm" onclick="hapusStaf(${i})">🗑️</button></td>
+        </tr>`;
+    });
+}
+function hapusStaf(idx){
+    if(confirm(`⚠️ Hapus Staf:\n${daftarStaf[idx].nama}`)){
+        daftarStaf.splice(idx,1);
+        simpanData();
+        tampilkanTabelStaf();
+    }
+}
+
+// ==============================================
+// 🤝 DAFTAR INVESTOR
+// ==============================================
+function tambahInvestor(){
+    let nama = prompt('Masukkan Nama Investor:');
+    if(!nama) return;
+    let persen = parseInt(prompt('Masukkan % Pembagian Laba:') || 0);
+    daftarInvestor.push({nama, persen});
+    simpanData();
+    tampilkanTabelInvestor();
+}
+function tampilkanTabelInvestor(){
+    let tb = document.getElementById('isiTabelInvestor');
+    if(!tb) return;
+    let data = ambilDataFilterLaporan();
+    let labaKotor = data.reduce((s,r)=>s+((r.labaBarang||0)+(r.biayaJasa||0)),0);
+    let op = parseInt(document.getElementById('biayaOperasional').value)||0;
+    let mt = parseInt(document.getElementById('biayaMaintenance').value)||0;
+    let labaBersih = labaKotor - op - mt;
+
+    tb.innerHTML = '';
+    if(daftarInvestor.length === 0){
+        tb.innerHTML = '<tr><td colspan="4" style="padding:10px; text-align:center; color:#888;">📭 Belum ada investor</td></tr>';
+        return;
+    }
+    daftarInvestor.forEach((inv,i) => {
+        let hak = Math.round(labaBersih * inv.persen / 100);
+        tb.innerHTML += `<tr>
+            <td class="tengah">${i+1}</td>
+            <td>${inv.nama}</td>
+            <td class="tengah">${inv.persen} %</td>
+            <td class="angka">${formatRupiah(hak)}</td>
+        </tr>`;
+    });
+}
+
+// ==============================================
+// ✅ SAAT PERTAMA DIBUKA
+// ==============================================
+window.onload = function(){
+    // Tunggu login dulu, tidak auto-load
+};
+</script>
+</body>
+</html>

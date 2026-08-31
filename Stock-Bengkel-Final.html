@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 Stok & Penjualan Bengkel</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+.grafik-baris{display:flex; gap:20px; flex-wrap:wrap; margin-top:15px;}
+.grafik-kotak{flex:1; min-width:320px; padding:10px; background:#fafafa; border-radius:8px;}
+.tab-grafik{margin-bottom:10px;}
+.tab-grafik button{padding:6px 12px; margin:0 2px; background:#ddd; color:#333; border:none; border-radius:4px;}
+.tab-grafik button.aktif{background:#2980b9; color:white;}
+
+        *{box-sizing:border-box; font-family:Segoe UI, sans-serif; margin:0; padding:0;}
+        body{background:#f0f4f8; padding:20px; max-width:1400px; margin:0 auto;}
+        h1,h2,h3{color:#2c3e50; margin-bottom:15px;}
+        .card{background:white; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.1); margin-bottom:25px;}
+        input,select,button{padding:10px 12px; margin:5px; border:1px solid #ccc; border-radius:6px; font-size:14px;}
+        input[readonly]{background:#f8f9fa; color:#333;}
+        input[type=number]{width:140px;}
+        select{min-width:220px;}
+        select#satuan{min-width:100px;}
+        input#kode, input#kodeKeranjang{text-transform:uppercase; font-weight:bold; letter-spacing:1px;}
+        input#nama, input#jenisMotorBarang{text-transform:uppercase;}
+        input#jenisMotor{text-transform:uppercase;}
+        button{background:#2980b9; color:white; border:none; cursor:pointer; font-weight:500;}
+        button:hover{background:#1f618d;}
+        button.btn-red{background:#e74c3c;}
+        button.btn-red:hover{background:#c0392b;}
+        button.btn-orange{background:#f39c12;}
+        button.btn-orange:hover{background:#d68910;}
+        button.btn-green{background:#27ae60; padding:8px 12px;}
+        button.btn-green:hover{background:#219653;}
+        button.btn-sm{padding:4px 8px; font-size:12px; margin:2px;}
+        button.btn-purple{background:#9b59b6; padding:6px 10px; font-size:13px;}
+        button.btn-purple:hover{background:#8e44ad;}
+        button.btn-excel{background:#107C41;}
+        button.btn-excel:hover{background:#0c6133;}
+        table{width:100%; border-collapse:separate; border-spacing:0; margin-top:12px; font-size:14px; border:1px solid #d0d7de; border-radius:8px; overflow:hidden;}
+        th{background:#2c3e50; color:white; padding:12px 10px; text-align:left; font-weight:600; white-space:nowrap; border-bottom:2px solid #4a5568;}
+        td{padding:11px 10px; border-bottom:1px solid #eaecef; border-right:1px solid #eaecef;}
+        td:last-child{border-right:none;}
+        tr:nth-child(even){background:#f8fafc;}
+        tr:hover{background:#eef6fd;}
+        td.angka{text-align:right; font-family:Consolas,monospace; font-weight:500;}
+        th.angka{text-align:right;}
+        td.tengah{text-align:center;}
+        td.stok-kritis{background:#ffebee; color:#c62828; font-weight:bold;}
+        .ringkas{display:flex; gap:15px; flex-wrap:wrap; margin-top:15px;}
+        .kotak{padding:12px 16px; border-radius:8px; background:#eef6fd; border-left:4px solid #2980b9;}
+        .kotak-hijau{border-left-color:#27ae60; background:#eafaf1;}
+        .kotak-kuning{border-left-color:#f39c12; background:#fef9e7;}
+        .atas-riwayat{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;}
+        .pencarian-stok{margin-bottom:12px; padding:10px; background:#f8f9fa; border-radius:6px; border-left:4px solid #27ae60;}
+        .jasa-terpisah{margin-top:15px; padding:10px; background:#fff3cd; border-radius:6px; border-left:4px solid #ffc107;}
+        .data-pelanggan{background:#eefaf8; padding:10px; border-radius:6px; margin-bottom:10px; border-left:4px solid #20c997;}
+        .cari-riwayat-luar{background:#f0f4ff; padding:15px; border-radius:8px; border-left:5px solid #6f42c1; margin-bottom:20px;}
+        .hasil-cari{margin-top:10px; padding:10px; background:#fff; border-radius:6px; border:1px solid #ddd; display:none;}
+        .hasil-cari.ada{display:block;}
+        .pelanggan-item{padding:10px 12px; border-bottom:1px solid #eee; cursor:pointer; border-radius:4px; transition:background .2s;}
+        .pelanggan-item:hover{background:#f3f4f6;}
+        .modal-latar{position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); display:none; justify-content:center; align-items:center; z-index:9999;}
+        .modal-latar.tampil{display:flex;}
+        .modal-kotak{background:white; padding:25px; border-radius:10px; width:95%; max-width:600px; max-height:90vh; overflow-y:auto; box-shadow:0 5px 20px rgba(0,0,0,.3);}
+        .modal-tutup{float:right; background:transparent; color:#666; font-size:22px; padding:0 8px; margin:-5px; border:none; cursor:pointer;}
+        .nota-cetak{display:none;}
+        .edit-mode{background:#fff8e1; padding:8px; border-radius:6px; border-left:3px solid #f39c12; margin-bottom:8px;}
+        hr{border:none; border-top:2px dashed #ccc; margin:10px 0;}
+        .layar-login{position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center; z-index:99999;}
+        .kotak-login{background:white; padding:35px 25px; border-radius:12px; box-shadow:0 5px 25px rgba(0,0,0,.3); text-align:center; width:90%; max-width:400px;}
+        .sembunyi{display:none !important;}
+        .btn-riwayat{background:#008080;}
+        .btn-riwayat:hover{background:#006666;}
+        @media print{
+            body{background:white;}
+            body *{visibility:hidden;}
+            .sembunyi-cetak,.modal-latar,.layar-login{display:none !important;}
+            .nota-cetak{display:block !important; width:100%; padding:10px; margin:0; visibility:visible !important;}
+            .nota-cetak *{visibility:visible !important;}
+            .nota-cetak table{width:100%; border:1px solid #333; border-collapse:collapse;}
+            .nota-cetak th, .nota-cetak td{border:1px solid #333; padding:8px; color:black;}
+            @page {size:A4; margin:15mm;}
+        }
+    </style>
+</head>
+<body onload="cekSandiSaatBuka()">
+
+
+<!-- LAYAR LOGIN -->
+<div class="layar-login" id="layarLogin">
+    <div class="kotak-login">
+        <h2>🔐 Masuk Aplikasi Bengkel</h2>
+        <input type="password" id="inputSandi" placeholder="Masukkan Kata Sandi" style="width:100%; padding:12px; font-size:16px; margin:15px 0;">
+        <br>
+        <button onclick="verifikasiSandi()" style="padding:12px 30px; font-size:16px; width:100%;">MASUK</button>
+        <p style="color:#888; margin-top:15px; font-size:13px;">Ketik kata sandi lalu tekan tombol MASUK atau tombol Enter</p>
+
+        <hr style="margin:20px 0; border:none; border-top:1px dashed #ccc;">
+
+        <!-- 🔑 BAGIAN GANTI KATA SANDI -->
+        <h3 style="font-size:15px; color:#3498db; margin-bottom:10px;">🔑 Ganti Kata Sandi</h3>
+        <input type="password" id="sandiLama" placeholder="Kata Sandi Saat Ini" style="width:100%; padding:10px; font-size:15px; margin-bottom:8px;">
+        <input type="password" id="sandiBaru" placeholder="Kata Sandi Baru (min. 4 karakter)" style="width:100%; padding:10px; font-size:15px; margin-bottom:8px;">
+        <input type="password" id="sandiUlang" placeholder="Ulangi Kata Sandi Baru" style="width:100%; padding:10px; font-size:15px; margin-bottom:12px;">
+        <button onclick="gantiKataSandi()" style="padding:9px; font-size:15px; width:100%; background:#3498db; color:white; border:none; border-radius:5px; cursor:pointer;">✅ Simpan Sandi Baru</button>
+        <p style="margin-top:8px; font-size:12px; color:#888;">Sandi bawaan: <b>1234</b> — Data Anda TIDAK akan hilang!</p>
+    </div>
+</div>
+
+
+<!-- ISI APLIKASI -->
+<div id="isiAplikasi" class="sembunyi">
+
+    <h1 class="sembunyi-cetak">📦 APLIKASI PENCATATAN STOK & PENJUALAN BENGKEL</h1>
+
+    <div class="card sembunyi-cetak">
+        <h2>➕ Tambah Barang / Restock / Ubah Data</h2>
+        <div id="infoModeEdit" class="edit-mode" style="display:none;">✏️ SEDANG MODE EDIT — Ubah data lalu simpan</div>
+        <input type="text" id="kode" placeholder="Kode Barang" oninput="cekKodeBarang(this.value); kapitalKode(this); isiDataRestockOtomatis(this.value)">
+        <input type="text" id="nama" placeholder="Nama Barang" oninput="kapitalNama(this)">
+        <input type="text" id="jenisMotorBarang" placeholder="Jenis Motor" oninput="kapitalNama(this)">
+        <select id="satuan">
+            <option value="PCS">PCS</option>
+            <option value="BTL">BTL</option>
+        </select>
+        <input type="number" id="hargaPokok" placeholder="Harga Pokok" min="0">
+        <input type="number" id="hargaJual" placeholder="Harga Jual" min="0">
+        <input type="number" id="stokAwal" placeholder="Stok Awal" min="0">
+        <input type="number" id="jumlah" placeholder="Jumlah Restock" min="0">
+        <input type="number" id="stokMinimum" placeholder="Stok Minimum" min="0">
+        <button onclick="tambahBarang()">💾 Simpan Data</button>
+        <button class="btn-orange" onclick="resetForm()">🔄 Kosongkan Form</button>
+        <small id="infoKode"></small>
+    </div>
+
+<div class="card sembunyi-cetak">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h2>📋 Daftar Stok Barang</h2>
+            <button class="btn-excel" onclick="backupStokKeExcel()">📥 Backup ke Excel</button>
+        </div>
+        <div class="pencarian-stok">
+            🔍 Cari Barang: <input type="text" id="kataKunci" placeholder="Ketik Kode / Nama / Jenis Motor..." oninput="cariBarang(this.value)">
+        </div>
+        <table>
+            <thead>
+    <tr>
+        <th>Kode</th>
+        <th>Nama Barang</th>
+        <th>Jenis Motor</th>
+        <th>Satuan</th>
+        <th class="angka">Harga Pokok</th>
+        <th class="angka">Harga Jual</th>
+        <th class="angka">Stok Awal</th>
+        <th class="angka">Restock</th>
+        <th class="angka">Terjual</th>
+        <th class="angka">Sisa Stok</th>
+        <th class="tengah">Riwayat</th>
+        <th>Aksi</th>
+	<th>Hapus</th>
+    </tr>
+</thead>
+            <tbody id="tabelStokIsi"></tbody>
+        </table>
+    </div>
+
+
+    <div class="card sembunyi-cetak">
+        <h2>🛒 Transaksi Penjualan</h2>
+        <div class="data-pelanggan">
+            <strong>👤 Data Pelanggan:</strong><br>
+            <label>Nama Pelanggan</label>
+    <input type="text" id="namaPelanggan" placeholder="Ketik nama pelanggan..." autocomplete="off" oninput="beriSaranPelanggan(this.value)">
+    <div id="saranPelanggan" style="background:#fff; border:1px solid #ccc; border-top:none; max-height:200px; overflow-y:auto; display:none; position:absolute; z-index:99;"></div>
+
+    <label>Nomor Plat Kendaraan</label>
+    <input type="text" id="platKendaraan" placeholder="Contoh: DK 1234 AB" autocomplete="off" oninput="beriSaranPlat(this.value)">
+    <div id="saranPlat" style="background:#fff; border:1px solid #ccc; border-top:none; max-height:200px; overflow-y:auto; display:none; position:absolute; z-index:99;"></div>
+
+    <label>Jenis Motor</label>
+    <input type="text" id="jenisMotor" placeholder="Contoh: Beat FI / Vario 150">
+        </div>
+
+        <input type="text" id="kodeKeranjang" placeholder="Kode Barang" oninput="isiDataKeranjang(); kapitalKode(this)">
+        <input type="text" id="namaKeranjang" placeholder="Nama Barang" readonly style="width:220px;">
+        <input type="number" id="hargaBarangKeranjang" placeholder="Harga Jual" min="0" readonly style="background:#fef9e7;">
+        <input type="number" id="jumlahKeranjang" placeholder="Jumlah" min="1">
+        <button onclick="tambahKeKeranjang()">➕ Tambah ke Keranjang</button>
+        <input type="text" id="waktuInput" placeholder="Tanggal & Jam" readonly style="width:250px; color:#2980b9; font-weight:bold;">
+
+        <div class="jasa-terpisah">
+            <strong>🔧 Jenis Jasa Service:</strong>
+            <select id="jenisJasa" onchange="isiBiayaJasaOtomatis()">
+                <option value="">— Pilih Jenis Jasa —</option>
+                <option value="Jasa Pasang">Jasa Pasang</option>
+                <option value="Service CVT">Service CVT</option>
+                <option value="Service Mesin">Service Mesin</option>
+                <option value="Service Karburator / TB">Service Karburator / TB</option>
+                <option value="Jasa Lainnya">Jasa Lainnya</option>
+            </select>
+            <input type="number" id="biayaJasaTotal" placeholder="0" min="0" oninput="hitungTotalKeranjang()">
+            <small style="color:#666;">→ Bisa input JASA SAJA tanpa barang</small>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Uraian Barang</th>
+                    <th style="width:80px; text-align:center;">Jumlah</th>
+                    <th style="width:140px; text-align:right;">Subtotal</th>
+                    <th style="width:60px;"></th>
+                </tr>
+            </thead>
+            <tbody id="isiKeranjang"></tbody>
+        </table>
+
+        <div style="margin-top:10px; text-align:right; font-size:15px; line-height:1.7;">
+            <strong>Total Barang: <span id="totalBrgKeranjang">Rp 0</span></strong><br>
+            Biaya Jasa: <span id="totalJasaKeranjang">Rp 0</span><br>
+            <hr>
+            <strong style="font-size:18px; color:#c0392b;">TOTAL BAYAR: <span id="totalBayarKeranjang">Rp 0</span></strong>
+        </div>
+
+<div style="margin:10px 0;">
+    <label><strong>💳 Cara Pembayaran:</strong></label><br>
+    <label style="margin:0 8px; cursor:pointer;">
+        <input type="radio" name="caraBayar" value="Tunai" checked> 💵 Tunai
+    </label>
+    <label style="margin:0 8px; cursor:pointer;">
+        <input type="radio" name="caraBayar" value="QRIS"> 📱 QRIS
+    </label>
+    <label style="margin:0 8px; cursor:pointer;">
+        <input type="radio" name="caraBayar" value="Transfer"> 🏦 Transfer
+    </label>
+</div>
+
+        <div style="margin-top:12px;">
+            <button class="btn-green" onclick="selesaikanTransaksi()">✅ Selesai & Simpan</button>
+            <button class="btn-orange" onclick="kosongkanKeranjang()">🗑️ Kosongkan</button>
+        </div>
+    </div>
+
+    <div class="card cari-riwayat-luar sembunyi-cetak">
+        <h3>🔍 Cek Riwayat Kunjungan Pelanggan</h3>
+        <p style="margin:5px 0 8px 0; font-size:13px; color:#444;">Ketik Nama atau No. Plat → Klik untuk lihat detail</p>
+        <input type="text" id="kataKunciCari" placeholder="Nama atau No. Plat" style="width:100%;" oninput="cariPelanggan(this.value)">
+        <div id="hasilCari" class="hasil-cari"></div>
+    </div>
+
+
+<div class="card sembunyi-cetak">
+        <div class="atas-riwayat">
+            <h2>📝 Riwayat Penjualan</h2>
+            <div>
+                <button class="btn-excel" onclick="backupRiwayatKeExcel()">📥 Backup Riwayat</button>
+                <button class="btn-red" onclick="hapusSemuaRiwayat()">🗑️ Hapus Semua</button>
+            </div>
+        </div>
+
+<div style="padding:10px; background:#f5f5f5; border-radius:6px; margin-bottom:10px;">
+    <strong>📅 Filter Riwayat:</strong>
+    <button onclick="filterTanggal('hariini')" style="margin:0 5px; padding:4px 10px; border:none; border-radius:4px; background:#4CAF50; color:white; cursor:pointer;">Hari Ini</button>
+    <button onclick="filterTanggal('kemarin')" style="margin:0 5px; padding:4px 10px; border:none; border-radius:4px; background:#2196F3; color:white; cursor:pointer;">Kemarin</button>
+    <button onclick="filterTanggal('7hari')" style="margin:0 5px; padding:4px 10px; border:none; border-radius:4px; background:#FF9800; color:white; cursor:pointer;">7 Hari Terakhir</button>
+    <button onclick="filterTanggal('bulanini')" style="margin:0 5px; padding:4px 10px; border:none; border-radius:4px; background:#9C27B0; color:white; cursor:pointer;">Bulan Ini</button>
+    <button onclick="filterTanggal('semua')" style="margin:0 5px; padding:4px 10px; border:none; border-radius:4px; background:#607D8B; color:white; cursor:pointer;">Tampilkan Semua</button>
+    <hr style="margin:8px 0; border:none; border-bottom:1px solid #ccc;">
+    Dari: <input type="date" id="tglDari">
+    Sampai: <input type="date" id="tglSampai">
+    <button onclick="filterTanggal('rentang')" style="margin-left:5px; padding:4px 10px; border:none; border-radius:4px; background:#333; color:white; cursor:pointer;">Terapkan</button>
+</div>
+        <table>
+    <thead>
+        <tr>
+            <th>Tanggal</th>
+            <th>Pelanggan / Plat / Motor</th>
+            <th>Uraian</th>
+            <th class="angka">Penjualan</th>
+            <th class="angka">Modal Keluar</th>
+            <th class="angka">Laba Brg</th>
+            <th class="angka">Jasa</th>
+            <th class="angka">Total Bayar</th>
+            <th class="angka">Laba Kotor</th>
+            <th class="tengah">Bayar</th>
+            <th class="tengah">Cetak</th>
+            <th class="tengah">Detail</th>
+            <th class="tengah">Ubah</th>
+            <th class="tengah">Hapus</th>
+        </tr>
+    </thead>
+    <tbody id="tabelRiwayatIsi"></tbody>
+</table>
+
+        <div class="ringkas">
+            <div class="kotak">💰 Total Pendapatan:<br><span style="font-size:18px;" id="totalSemuaBayar">Rp 0</span></div>
+            <div class="kotak kotak-hijau">📈 Total Laba Barang:<br><span style="font-size:18px; color:#27ae60;" id="totalLabaBarang">Rp 0</span></div>
+            <div class="kotak kotak-kuning">🔧 Total Laba Jasa:<br><span style="font-size:18px; color:#b45309;" id="totalLabaJasa">Rp 0</span></div>
+            <div class="kotak">📊 Jumlah Transaksi:<br><span id="jumlahTransaksi">0</span></div>
+        </div>
+    </div>        
+
+
+    <!-- MODAL RIWAYAT RESTOCK -->
+    <div class="modal-latar" id="modalRiwayatRestock">
+        <div class="modal-kotak">
+            <button class="modal-tutup" onclick="tutupModalRiwayatRestock()">&times;</button>
+            <h3 id="judulRiwayatRestock">📋 Riwayat Restock Barang</h3>
+            <div id="isiRiwayatRestock"></div>
+        </div>
+    </div>
+
+    <div class="modal-latar" id="modalDetail">
+        <div class="modal-kotak">
+            <button class="modal-tutup" onclick="tutupModalDetail()">&times;</button>
+            <h3 id="modalJudul">📋 Detail Riwayat</h3>
+            <div id="modalIsi"></div>
+        </div>
+    </div>
+
+    <div class="nota-cetak" id="areaNota">
+        <div style="text-align:center; margin-bottom:20px; padding-bottom:10px; border-bottom:2px dashed #333;">
+            <h2 style="margin:0; color:#000;">NOTA PENJUALAN BENGKEL</h2>
+            <p style="margin:5px 0;">Terima Kasih Atas Kepercayaan Anda</p>
+        </div>
+        <p><strong>Tanggal:</strong> <span id="notaTanggal"></span></p>
+        <p><strong>Nama Pelanggan:</strong> <span id="notaNama"></span></p>
+        <p><strong>No. Plat:</strong> <span id="notaPlat"></span></p>
+        <p><strong>Jenis Motor:</strong> <span id="notaMotor"></span></p>
+        <table style="margin-top:15px; width:100%;">
+            <thead>
+                <tr>
+                    <th>Uraian Barang / Jasa</th>
+                    <th style="width:80px; text-align:center;">Jml</th>
+                    <th style="width:140px; text-align:right;">Harga</th>
+                </tr>
+            </thead>
+            <tbody id="isiNota"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+
+// ==============================================
+// 👤 SARAN OTOMATIS NAMA PELANGGAN
+// ==============================================
+function beriSaranPelanggan(kata) {
+    kata = kata.trim().toUpperCase();
+    let kotak = document.getElementById('saranPelanggan');
+    if (kata.length < 2) { kotak.style.display='none'; return; }
+
+    let cocok = riwayat.filter(r => (r.namaPelanggan||'').toUpperCase().includes(kata));
+    let unik = [];
+    cocok.forEach(r=>{
+        if(!unik.find(x=>x.nama===r.namaPelanggan)) unik.push({nama:r.namaPelanggan, plat:r.platKendaraan, motor:r.jenisMotor});
+    });
+
+    if(unik.length===0) { kotak.style.display='none'; return; }
+    kotak.innerHTML = unik.map(x=>`<div style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee;" 
+        onclick="isiDataPelanggan('${x.nama}','${x.plat}','${x.motor}')">${x.nama} — ${x.plat} — ${x.motor}</div>`).join('');
+    kotak.style.display='block';
+}
+
+// ==============================================
+// 🔤 SARAN OTOMATIS NOMOR PLAT
+// ==============================================
+function beriSaranPlat(kata) {
+    kata = kata.trim().toUpperCase();
+    let kotak = document.getElementById('saranPlat');
+    if (kata.length < 2) { kotak.style.display='none'; return; }
+
+    let cocok = riwayat.filter(r => (r.platKendaraan||'').toUpperCase().includes(kata));
+    let unik = [];
+    cocok.forEach(r=>{
+        if(!unik.find(x=>x.plat===r.platKendaraan)) unik.push({nama:r.namaPelanggan, plat:r.platKendaraan, motor:r.jenisMotor});
+    });
+
+    if(unik.length===0) { kotak.style.display='none'; return; }
+    kotak.innerHTML = unik.map(x=>`<div style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee;" 
+        onclick="isiDataPelanggan('${x.nama}','${x.plat}','${x.motor}')">${x.plat} — ${x.nama} — ${x.motor}</div>`).join('');
+    kotak.style.display='block';
+}
+
+// ==============================================
+// ✅ ISI OTOMATIS SAAT DIPILIK
+// ==============================================
+function isiDataPelanggan(nama, plat, motor) {
+    document.getElementById('namaPelanggan').value = nama||'';
+    document.getElementById('platKendaraan').value = plat||'';
+    document.getElementById('jenisMotor').value = motor||'';
+    document.getElementById('saranPelanggan').style.display='none';
+    document.getElementById('saranPlat').style.display='none';
+}
+
+// ==============================================
+// ✅ TUTUP SARAN JIKA KLIK DI LUAR KOTAK
+// ==============================================
+document.addEventListener('click', function(e){
+    if(!e.target.closest('#namaPelanggan') && !e.target.closest('#saranPelanggan')){
+        document.getElementById('saranPelanggan').style.display='none';
+    }
+    if(!e.target.closest('#platKendaraan') && !e.target.closest('#saranPlat')){
+        document.getElementById('saranPlat').style.display='none';
+    }
+});
+
+// === KATA SANDI ===
+const KATA_SANDI_RAHASIA = 'bengkel123';
+
+function cekSandiSaatBuka(){
+    document.getElementById('inputSandi').addEventListener('keypress', e=>{
+        if(e.key === 'Enter') verifikasiSandi();
+    });
+}
+
+// === 🔍 CARI BARANG OTOMATIS: KODE / NAMA / JENIS MOTOR ===
+function cariBarang(kata) {
+    kata = kata.trim().toUpperCase();
+    let tb = document.getElementById('tabelStokIsi');
+    let baris = tb.querySelectorAll('tr');
+    
+    baris.forEach(tr => {
+        let kode = tr.getAttribute('data-kode') || '';
+        let nama = tr.getAttribute('data-nama') || '';
+        let motor = tr.getAttribute('data-motor') || '';
+        
+        // Tampilkan jika cocok di SALAH SATU kolom
+        if (kata === '' || 
+            kode.includes(kata) || 
+            nama.toUpperCase().includes(kata) || 
+            motor.toUpperCase().includes(kata)) {
+            tr.style.display = '';
+        } else {
+            tr.style.display = 'none';
+        }
+    });
+}
+
+function verifikasiSandi(){
+    let input = document.getElementById('inputSandi').value;
+    if(input === KATA_SANDI_RAHASIA){
+        document.getElementById('layarLogin').classList.add('sembunyi');
+        document.getElementById('isiAplikasi').classList.remove('sembunyi');
+        bacaDataDariPenyimpanan();
+        tampilkanTabel();
+        tampilkanRiwayat();
+        tampilkanLaporanLabaRugi();
+        tampilkanBarangTerlaris();
+    }else{
+        alert('❌ Kata sandi salah!');
+        document.getElementById('inputSandi').value = '';
+    }
+}
+
+let barang = [], riwayat = [], keranjang = [];
+
+function kapitalKode(input){ input.value = input.value.toUpperCase(); }
+function kapitalNama(input){ input.value = input.value.toUpperCase(); }
+function formatNamaPelanggan(input){ input.value = input.value.replace(/\b\w/g, c=>c.toUpperCase()); }
+function formatPlatKendaraan(input){ input.value = input.value.toUpperCase(); }
+
+function formatRupiah(angka){
+    return new Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR', maximumFractionDigits:0}).format(angka||0);
+}
+
+function updateWaktu(){
+    const d = new Date();
+    return `${d.toLocaleDateString('id-ID')} — ${d.toLocaleTimeString('id-ID')}`;
+}
+
+document.getElementById('waktuInput').value = updateWaktu();
+setInterval(()=>{ document.getElementById('waktuInput').value = updateWaktu(); }, 1000);
+
+function simpanData(){
+    localStorage.setItem('bengkelBarang', JSON.stringify(barang));
+    localStorage.setItem('bengkelRiwayat', JSON.stringify(riwayat));
+}
+
+function bacaDataDariPenyimpanan(){
+    try {
+        let sb = localStorage.getItem('bengkelBarang');
+        let sr = localStorage.getItem('bengkelRiwayat');
+        if(sb) barang = JSON.parse(sb);
+        if(sr) riwayat = JSON.parse(sr);
+        hitungUlangStok();
+    } catch(e) { barang=[]; riwayat=[]; }
+}
+
+function hitungTerjual(kode){
+    let total=0;
+    riwayat.forEach(r=>{ if(r.items) r.items.forEach(i=>{ if(i.kode===kode) total+=i.jumlah; }); });
+    return total;
+}
+
+function hitungUlangStok(){
+    barang.forEach(b=>{
+        let t = hitungTerjual(b.kode);
+        let totalRestock = Array.isArray(b.riwayatRestock) ? b.riwayatRestock.reduce((s,r)=>s+r.jumlah,0) : (b.restock||0);
+        b.stok = (b.stokAwal||0) + totalRestock - t;
+        if(b.stok<0) b.stok=0;
+    });
+    simpanData();
+}
+
+function isiDataRestockOtomatis(kode){
+    kode = kode.toUpperCase().trim();
+    let b = barang.find(x=>x.kode===kode);
+    let info = document.getElementById('infoModeEdit');
+    if(b){
+        info.style.display='block';
+        document.getElementById('nama').value=b.nama;
+        document.getElementById('jenisMotorBarang').value=b.jenisMotor||'';
+        document.getElementById('satuan').value=b.satuan||'PCS';
+        document.getElementById('hargaPokok').value=b.hargaPokok||'';
+        document.getElementById('hargaJual').value=b.hargaJual||'';
+        document.getElementById('stokAwal').value=b.stokAwal||'';
+        document.getElementById('jumlah').value='';
+        document.getElementById('stokMinimum').value=b.stokMin||'';
+    } else {
+        info.style.display='none';
+    }
+}
+
+function cekKodeBarang(kode){
+    let info = document.getElementById('infoKode');
+    kode = kode.toUpperCase().trim();
+    if(barang.find(x=>x.kode===kode)){
+        info.textContent=' ⚠️ Kode sudah ada — bisa Edit/Restock';
+        info.style.color='#f39c12';
+    } else {
+        info.textContent=' ✅ Kode baru — barang baru';
+        info.style.color='#27ae60';
+    }
+}
+
+function isiBiayaJasaOtomatis(){
+    let pilih = document.getElementById('jenisJasa').value;
+    let harga = {
+        'Jasa Pasang':0,
+        'Service CVT':75000,
+        'Service Mesin':150000,
+        'Service Karburator / TB':50000,
+        'Jasa Lainnya':0
+    };
+    if(harga[pilih]!==undefined){
+        document.getElementById('biayaJasaTotal').value = harga[pilih]||'';
+        hitungTotalKeranjang();
+    }
+}
+
+// === FUNGSI TAMBAH BARANG & RESTOCK DENGAN RIWAYAT ===
+function tambahBarang(){
+    let kode = document.getElementById('kode').value.trim().toUpperCase();
+    let nama = document.getElementById('nama').value.trim().toUpperCase();
+    let jenis = document.getElementById('jenisMotorBarang').value.trim().toUpperCase();
+    let sat = document.getElementById('satuan').value;
+    let hp = parseInt(document.getElementById('hargaPokok').value) || 0;
+    let hj = parseInt(document.getElementById('hargaJual').value) || 0;
+    let sa = parseInt(document.getElementById('stokAwal').value) || 0;
+    let rs = parseInt(document.getElementById('jumlah').value) || 0;
+    let smin = parseInt(document.getElementById('stokMinimum').value) || 0;
+    let tglSekarang = updateWaktu();
+
+    if(!kode || !nama) return alert('⚠️ Kode & Nama Barang Wajib Diisi!');
+
+    let idx = barang.findIndex(x=>x.kode === kode);
+    if(idx >= 0){
+        // EDIT / RESTOCK — Tambah ke Riwayat Restock
+        barang[idx].nama = nama;
+        barang[idx].jenisMotor = jenis;
+        barang[idx].satuan = sat;
+        barang[idx].hargaPokok = hp;
+        barang[idx].hargaJual = hj;
+        barang[idx].stokAwal = sa;
+        barang[idx].stokMin = smin;
+
+        // ✅ TAMBAH KE RIWAYAT RESTOCK JIKA ADA JUMLAH RESTOCK
+        if(rs > 0){
+            if(!Array.isArray(barang[idx].riwayatRestock)) barang[idx].riwayatRestock = [];
+            barang[idx].riwayatRestock.push({
+                tanggal: tglSekarang,
+                jumlah: rs,
+                hargaPokokSaatItu: hp
+            });
+        }
+
+        // Hitung total restock dari riwayat
+        let totalRs = Array.isArray(barang[idx].riwayatRestock) ? barang[idx].riwayatRestock.reduce((s,r)=>s+r.jumlah,0) : 0;
+        barang[idx].restock = totalRs;
+        barang[idx].stok = sa + totalRs - hitungTerjual(kode);
+
+        alert(`✅ Restock Dicatat!\nJumlah: ${rs} ${sat}\nTanggal: ${tglSekarang}`);
+    } else {
+        // BARANG BARU
+        if(sa === 0 && rs === 0) return alert('⚠️ Isi Stok Awal atau Jumlah Restock!');
+        
+        let riwayatRs = [];
+        if(rs > 0){
+            riwayatRs.push({
+                tanggal: tglSekarang,
+                jumlah: rs,
+                hargaPokokSaatItu: hp
+            });
+        }
+
+        barang.push({
+            kode: kode, nama: nama, jenisMotor: jenis, satuan: sat,
+            hargaPokok: hp, hargaJual: hj, stokAwal: sa, restock: rs,
+            stokMin: smin, stok: sa + rs,
+            riwayatRestock: riwayatRs,
+            tanggalStokAwal: sa > 0 ? tglSekarang : '-'
+        });
+        alert(`✅ Barang Baru Disimpan!\nStok Awal: ${sa} ${sat}\nRestock: ${rs} ${sat}\nTanggal: ${tglSekarang}`);
+    }
+    simpanData();
+    tampilkanTabel();
+    tampilkanLaporanLabaRugi();
+    tampilkanBarangTerlaris();
+    resetForm();
+}
+
+function resetForm(){
+    document.getElementById('kode').value='';
+    document.getElementById('nama').value='';
+    document.getElementById('jenisMotorBarang').value='';
+    document.getElementById('satuan').value='PCS';
+    document.getElementById('hargaPokok').value='';
+    document.getElementById('hargaJual').value='';
+    document.getElementById('stokAwal').value='';
+    document.getElementById('jumlah').value='';
+    document.getElementById('stokMinimum').value='';
+    document.getElementById('infoKode').textContent='';
+    document.getElementById('infoModeEdit').style.display='none';
+}
+
+function editBarangDariTabel(kode){
+    let b = barang.find(x=>x.kode===kode);
+    if(!b) return;
+    document.getElementById('kode').value=b.kode;
+    document.getElementById('nama').value=b.nama;
+    document.getElementById('jenisMotorBarang').value=b.jenisMotor||'';
+    document.getElementById('satuan').value=b.satuan||'PCS';
+    document.getElementById('hargaPokok').value=b.hargaPokok||'';
+    document.getElementById('hargaJual').value=b.hargaJual||'';
+    document.getElementById('stokAwal').value=b.stokAwal||'';
+    document.getElementById('jumlah').value='';
+    document.getElementById('stokMinimum').value=b.stokMin||'';
+    document.getElementById('infoModeEdit').style.display='block';
+    window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// === LIHAT RIWAYAT RESTOCK ===
+function lihatRiwayatRestock(kode){
+    let b = barang.find(x=>x.kode===kode);
+    if(!b) return;
+    document.getElementById('judulRiwayatRestock').textContent = `📋 Riwayat Restock — ${b.kode} | ${b.nama}`;
+    
+    let isi = `<p><strong>Stok Awal:</strong> ${b.stokAwal||0} ${b.satuan||'PCS'}`;
+    if(b.tanggalStokAwal) isi += ` &nbsp; <small>(${b.tanggalStokAwal})</small>`;
+    isi += `</p>`;
+    isi += `<p><strong>Total Restock:</strong> ${b.restock||0} ${b.satuan||'PCS'}</p><hr>`;
+
+    if(!Array.isArray(b.riwayatRestock) || b.riwayatRestock.length === 0){
+        isi += `<p style="color:#888;">Belum ada riwayat restock.</p>`;
+    } else {
+        isi += `<table style="width:100%;"><thead><tr><th>Tanggal & Jam</th><th style="text-align:center;">Jumlah</th><th style="text-align:right;">Harga Pokok</th></tr></thead><tbody>`;
+        b.riwayatRestock.slice().reverse().forEach(r=>{
+            isi += `<tr><td>${r.tanggal}</td><td style="text-align:center;">${r.jumlah} ${b.satuan||'PCS'}</td><td style="text-align:right;">${formatRupiah(r.hargaPokokSaatItu)}</td></tr>`;
+        });
+        isi += `</tbody></table>`;
+    }
+    document.getElementById('isiRiwayatRestock').innerHTML = isi;
+    document.getElementById('modalRiwayatRestock').classList.add('tampil');
+}
+
+function tutupModalRiwayatRestock(){
+    document.getElementById('modalRiwayatRestock').classList.remove('tampil');
+}
+
+function hapusBarang(kode){
+    if(confirm('⚠️ Hapus barang ini?')){ barang=barang.filter(x=>x.kode!==kode); simpanData(); tampilkanTabel(); }
+}
+
+function tampilkanTabel(){
+    let tb = document.getElementById('tabelStokIsi'); 
+    tb.innerHTML='';
+    barang.forEach(b=>{
+        let tj = hitungTerjual(b.kode);
+        let tr=document.createElement('tr');
+	tr.setAttribute('data-kode', b.kode || '');
+	tr.setAttribute('data-nama', b.nama || '');
+	tr.setAttribute('data-motor', b.jenisMotor || '');
+
+        // ✅ Penanda merah TETAP ADA
+        let kelasMerah = (b.stok <= 3) ? 'stok-kritis' : '';
+
+        // ✅ Kolom Stok Min DIHAPUS, tapi warna merah TETAP BERJALAN
+        tr.innerHTML=`<td>${b.kode}</td>
+            <td>${b.nama}</td>
+            <td>${b.jenisMotor||'-'}</td>
+            <td style="text-align:center;">${b.satuan||'PCS'}</td>
+            <td class="angka">${formatRupiah(b.hargaPokok)}</td>
+            <td class="angka">${formatRupiah(b.hargaJual)}</td>
+            <td class="angka">${b.stokAwal||0}</td>
+            <td class="angka">${b.restock||0}</td>
+            <td class="angka">${tj}</td>
+            <td class="angka ${kelasMerah}">${b.stok||0}</td>
+            <td class="tengah"><button class="btn-riwayat btn-sm" onclick="lihatRiwayatRestock('${b.kode}')">📋 Lihat</button></td>
+            <td><button class="btn-purple btn-sm" onclick="editBarangDariTabel('${b.kode}')">Edit</button> 
+             <td><button class="btn-red btn-sm" onclick="hapusBarang('${b.kode}')">Hapus</button></td>`;
+        
+        tb.appendChild(tr);
+    });
+}
+function isiDataKeranjang(){
+    let kode = document.getElementById('kodeKeranjang').value.trim().toUpperCase();
+    let b = barang.find(x=>x.kode===kode);
+    if(b){
+        document.getElementById('namaKeranjang').value=b.nama;
+        document.getElementById('hargaBarangKeranjang').value=b.hargaJual;
+    } else {
+        document.getElementById('namaKeranjang').value='';
+        document.getElementById('hargaBarangKeranjang').value='';
+    }
+}
+
+function tambahKeKeranjang(){
+    let kode = document.getElementById('kodeKeranjang').value.trim().toUpperCase();
+    let nama = document.getElementById('namaKeranjang').value.trim();
+    let hs = parseInt(document.getElementById('hargaBarangKeranjang').value)||0;
+    let jml = parseInt(document.getElementById('jumlahKeranjang').value)||0;
+    if(!kode||!nama||jml<=0) return alert('⚠️ Lengkapi Kode & Jumlah!');
+    let b = barang.find(x=>x.kode===kode);
+    if(!b) return alert('⚠️ Barang tidak ditemukan!');
+    if(b.stok<jml) return alert(`⚠️ Stok kurang! Tersedia: ${b.stok}`);
+    keranjang.push({kode:kode,nama:nama,hargaSatuan:hs,jumlah:jml,hargaPokok:b.hargaPokok,subtotal:hs*jml,laba:(hs-b.hargaPokok)*jml});
+    tampilkanKeranjang();
+    document.getElementById('kodeKeranjang').value='';
+    document.getElementById('namaKeranjang').value='';
+    document.getElementById('hargaBarangKeranjang').value='';
+    document.getElementById('jumlahKeranjang').value='';
+}
+
+function hapusDariKeranjang(i){ if(confirm('⚠️ Hapus?')){ keranjang.splice(i,1); tampilkanKeranjang(); } }
+
+function kosongkanKeranjang(){
+    if(confirm('⚠️ Kosongkan keranjang?')){
+        keranjang=[];
+        document.getElementById('biayaJasaTotal').value='';
+        document.getElementById('jenisJasa').value='';
+        document.getElementById('namaPelanggan').value='';
+        document.getElementById('platKendaraan').value='';
+        document.getElementById('jenisMotor').value='';
+        tampilkanKeranjang();
+    }
+}
+
+function hitungTotalKeranjang(){
+    let tb = keranjang.reduce((s,i)=>s+i.subtotal,0);
+    let js = parseInt(document.getElementById('biayaJasaTotal').value)||0;
+    document.getElementById('totalBrgKeranjang').textContent=formatRupiah(tb);
+    document.getElementById('totalJasaKeranjang').textContent=formatRupiah(js);
+    document.getElementById('totalBayarKeranjang').textContent=formatRupiah(tb+js);
+}
+
+function tampilkanKeranjang(){
+    let tb = document.getElementById('isiKeranjang'); tb.innerHTML='';
+    keranjang.forEach((item,i)=>{
+        let tr=document.createElement('tr');
+        tr.innerHTML=`<td>${item.nama}</td><td class="angka">${item.jumlah}</td><td class="angka">${formatRupiah(item.subtotal)}</td><td><button class="btn-red btn-sm" onclick="hapusDariKeranjang(${i})">X</button></td>`;
+        tb.appendChild(tr);
+    });
+    hitungTotalKeranjang();
+}
+
+function isiNotaDanCetak(data){
+    document.getElementById('notaTanggal').textContent=data.tgl;
+    document.getElementById('notaNama').textContent=data.namaPelanggan;
+    document.getElementById('notaPlat').textContent=data.platKendaraan;
+    document.getElementById('notaMotor').textContent=data.jenisMotor;
+    let tb = document.getElementById('isiNota'); tb.innerHTML='';
+    data.items.forEach(i=>{
+        let tr=document.createElement('tr');
+        tr.innerHTML=`<td>${i.nama}</td><td style="text-align:center;">${i.jumlah}</td><td style="text-align:right;">${formatRupiah(i.subtotal)}</td>`;
+        tb.appendChild(tr);
+    });
+    if(data.biayaJasa>0){
+        let tr=document.createElement('tr');
+        let lbl = data.namaJasa||'Jasa Pasang';
+        tr.innerHTML=`<td>🔧 ${lbl}</td><td style="text-align:center;"></td><td style="text-align:right;">${formatRupiah(data.biayaJasa)}</td>`;
+        tb.appendChild(tr);
+    }
+    let trt=document.createElement('tr');
+    trt.innerHTML=`<td style="font-weight:bold;">TOTAL BAYAR</td><td></td><td style="text-align:right; font-weight:bold;">${formatRupiah(data.totalBayar)}</td>`;
+    tb.appendChild(trt);
+}
+
+function selesaikanTransaksi(){
+    let nama = document.getElementById('namaPelanggan').value.trim()||'-';
+    let plat = document.getElementById('platKendaraan').value.trim()||'-';
+    let motor = document.getElementById('jenisMotor').value.trim().toUpperCase()||'-';
+    let jasa = parseInt(document.getElementById('biayaJasaTotal').value)||0;
+    let namaJasa = document.getElementById('jenisJasa').value;
+    let tgl = updateWaktu();
+
+    // ✅ === TAMBAHAN: BACA PILIHAN CARA PEMBAYARAN ===
+    let elemenBayar = document.querySelector('input[name="caraBayar"]:checked');
+    let caraBayarTerpilih = elemenBayar ? elemenBayar.value : 'Tunai';
+
+    let totalBrg = keranjang.reduce((s,i)=>s+i.subtotal,0);
+    let totalModal = keranjang.reduce((s,i)=>s+(i.hargaPokok*i.jumlah),0);
+    let totalLabaBrg = keranjang.reduce((s,i)=>s+i.laba,0);
+    let totalBayar = totalBrg + jasa;
+    let adaBarang = keranjang.length>0;
+    let adaJasa = jasa>0;
+    if(!adaBarang && !adaJasa) return alert('⚠️ Masukkan barang ATAU pilih jasa!');
+    if(adaBarang){
+        keranjang.forEach(item=>{
+            let b = barang.find(x=>x.kode===item.kode);
+            if(b) b.stok -= item.jumlah;
+        });
+    }
+    riwayat.unshift({
+        tgl:tgl, namaPelanggan:nama, platKendaraan:plat, jenisMotor:motor,
+        namaJasa:namaJasa, biayaJasa:jasa, items:JSON.parse(JSON.stringify(keranjang)),
+        totalBarang:totalBrg, modalKeluar:totalModal, labaBarang:totalLabaBrg, totalBayar:totalBayar,
+        caraBayar: caraBayarTerpilih  // ✅ === TAMBAHAN: SIMPAN CARA PEMBAYARAN ===
+    });
+    simpanData();
+    tampilkanTabel();
+    tampilkanRiwayat();
+    tampilkanLaporanLabaRugi();
+    tampilkanBarangTerlaris();
+    isiNotaDanCetak(riwayat[0]);
+    keranjang=[];
+    document.getElementById('biayaJasaTotal').value='';
+    document.getElementById('jenisJasa').value='';
+    document.getElementById('namaPelanggan').value='';
+    document.getElementById('platKendaraan').value='';
+    document.getElementById('jenisMotor').value='';
+    tampilkanKeranjang();
+    alert(`✅ SELESAI!\nTotal Bayar: ${formatRupiah(totalBayar)}\nNota akan dicetak...`);
+    setTimeout(()=>window.print(), 600);
+}
+
+function tampilkanRiwayat(){
+    let tb = document.getElementById('tabelRiwayatIsi');
+    tb.innerHTML = '';
+    let ttlByr = 0, ttlModal = 0, ttlLba = 0, ttlJs = 0;
+    riwayat.forEach((r, idx) => {
+        ttlByr   += r.totalBayar || 0;
+        ttlModal += r.modalKeluar || 0;
+        ttlLba   += r.labaBarang || 0;
+        ttlJs    += r.biayaJasa || 0;
+        let brg = r.items.map(i => `${i.nama} × ${i.jumlah}`).join(', ');
+        let labaKotor = (r.labaBarang || 0) + (r.biayaJasa || 0);
+        let jasaTampil = r.namaJasa ? ` | ${r.namaJasa}` : '';
+
+        // ✅ === TAMBAHAN: TAMPILKAN CARA PEMBAYARAN DENGAN IKON ===
+        let ikonBayar = (r.caraBayar==='Tunai')?'💵 Tunai':
+                        (r.caraBayar==='QRIS')?'📱 QRIS':
+                        (r.caraBayar==='Transfer')?'🏦 Transfer':'—';
+
+        let tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${r.tgl}</td>
+            <td>${r.namaPelanggan || '-'} / ${r.platKendaraan || '-'} / ${r.jenisMotor || '-'}</td>
+            <td>${brg}${jasaTampil}</td>
+            <td class="angka">${formatRupiah(r.modalKeluar || 0)}</td>
+            <td class="angka">${formatRupiah(r.labaBarang || 0)}</td>
+            <td class="angka">${formatRupiah(r.biayaJasa || 0)}</td>
+            <td class="angka">${formatRupiah(r.totalBarang || 0)}</td>
+            <td class="angka">${formatRupiah(r.totalBayar || 0)}</td>
+            <td class="angka">${formatRupiah(labaKotor)}</td>
+            <td class="tengah">${ikonBayar}</td> <!-- ✅ KOLOM CARA BAYAR -->
+            <td class="tengah"><button class="btn-green btn-sm" onclick="cetakUlang(${idx})">🖨️</button></td>
+            <td class="tengah"><button class="btn-purple btn-sm" onclick="lihatDetail(${idx})">👁️</button></td>
+            <td class="tengah">
+                <button class="btn-sm" style="background:#3498db; color:white; border:none; border-radius:3px; cursor:pointer;" onclick="ubahRiwayat(${idx})">✏️</button>
+            </td>
+            <td class="tengah"><button class="btn-red btn-sm" onclick="hapusRiwayat(${idx})">🗑️</button></td>
+        `;
+        tb.appendChild(tr);
+    });
+    document.getElementById('totalSemuaBayar').textContent = formatRupiah(ttlByr);
+    document.getElementById('totalLabaBarang').textContent = formatRupiah(ttlLba);
+    document.getElementById('totalLabaJasa').textContent = formatRupiah(ttlJs);
+    document.getElementById('jumlahTransaksi').textContent = riwayat.length;
+}
+
+function cetakUlang(idx){
+    let r = riwayat[idx];
+    let totalRiwayat = r.totalBarang + (r.biayaJasa || 0);
+    let isiNota = buatIsiNota({
+        tanggal: r.tgl || '',
+        pelanggan: r.namaPelanggan || 'Umum',
+        items: r.items || [],
+        jasa: r.namaJasa ? [{nama: r.namaJasa, harga: r.biayaJasa}] : [],
+        total: totalRiwayat,
+        bayar: r.totalBayar || totalRiwayat,
+        kembalian: (r.totalBayar || totalRiwayat) - totalRiwayat
+    });
+    let win = window.open('', '_blank', 'width=300,height=500');
+    win.document.write(isiNota);
+    win.document.close();
+    setTimeout(()=>{ win.print(); }, 400);
+}
+
+function tutupModalDetail(){ 
+    document.getElementById('modalDetail').classList.remove('tampil'); 
+}
+
+function hapusRiwayat(idx){ 
+    if(confirm('⚠️ Hapus riwayat ini?')){ 
+        riwayat.splice(idx,1); 
+        simpanData(); 
+        tampilkanRiwayat(); 
+    } 
+}
+
+function hapusSemuaRiwayat(){ 
+    if(confirm('⚠️ YAKIN HAPUS SEMUA?')){ 
+        riwayat=[]; 
+        simpanData(); 
+        tampilkanRiwayat(); 
+    } 
+}
+
+function ubahRiwayat(idx){
+    simpanRiwayatAsli();
+    let r = riwayat[idx];
+    if (!r) return;
+
+    let tglBaru = prompt('Tanggal:', r.tgl || '');
+    let pelangganBaru = prompt('Nama Pelanggan:', r.namaPelanggan || '');
+    let platBaru = prompt('Nomor Plat:', r.platKendaraan || '');
+    let motorBaru = prompt('Jenis Motor:', r.jenisMotor || '');
+
+    if (tglBaru === null || pelangganBaru === null || platBaru === null || motorBaru === null) {
+        return; // Dibatalkan
+    }
+
+    r.tgl = tglBaru;
+    r.namaPelanggan = pelangganBaru;
+    r.platKendaraan = platBaru;
+    r.jenisMotor = motorBaru;
+
+    let posisiAsli = riwayatAsli.findIndex(x => x === r);
+    if (posisiAsli !== -1) {
+        riwayatAsli[posisiAsli] = r;
+    }
+
+    simpanData();
+    tampilkanRiwayat();
+    alert('✅ Data berhasil diperbarui!');
+}
+
+function cariPelanggan(kata){
+    let wd = document.getElementById('hasilCari');
+    if(!kata.trim()){ 
+        wd.classList.remove('ada'); 
+        return; 
+    }
+    let hsl = riwayat.filter(r=>(r.namaPelanggan+' '+r.platKendaraan).toLowerCase().includes(kata.toLowerCase()));
+    if(hsl.length===0){ 
+        wd.innerHTML='<p>Tidak ditemukan</p>'; 
+        wd.classList.add('ada'); 
+        return; 
+    }
+    let html = '';
+    hsl.forEach((r, i) => {
+        html += `<div class="pelanggan-item" onclick="lihatDetailPelangganDariCari(${riwayat.indexOf(r)})">
+            <strong>${r.namaPelanggan}</strong> — ${r.platKendaraan} / ${r.jenisMotor}<br>
+            <small>📅 ${r.tgl} | Total: ${formatRupiah(r.totalBayar)}</small>
+        </div>`;
+    });
+    wd.innerHTML = html;
+    wd.classList.add('ada');
+}
+
+function lihatDetailPelangganDariCari(idx) {
+    lihatDetail(idx);
+    document.getElementById('hasilCari').classList.remove('ada');
+    document.getElementById('kataKunciCari').value = '';
+}
+
+function tampilkanLaporanLabaRugi(){
+    let sekarang = new Date();
+    let bulanIni = sekarang.getMonth() + 1;
+    let tahunIni = sekarang.getFullYear();
+
+    let totalPenjualan = 0, totalModalKeluar = 0, totalLabaBarang = 0, totalJasa = 0;
+    riwayat.forEach(r => {
+        if(!r.tgl){
+            totalPenjualan += r.totalBarang || 0;
+            totalModalKeluar += r.modalKeluar || 0;
+            totalLabaBarang += r.labaBarang || 0;
+            totalJasa += r.biayaJasa || 0;
+            return;
+        }
+
+        let tglBulan, tglTahun;
+        if(r.tgl.indexOf('-') === 4){
+            let b = r.tgl.split('-');
+            tglTahun = parseInt(b[0]);
+            tglBulan = parseInt(b[1]);
+        }else{
+            let b = r.tgl.split(/[-/]/);
+            if(b.length >= 3){
+                tglTahun = parseInt(b[2]);
+                tglBulan = parseInt(b[1]);
+            }
+        }
+
+        if(tglBulan && tglTahun){
+            if(tglBulan === bulanIni && tglTahun === tahunIni){
+                totalPenjualan += r.totalBarang || 0;
+                totalModalKeluar += r.modalKeluar || 0;
+                totalLabaBarang += r.labaBarang || 0;
+                totalJasa += r.biayaJasa || 0;
+            }
+        }else{
+            totalPenjualan += r.totalBarang || 0;
+            totalModalKeluar += r.modalKeluar || 0;
+            totalLabaBarang += r.labaBarang || 0;
+            totalJasa += r.biayaJasa || 0;
+        }
+    });
+
+    let labaKotor = totalLabaBarang + totalJasa;
+
+    let ePenjualan = document.getElementById('lapPenjualanBarang');
+    let eModal = document.getElementById('lapModalKeluar');
+    let eLabaBrg = document.getElementById('lapLabaBarang');
+    let eJasa = document.getElementById('lapJasa');
+    let eLabaKotor = document.getElementById('lapLabaKotor');
+
+    if(ePenjualan) ePenjualan.textContent = formatRupiah(totalPenjualan);
+    if(eModal) eModal.textContent = formatRupiah(totalModalKeluar);
+    if(eLabaBrg) eLabaBrg.textContent = formatRupiah(totalLabaBarang);
+    if(eJasa) eJasa.textContent = formatRupiah(totalJasa);
+    if(eLabaKotor) eLabaKotor.textContent = formatRupiah(labaKotor);
+}
+
+function tampilkanBarangTerlaris(){
+    let terjual = {};
+    riwayat.forEach(r => {
+        if(r.items) r.items.forEach(i => {
+            if(!terjual[i.kode]) terjual[i.kode] = {nama:i.nama, jumlah:0};
+            terjual[i.kode].jumlah += i.jumlah;
+        });
+    });
+    let urut = Object.entries(terjual).sort((a,b)=>b[1].jumlah - a[1].jumlah);
+    let terlaris = urut.slice(0,5);
+    let jarang = urut.slice(-5).reverse();
+
+    let htmlTerlaris = terlaris.length ? '<ol>' : '';
+    terlaris.forEach(x=>{ htmlTerlaris += `<li><strong>${x[1].nama}</strong> — ${x[1].jumlah} bh</li>`; });
+    htmlTerlaris += terlaris.length ? '</ol>' : '<p style="color:#888;">Belum ada data</p>';
+    document.getElementById('daftarTerlaris').innerHTML = htmlTerlaris;
+
+    let htmlJarang = jarang.length ? '<ol>' : '';
+    jarang.forEach(x=>{ htmlJarang += `<li><strong>${x[1].nama}</strong> — ${x[1].jumlah} bh</li>`; });
+    htmlJarang += jarang.length ? '</ol>' : '<p style="color:#888;">Belum ada data</p>';
+    document.getElementById('daftarJarangLaku').innerHTML = htmlJarang;
+}
+
+function backupStokKeExcel(){
+    let isi = "Kode\tNama Barang\tJenis Motor\tSatuan\tHarga Pokok\tHarga Jual\tStok Awal\tRestock\tTerjual\tSisa Stok\tStok Minimum\n";
+    barang.forEach(b=>{
+        let tj = hitungTerjual(b.kode);
+        isi += `${b.kode}\t${b.nama}\t${b.jenisMotor||''}\t${b.satuan||'PCS'}\t${b.hargaPokok}\t${b.hargaJual}\t${b.stokAwal||0}\t${b.restock||0}\t${tj}\t${b.stok||0}\t${b.stokMin||0}\n`;
+    });
+    let blob = new Blob([isi], {type:'application/vnd.ms-excel'});
+    let link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Stok_Bengkel_${new Date().toLocaleDateString('id-ID')}.xls`;
+    link.click();
+}
+
+function backupRiwayatKeExcel(){
+    let isi = "Tanggal\tNama Pelanggan\tNo. Plat\tJenis Motor\tUraian Barang\tTotal Barang\tModal Keluar\tLaba Barang\tBiaya Jasa\tTotal Bayar\tLaba Kotor\n";
+    riwayat.forEach(r=>{
+        let brg = r.items.map(i=>`${i.nama}×${i.jumlah}`).join(', ');
+        let labaKotor = (r.labaBarang||0)+(r.biayaJasa||0);
+        isi += `${r.tgl}\t${r.namaPelanggan}\t${r.platKendaraan}\t${r.jenisMotor}\t${brg}\t${r.totalBarang||0}\t${r.modalKeluar||0}\t${r.labaBarang||0}\t${r.biayaJasa||0}\t${r.totalBayar}\t${labaKotor}\n`;
+    });
+    let blob = new Blob([isi], {type:'application/vnd.ms-excel'});
+    let link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Riwayat_Penjualan_Bengkel_${new Date().toLocaleDateString('id-ID')}.xls`;
+    link.click();
+}
+
+// === TUTUP MODAL DENGAN KLIK DI LUAR AREA ===
+document.querySelectorAll('.modal-latar').forEach(m=>{
+    m.addEventListener('click', e=>{
+        if(e.target === m) m.classList.remove('tampil');
+    });
+});
+// === FUNGSI GRAFIK — HARIAN / BULANAN / TAHUNAN ===
+let grafikPenjualan = null;
+let jenisGrafikAktif = 'harian';
+const DAFTAR_BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+function siapkanDataGrafik(jenis) {
+    let data = {};
+
+    if (jenis === 'harian') {
+        // 📊 HARIAN → SELALU TAMPIL 00:00 s/d 23:00
+        for (let j = 0; j < 24; j++) {
+            let jam = (j < 10 ? '0' + j : j) + ':00';
+            data[jam] = { penjualan: 0, modal: 0, laba: 0, jasa: 0 };
+        }
+    } 
+    else if (jenis === 'bulanan') {
+        // 📈 BULANAN → SELALU TAMPIL 1 s/d 31
+        for (let tgl = 1; tgl <= 31; tgl++) {
+            data[tgl.toString()] = { penjualan: 0, modal: 0, laba: 0, jasa: 0 };
+        }
+    }
+    else {
+        // 📉 TAHUNAN → SELALU TAMPIL Januari s/d Desember
+        DAFTAR_BULAN.forEach(bulan => {
+            data[bulan] = { penjualan: 0, modal: 0, laba: 0, jasa: 0 };
+        });
+    }
+
+    riwayat.forEach(r => {
+        if (!r.tgl) return;
+        let bagian = r.tgl.split(' — ');
+        let tglStr = bagian[0];
+        let jamStr = bagian[1] || '00:00:00';
+        let kunci;
+
+        if (jenis === 'harian') {
+            kunci = jamStr.substring(0, 2) + ':00';
+        } 
+        else if (jenis === 'bulanan') {
+            let tgl = tglStr.split('/');
+            kunci = tgl[0];
+        } 
+        else {
+            let tgl = tglStr.split('/');
+            let bulan = parseInt(tgl[1]);
+            kunci = DAFTAR_BULAN[bulan - 1];
+        }
+
+        if (!data[kunci]) {
+            data[kunci] = { penjualan: 0, modal: 0, laba: 0, jasa: 0 };
+        }
+        data[kunci].penjualan += r.totalBarang || 0;
+        data[kunci].modal += r.modalKeluar || 0;
+        data[kunci].laba += (r.labaBarang || 0) + (r.biayaJasa || 0);
+        data[kunci].jasa += r.biayaJasa || 0;
+    });
+
+    // Urutkan label dengan benar
+    let urutan = Object.keys(data);
+    if (jenis === 'harian') {
+        urutan.sort((a,b) => a.localeCompare(b));
+    } else if (jenis === 'bulanan') {
+        urutan.sort((a,b) => parseInt(a) - parseInt(b));
+    } else {
+        urutan.sort((a,b) => DAFTAR_BULAN.indexOf(a) - DAFTAR_BULAN.indexOf(b));
+    }
+
+    let hasil = {};
+    urutan.forEach(k => hasil[k] = data[k]);
+    return hasil;
+}
+
+function gambarGrafik() {
+    const ctx = document.getElementById('grafikPenjualan').getContext('2d');
+    let data = siapkanDataGrafik(jenisGrafikAktif);
+    let label = Object.keys(data);
+    let penjualan = label.map(k => data[k].penjualan);
+    let modal = label.map(k => data[k].modal);
+    let laba = label.map(k => data[k].laba);
+
+    if (grafikPenjualan) grafikPenjualan.destroy();
+
+    let judulGrafik = jenisGrafikAktif === 'harian' ? 'Penjualan Per JAM (00:00 s/d 23:00)' :
+                      jenisGrafikAktif === 'bulanan' ? 'Penjualan Tanggal 1 s/d 31' :
+                      'Penjualan Per BULAN (Januari s/d Desember)';
+
+    grafikPenjualan = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: label,
+            datasets: [
+                { label: 'Penjualan', data: penjualan, backgroundColor: 'rgba(54, 162, 235, 0.6)' },
+                { label: 'Modal', data: modal, backgroundColor: 'rgba(231, 76, 60, 0.6)' },
+                { label: 'Laba', data: laba, backgroundColor: 'rgba(46, 204, 113, 0.6)' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                title: { display: true, text: judulGrafik, font: { size: 16 } }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function ubahGrafik(jenis, tombol) {
+    jenisGrafikAktif = jenis;
+    document.querySelectorAll('.tab-grafik button').forEach(b => b.classList.remove('aktif'));
+    tombol.classList.add('aktif');
+    gambarGrafik();
+}
+
+// Tampilkan grafik setelah login
+setTimeout(()=>{ 
+    if(!document.getElementById('isiAplikasi').classList.contains('sembunyi')) {
+        gambarGrafik(); 
+    } 
+}, 500);
+// === NOTA KASIR KECIL — LENGKAP ===
+
+// 👇 UBAH DATA BENGKEL ANDA DI BAWAH INI 👇
+const NAMA_TOKO = 'BENGKEL ANDA';
+const ALAMAT_TOKO = 'Alamat Bengkel Anda';
+const NO_TELP = '08123456789';
+// ☝️ UBAH SESUAI DATA ANDA DI ATAS ☝️
+
+function buatIsiNota(data) {
+    let tanggal = data.tanggal || new Date().toLocaleString('id-ID');
+    let pelanggan = data.pelanggan || 'Umum';
+    let barang = data.items || [];
+    let jasa = data.jasa || [];
+    let total = data.total || 0;
+    let bayar = data.bayar || total;
+    let kembalian = data.kembalian || 0;
+
+    let htmlBarang = '';
+    for (let i = 0; i < barang.length; i++) {
+        let b = barang[i];
+        let jml = b.jumlah || 0;
+        let hrg = b.hargaSatuan || 0;
+        htmlBarang += '<div style="display:flex;justify-content:space-between;font-size:12px;line-height:14px;">' +
+            '<span>' + ((b.nama||'').substring(0,12)) + ' ' + jml + '</span>' +
+            '<span>' + (jml*hrg).toLocaleString('id-ID') + '</span></div>';
+    }
+
+    let htmlJasa = '';
+    for (let i = 0; i < jasa.length; i++) {
+        let j = jasa[i];
+        htmlJasa += '<div style="display:flex;justify-content:space-between;font-size:12px;line-height:14px;">' +
+            '<span>' + ((j.nama||'').substring(0,12)) + '</span>' +
+            '<span>' + (j.harga||0).toLocaleString('id-ID') + '</span></div>';
+    }
+
+    let isi = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Nota Kasir</title>' +
+        '<style>body{margin:5px;padding:5px;font-family:"Courier New";font-size:13px;line-height:15px;width:280px}' +
+        '.garis{border-bottom:1px dashed #000;margin:4px 0}.tengah{text-align:center}.r{text-align:right}</style></head><body>';
+
+    isi += '<div class="tengah"><b>' + NAMA_TOKO + '</b></div>';
+    isi += '<div class="tengah" style="font-size:11px">' + ALAMAT_TOKO + '</div>';
+    isi += '<div class="tengah" style="font-size:11px">Telp: ' + NO_TELP + '</div>';
+    isi += '<div class="garis"></div>';
+    isi += '<div>Tanggal: ' + tanggal + '</div>';
+    isi += '<div>Pelanggan: ' + pelanggan + '</div>';
+    isi += '<div class="garis"></div>';
+    isi += '<div><b>BARANG</b></div>' + htmlBarang;
+    isi += '<div class="garis"></div>';
+
+    if (htmlJasa) {
+        isi += '<div><b>JASA SERVIS</b></div>' + htmlJasa;
+        isi += '<div class="garis"></div>';
+    }
+
+    isi += '<div style="display:flex;justify-content:space-between;"><b>TOTAL</b><b>' + total.toLocaleString('id-ID') + '</b></div>';
+    isi += '<div style="display:flex;justify-content:space-between;">Bayar<span>' + bayar.toLocaleString('id-ID') + '</span></div>';
+    isi += '<div style="display:flex;justify-content:space-between;">Kembalian<span>' + kembalian.toLocaleString('id-ID') + '</span></div>';
+    isi += '<div class="garis"></div>';
+    isi += '<div class="tengah" style="margin-top:8px">TERIMA KASIH & HATI-HATI YA</div>';
+    isi += '</body></html>';
+    return isi;
+}
+
+// Cetak dari keranjang saat transaksi
+function cetakNotaKasirDariTransaksi() {
+    let total = 0, barang = [], jasa = [], pelanggan = 'Umum', bayar = 0, kembalian = 0;
+    try {
+        if (typeof hitungTotalSeluruh === 'function') total = hitungTotalSeluruh();
+        if (typeof keranjangPenjualan !== 'undefined') barang = keranjangPenjualan;
+        if (typeof keranjangJasa !== 'undefined') jasa = keranjangJasa;
+        let elPel = document.getElementById('namaPelanggan') || document.getElementById('pelanggan');
+        if (elPel && elPel.value) pelanggan = elPel.value;
+        let elBayar = document.getElementById('uangBayar');
+        if (elBayar && elBayar.value) { bayar = Number(elBayar.value) || total; kembalian = bayar - total; }
+    } catch(e) { alert('⚠️ Masukkan barang dulu!'); return; }
+    if (barang.length === 0 && jasa.length === 0) { alert('⚠️ Belum ada barang!'); return; }
+
+    let win = window.open('', '_blank', 'width=300,height=500');
+    win.document.write(buatIsiNota({
+        tanggal: new Date().toLocaleString('id-ID'),
+        pelanggan: pelanggan, items: barang, jasa: jasa,
+        total: total, bayar: bayar, kembalian: kembalian
+    }));
+    win.document.close();
+    setTimeout(()=>{ win.print(); }, 400);
+}
+
+
+function cetakNotaKasirDariRiwayat(index) {
+    if (typeof riwayat === 'undefined' || !riwayat[index]) return;
+    let r = riwayat[index];
+    let totalRiwayat = r.total || ((r.totalBarang||0) + (r.totalJasa||0)) || 0;
+    let win = window.open('', '_blank', 'width=300,height=500');
+    win.document.write(buatIsiNota({
+        tanggal: r.tgl || '', pelanggan: r.pelanggan || 'Umum',
+        items: r.items || [], jasa: r.jasa || [],
+        total: totalRiwayat, bayar: r.bayar || totalRiwayat, kembalian: r.kembalian || 0
+    }));
+    win.document.close();
+    setTimeout(()=>{ win.print(); }, 400);
+}
+
+function lihatDetail(idx){
+    let r = riwayat[idx];
+    let brg = r.items.map(i=>`• ${i.nama} — ${i.jumlah} bh × ${formatRupiah(i.hargaSatuan)} = ${formatRupiah(i.subtotal)}`).join('<br>');
+    let isiJasa = '';
+    if (r.namaJasa) {
+        isiJasa = `<p><strong>🔧 Jasa:</strong> ${r.namaJasa}</p>`;
+        if (r.biayaJasa > 0) isiJasa += `<p><strong>Biaya:</strong> ${formatRupiah(r.biayaJasa)}</p>`;
+    }
+    document.getElementById('modalJudul').textContent = `📋 Detail — ${r.tgl}`;
+    document.getElementById('modalIsi').innerHTML = `
+        <p><strong>Nama:</strong> ${r.namaPelanggan || 'Umum'}</p>
+        <p><strong>Plat/Motor:</strong> ${r.platKendaraan || '-'} / ${r.jenisMotor || '-'}</p>
+        ${isiJasa}<hr><p>${brg || '(Tanpa Barang)'}</p>
+        <hr><p><strong>Modal: ${formatRupiah(r.modalKeluar||0)}</strong></p>
+        <p><strong>Total Bayar: ${formatRupiah(r.totalBayar)}</strong></p>
+    `;
+    document.getElementById('modalDetail').classList.add('tampil');
+}
+
+function cetakUlang(idx){
+    let r = riwayat[idx];
+    let total = r.totalBarang + (r.biayaJasa || 0);
+    let bayar = r.totalBayar || total;
+    let kembalian = bayar - total;
+
+    let daftarBarang = '';
+    if (r.items && r.items.length > 0) {
+        r.items.forEach(i => {
+            let sub = (i.hargaSatuan || 0) * (i.jumlah || 0);
+            daftarBarang += '<tr><td>' + i.nama + ' × ' + i.jumlah + '</td><td align="right">Rp ' + sub.toLocaleString('id-ID') + '</td></tr>';
+        });
+    }
+
+    let jasa = r.namaJasa ? '<tr><td colspan="2">🔧 JASA: ' + r.namaJasa + ' — Rp ' + (r.biayaJasa||0).toLocaleString('id-ID') + '</td></tr>' : '';
+
+    let nota = `
+<html>
+<head>
+<style>
+body { font-family: Courier New; font-size:13px; width:280px; padding:10px; }
+.tengah { text-align:center; }
+.garis { border-bottom:1px dashed #000; margin:5px 0; }
+table { width:100%; border-collapse:collapse; }
+</style>
+</head>
+<body>
+<div class="tengah"><b>BENGKEL ANDA</b></div>
+<div class="tengah">Alamat Bengkel Anda</div>
+<div class="garis"></div>
+<div>Tanggal: ${r.tgl || ''}</div>
+<div>Pelanggan: ${r.namaPelanggan || 'Umum'}</div>
+<div>Kendaraan: ${r.platKendaraan || '-'} / ${r.jenisMotor || '-'}</div>
+<div class="garis"></div>
+<table>${daftarBarang}${jasa}</table>
+<div class="garis"></div>
+<table>
+<tr><td><b>TOTAL</b></td><td align="right"><b>Rp ${total.toLocaleString('id-ID')}</b></td></tr>
+<tr><td>BAYAR</td><td align="right">Rp ${bayar.toLocaleString('id-ID')}</td></tr>
+<tr><td>KEMBALIAN</td><td align="right">Rp ${kembalian.toLocaleString('id-ID')}</td></tr>
+</table>
+<div class="garis"></div>
+<div class="tengah">Terima Kasih 🙏</div>
+<script>window.onload=function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+    let win = window.open('', '_blank', 'width=300,height=500');
+    win.document.write(nota);
+    win.document.close();
+}
+
+function kirimWA(idx){
+    let r = riwayat[idx];
+    let total = r.totalBarang + (r.biayaJasa || 0);
+    let bayar = r.totalBayar || total;
+    let kembalian = bayar - total;
+
+    let daftarBarang = '';
+    if (r.items && r.items.length > 0) {
+        r.items.forEach(i => {
+            let sub = (i.hargaSatuan || 0) * (i.jumlah || 0);
+            daftarBarang += '• ' + i.nama + ' × ' + i.jumlah + ' = Rp ' + sub.toLocaleString('id-ID') + '\n';
+        });
+    }
+
+    let jasa = r.namaJasa ? '🔧 JASA: ' + r.namaJasa + ' — Rp ' + (r.biayaJasa||0).toLocaleString('id-ID') + '\n' : '';
+
+    let pesan = `*NOTA PENJUALAN*
+━━━━━━━━━━━━━━━━
+📅 Tanggal: ${r.tgl || ''}
+👤 Pelanggan: ${r.namaPelanggan || 'Umum'}
+🚗 Kendaraan: ${r.platKendaraan || '-'} / ${r.jenisMotor || '-'}
+━━━━━━━━━━━━━━━━
+${daftarBarang}${jasa}
+━━━━━━━━━━━━━━━━
+💰 TOTAL     : Rp ${total.toLocaleString('id-ID')}
+💵 BAYAR     : Rp ${bayar.toLocaleString('id-ID')}
+💳 KEMBALIAN : Rp ${kembalian.toLocaleString('id-ID')}
+━━━━━━━━━━━━━━━━
+Terima Kasih 🙏`;
+
+    window.open('https://wa.me/?text=' + encodeURIComponent(pesan), '_blank');
+}
+// === FUNGSI FILTER TANGGAL ===
+let riwayatAsli = [];
+
+function simpanRiwayatAsli(){
+    if (riwayatAsli.length === 0) {
+        riwayatAsli = [...riwayat];
+    }
+}
+
+function ambilTanggal(tglStr){
+    if (!tglStr) return null;
+    let tgl = tglStr.split(' ')[0].split('/');
+    if (tgl.length === 3) {
+        return new Date(tgl[2], tgl[1]-1, tgl[0]);
+    }
+    return null;
+}
+
+function filterTanggal(jenis){
+    simpanRiwayatAsli();
+    let sekarang = new Date();
+    let dari = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
+    let sampai = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
+
+    if (jenis === 'hariini') {
+        // hari ini
+    } else if (jenis === 'kemarin') {
+        dari.setDate(dari.getDate() - 1);
+        sampai.setDate(sampai.getDate() - 1);
+    } else if (jenis === '7hari') {
+        dari.setDate(dari.getDate() - 6);
+    } else if (jenis === 'bulanini') {
+        dari = new Date(sekarang.getFullYear(), sekarang.getMonth(), 1);
+    } else if (jenis === 'rentang') {
+        let tglDari = document.getElementById('tglDari').value;
+        let tglSampai = document.getElementById('tglSampai').value;
+        if (!tglDari || !tglSampai) {
+            alert('Silakan pilih tanggal Dari dan Sampai!');
+            return;
+        }
+        dari = new Date(tglDari);
+        sampai = new Date(tglSampai);
+    } else if (jenis === 'semua') {
+        riwayat = [...riwayatAsli];
+        tampilkanRiwayat();
+        return;
+    }
+
+    sampai.setHours(23,59,59);
+
+    riwayat = riwayatAsli.filter(r => {
+        let tgl = ambilTanggal(r.tgl);
+        if (!tgl) return true;
+        return tgl >= dari && tgl <= sampai;
+    });
+
+    tampilkanRiwayat();
+}
+
+// ==============================================
+// 🔑 KATA SANDI PEMILIK
+// ==============================================
+let kataSandiPemilikSimpan = localStorage.getItem('sandiPemilikBengkel') || '1234';
+
+function bukaAksesPemilik(){
+    let masukan = document.getElementById('kataSandiAksesPemilik').value;
+    if(masukan === kataSandiPemilikSimpan){
+        // 1. BUKA BAGIAN PEMILIK
+        document.getElementById('blokKunciPemilik').style.display = 'none';
+        document.getElementById('bagianIsiPemilik').style.display = 'block';
+
+        // ✅ OTOMATIS KLIK "TAMPILKAN SEMUA" SAAT SANDI DIBUKA
+        resetFilterTanggal(); // ← INI KUNCINYA! SAMA DENGAN KLIK TOMBOL ANDA
+
+        // 2. BARU BACA DATA & HITUNG SEMUA ANGKA
+        bacaDataPengeluaran();
+        tampilkanTabelPengeluaran();
+        tampilkanLaporanLabaRugi();
+        tampilkanBarangTerlaris();
+        ubahGrafik('harian');
+        hitungUlangSemuaAngka();
+
+    }else{
+        alert('❌ Kata sandi salah!');
+        document.getElementById('kataSandiAksesPemilik').value = '';
+    }
+}
+
+function simpanKataSandiPemilik(){
+    let sandiBaru = document.getElementById('inputSandiBaru').value.trim();
+    if(sandiBaru.length < 4){ alert('⚠️ Sandi minimal 4 karakter!'); return; }
+    kataSandiPemilikSimpan = sandiBaru;
+    localStorage.setItem('sandiPemilikBengkel', sandiBaru);
+    alert('✅ Kata sandi berhasil diganti! Silakan ingat sandi baru Anda.');
+    document.getElementById('inputSandiBaru').value = '';
+}
+
+// ==============================================
+// 📋 DATA PENGELOUARAN
+// ==============================================
+let dataPengeluaran = [];
+let dataPengeluaranAsli = [];
+
+function simpanDataPengeluaran(){
+    localStorage.setItem('bengkelDataPengeluaran', JSON.stringify(dataPengeluaran));
+}
+function bacaDataPengeluaran(){
+    let ambil = localStorage.getItem('bengkelDataPengeluaran');
+    if(ambil){
+        dataPengeluaran = JSON.parse(ambil);
+        dataPengeluaranAsli = [...dataPengeluaran];
+    }
+}
+
+// ==============================================
+// ➕ TAMBAH DATA PENGELOUARAN
+// ==============================================
+function tambahDataOperasional(){
+    let tgl = document.getElementById('inputTglOperasional').value;
+    let ket = document.getElementById('inputKetOperasional').value.trim() || 'Pengeluaran Operasional';
+    let jml = parseInt(document.getElementById('inputJumlahOperasional').value) || 0;
+    if(!tgl){ alert('⚠️ Silakan isi Tanggal!'); return; }
+    if(jml <= 0){ alert('⚠️ Silakan isi Jumlah Uang!'); return; }
+    dataPengeluaran.unshift({tanggal:tgl, jenis:'Operasional', keterangan:ket, jumlah:jml});
+    dataPengeluaranAsli = [...dataPengeluaran];
+    simpanDataPengeluaran();
+    tampilkanTabelPengeluaran();
+    hitungUlangSemuaAngka();
+    document.getElementById('inputKetOperasional').value = '';
+    document.getElementById('inputJumlahOperasional').value = '';
+}
+function tambahDataMaintenance(){
+    let tgl = document.getElementById('inputTglMaintenance').value;
+    let ket = document.getElementById('inputKetMaintenance').value.trim() || 'Pengeluaran Maintenance';
+    let jml = parseInt(document.getElementById('inputJumlahMaintenance').value) || 0;
+    if(!tgl){ alert('⚠️ Silakan isi Tanggal!'); return; }
+    if(jml <= 0){ alert('⚠️ Silakan isi Jumlah Uang!'); return; }
+    dataPengeluaran.unshift({tanggal:tgl, jenis:'Maintenance', keterangan:ket, jumlah:jml});
+    dataPengeluaranAsli = [...dataPengeluaran];
+    simpanDataPengeluaran();
+    tampilkanTabelPengeluaran();
+    hitungUlangSemuaAngka();
+    document.getElementById('inputKetMaintenance').value = '';
+    document.getElementById('inputJumlahMaintenance').value = '';
+}
+function tambahDataGaji(){
+    let bln = document.getElementById('inputBulanGaji').value;
+    let nama = document.getElementById('inputNamaKaryawan').value.trim() || 'Karyawan';
+    let jml = parseInt(document.getElementById('inputJumlahGaji').value) || 0;
+    if(!bln){ alert('⚠️ Silakan isi Bulan Gaji!'); return; }
+    if(jml <= 0){ alert('⚠️ Silakan isi Jumlah Gaji!'); return; }
+    dataPengeluaran.unshift({tanggal:bln, jenis:'Gaji', keterangan:nama, jumlah:jml});
+    dataPengeluaranAsli = [...dataPengeluaran];
+    simpanDataPengeluaran();
+    tampilkanTabelPengeluaran();
+    hitungUlangSemuaAngka();
+    document.getElementById('inputNamaKaryawan').value = '';
+    document.getElementById('inputJumlahGaji').value = '';
+}
+
+// ==============================================
+// 🔍 FILTER TANGGAL
+// ==============================================
+function ubahKeObjekTanggal(tanggalTeks){
+    if(!tanggalTeks) return null;
+    let bagian = tanggalTeks.split('-');
+    if(bagian.length >= 3) return new Date(bagian[0], bagian[1]-1, bagian[2]);
+    if(bagian.length === 2) return new Date(bagian[0], bagian[1]-1, 1);
+    return null;
+}
+function terapkanFilterTanggal(){
+    let tglDari = ubahKeObjekTanggal(document.getElementById('filterTanggalDari').value);
+    let tglSampai = ubahKeObjekTanggal(document.getElementById('filterTanggalSampai').value);
+    if(!tglDari && !tglSampai){
+        tampilkanTabelPengeluaran();
+        hitungUlangSemuaAngka();
+        return;
+    }
+    dataPengeluaran = dataPengeluaranAsli.filter(function(baris){
+        let tglBaris = ubahKeObjekTanggal(baris.tanggal);
+        if(!tglBaris) return true;
+        if(tglDari && tglBaris < tglDari) return false;
+        if(tglSampai && tglBaris > tglSampai) return false;
+        return true;
+    });
+    tampilkanTabelPengeluaran();
+    hitungUlangSemuaAngka();
+    tampilkanLaporanLabaRugi();
+    hitungUlangSemuaAngka();
+}
+
+function resetFilterTanggal(){
+    document.getElementById('filterTanggalDari').value = '';
+    document.getElementById('filterTanggalSampai').value = '';
+    dataPengeluaran = [...dataPengeluaranAsli];
+    tampilkanTabelPengeluaran();
+    hitungUlangSemuaAngka();
+}
+
+// ==============================================
+// 💾 BACKUP KE EXCEL
+// ==============================================
+function unduhBackupKeExcel(){
+    let bulanSekarang = new Date().toISOString().slice(0,7);
+    let isiFile = "Tanggal\tJenis Pengeluaran\tKeterangan\tJumlah (Rp)\n";
+    dataPengeluaran.forEach(function(baris){
+        isiFile += `${baris.tanggal}\t${baris.jenis}\t${baris.keterangan}\t${baris.jumlah}\n`;
+    });
+    let berkas = new Blob([isiFile], {type:'text/tab-separated-values;charset=utf-8'});
+    let tautan = document.createElement('a');
+    tautan.href = URL.createObjectURL(berkas);
+    tautan.download = `Backup_Pengeluaran_Bengkel_${bulanSekarang}.xls`;
+    tautan.click();
+    URL.revokeObjectURL(tautan.href);
+}
+
+// ==============================================
+// 📊 TAMPILKAN TABEL RIWAYAT
+// ==============================================
+function tampilkanTabelPengeluaran(){
+    let isiTabel = document.getElementById('tabelRiwayatPengeluaran');
+    isiTabel.innerHTML = '';
+    dataPengeluaran.forEach(function(baris, indeks){
+        let barisTabel = document.createElement('tr');
+        barisTabel.innerHTML = `
+            <td style="padding:8px; border:1px solid #ddd;">${baris.tanggal}</td>
+            <td style="padding:8px; border:1px solid #ddd;">${baris.jenis}</td>
+            <td style="padding:8px; border:1px solid #ddd;">${baris.keterangan}</td>
+            <td style="padding:8px; border:1px solid #ddd; text-align:right;">${formatRupiah(baris.jumlah)}</td>
+            <td style="padding:8px; border:1px solid #ddd; text-align:center;">
+                <button onclick="hapusBarisPengeluaran(${indeks})" style="padding:4px 8px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer;">✕</button>
+            </td>`;
+        isiTabel.appendChild(barisTabel);
+    });
+}
+function hapusBarisPengeluaran(indeks){
+    if(confirm('⚠️ YAKIN MENGHAPUS DATA INI? Data tidak bisa dikembalikan!')){
+        dataPengeluaran.splice(indeks, 1);
+        dataPengeluaranAsli.splice(indeks, 1);
+        simpanDataPengeluaran();
+        tampilkanTabelPengeluaran();
+        hitungUlangSemuaAngka();
+    }
+}
+
+// ==============================================
+// ⚙️ HITUNG SEMUA ANGKA RINGKASAN
+// ==============================================
+function hitungUlangSemuaAngka(){
+    // === AMBIL BULAN & TAHUN SEKARANG ===
+    let sekarang = new Date();
+    let bulanIni = sekarang.getMonth() + 1;
+    let tahunIni = sekarang.getFullYear();
+
+    // === HITUNG SEMUA DATA DULU — JIKA TANGGAL TIDAK TERBACA TETAP DIHITUNG ===
+    let omsetPenjualan = 0;
+    let totalBiayaJasa = 0;
+    let labaKotorSemua = 0;
+    let adaTanggalValid = false;
+
+    riwayat.forEach(function(transaksi){
+        if(!transaksi.tgl){
+            // Jika tidak ada tanggal → TETAP DIHITUNG (agar tidak jadi 0)
+            omsetPenjualan += (transaksi.totalBarang || 0);
+            totalBiayaJasa += (transaksi.biayaJasa || 0);
+            labaKotorSemua += ((transaksi.labaBarang || 0) + (transaksi.biayaJasa || 0));
+            return;
+        }
+
+        // Coba baca tanggal dalam berbagai format
+        let tglBulan, tglTahun;
+        
+        // Format: 2026-08-24
+        if(transaksi.tgl.indexOf('-') !== -1){
+            let bagianTgl = transaksi.tgl.split('-');
+            tglTahun = parseInt(bagianTgl[0]);
+            tglBulan = parseInt(bagianTgl[1]);
+        }
+        // Format lain: 24-08-2026 atau 24/08/2026
+        else{
+            let bagianTgl = transaksi.tgl.split(/[-/]/);
+            if(bagianTgl.length >= 3){
+                tglTahun = parseInt(bagianTgl[2]);
+                tglBulan = parseInt(bagianTgl[1]);
+            }
+        }
+
+        // Jika bulan & tahun terbaca → hitung hanya bulan ini
+        if(tglBulan && tglTahun){
+            adaTanggalValid = true;
+            if(tglBulan === bulanIni && tglTahun === tahunIni){
+                omsetPenjualan += (transaksi.totalBarang || 0);
+                totalBiayaJasa += (transaksi.biayaJasa || 0);
+                labaKotorSemua += ((transaksi.labaBarang || 0) + (transaksi.biayaJasa || 0));
+            }
+        }else{
+            // Jika format tanggal tidak terbaca → TETAP DIHITUNG SEMUA
+            omsetPenjualan += (transaksi.totalBarang || 0);
+            totalBiayaJasa += (transaksi.biayaJasa || 0);
+            labaKotorSemua += ((transaksi.labaBarang || 0) + (transaksi.biayaJasa || 0));
+        }
+    });
+
+    // 2. HITUNG TOTAL PENGELOUARAN
+    let totOperasional = 0, totMaintenance = 0, totGaji = 0;
+    dataPengeluaran.forEach(function(baris){
+        if(baris.jenis === 'Operasional') totOperasional += baris.jumlah;
+        else if(baris.jenis === 'Maintenance') totMaintenance += baris.jumlah;
+        else if(baris.jenis === 'Gaji') totGaji += baris.jumlah;
+    });
+
+    // 3. HITUNG LABA BERSIH
+    let labaBersih = labaKotorSemua - totOperasional - totMaintenance - totGaji;
+
+    // 4. BACA PENGATURAN
+    let sudahGajiTetap = document.getElementById('centangSudahGajiTetap').checked;
+    let jmlMek = parseInt(document.getElementById('inputJumlahMekanik').value) || 0;
+    let prMek = parseInt(document.getElementById('inputPersenMekanik').value) || 12;
+    prMek = Math.max(10, Math.min(15, prMek));
+    let jmlMag = parseInt(document.getElementById('inputJumlahMagang').value) || 0;
+    let uangMkn = parseInt(document.getElementById('inputUangMakan').value) || 0;
+    let uangTrn = parseInt(document.getElementById('inputUangTransport').value) || 0;
+    let prInv = parseInt(document.getElementById('inputPersenInvestor').value) || 15;
+    prInv = Math.max(10, Math.min(20, prInv));
+    let jmlBon = parseInt(document.getElementById('inputJumlahBonusKaryawan').value) || 0;
+    let prBon = parseInt(document.getElementById('inputPersenBonus').value) || 3;
+
+    // 5. HITUNG BAGI HASIL MEKANIK — HANYA JIKA BELUM GAJI TETAP
+    let bagiMekanik = 0, perOrangMekanik = 0;
+    if(!sudahGajiTetap && jmlMek > 0){
+        bagiMekanik = Math.round(totalBiayaJasa * prMek / 100);
+        perOrangMekanik = Math.round(bagiMekanik / jmlMek);
+        document.getElementById('barisMekanikTampil').style.display = 'table-row';
+        document.getElementById('barisMekanikPerOrang').style.display = 'table-row';
+    }else{
+        document.getElementById('barisMekanikTampil').style.display = 'none';
+        document.getElementById('barisMekanikPerOrang').style.display = 'none';
+    }
+
+    // 6. HITUNG BIAYA SISWA MAGANG
+    let totalBiayaMagang = jmlMag > 0 ? (uangMkn + uangTrn) * jmlMag : 0;
+    document.getElementById('barisMagangTampil').style.display = jmlMag > 0 ? 'table-row' : 'none';
+
+    // 7. HITUNG BONUS KARYAWAN — TOTAL DAN PER ORANG
+    let totalBonusKaryawan = jmlBon > 0 ? Math.round(omsetPenjualan * prBon / 100) : 0;
+    let bonusPerOrang = jmlBon > 0 ? Math.round(totalBonusKaryawan / jmlBon) : 0;
+
+    // 8. HITUNG BAGI HASIL INVESTOR
+    let bagiInvestor = labaBersih > 0 ? Math.round(labaBersih * prInv / 100) : 0;
+
+    // 9. TAMPILKAN SEMUA ANGKA KE TABEL
+    document.getElementById('angkaOmset').textContent = formatRupiah(omsetPenjualan);
+    document.getElementById('angkaTotalJasa').textContent = formatRupiah(totalBiayaJasa);
+    document.getElementById('angkaLabaKotor').textContent = formatRupiah(labaKotorSemua);
+    document.getElementById('angkaTotalOperasional').textContent = formatRupiah(totOperasional);
+    document.getElementById('angkaTotalMaintenance').textContent = formatRupiah(totMaintenance);
+    document.getElementById('angkaTotalGaji').textContent = formatRupiah(totGaji);
+    document.getElementById('angkaLabaBersih').textContent = formatRupiah(Math.max(0, labaBersih));
+
+    document.getElementById('tampilPersenMek').textContent = prMek;
+    document.getElementById('tampilJumlahMek').textContent = jmlMek;
+    document.getElementById('angkaBagiMekanik').textContent = formatRupiah(bagiMekanik);
+    document.getElementById('angkaMekanikPerOrang').textContent = formatRupiah(perOrangMekanik);
+
+    document.getElementById('tampilJumlahMag').textContent = jmlMag;
+    document.getElementById('angkaBiayaMagang').textContent = formatRupiah(totalBiayaMagang);
+
+    document.getElementById('tampilPersenBonus').textContent = prBon;
+    document.getElementById('tampilJumlahBonus').textContent = jmlBon;
+    document.getElementById('angkaBonusTotal').textContent = formatRupiah(totalBonusKaryawan);
+    document.getElementById('angkaBonusPerOrang').textContent = formatRupiah(bonusPerOrang);
+
+    document.getElementById('tampilPersenInvestor').textContent = prInv;
+    document.getElementById('angkaBagiInvestor').textContent = formatRupiah(bagiInvestor);
+}
+
+</script>
+
+<!-- ================================================= -->
+<!-- 🔒 LAPORAN & PEMBAGIAN HASIL (TERKUNCI SANDI) -->
+<!-- ================================================= -->
+<div class="card">
+    <h2>💰 Laporan & Pembagian Hasil</h2>
+
+    <!-- 🔒 KUNCI KATA SANDI -->
+    <div id="blokKunciPemilik" style="background:#fff3cd; padding:18px; border-radius:8px; text-align:center;">
+        <h3>🔒 Bagian Khusus Pemilik</h3>
+        <p>Masukkan kata sandi untuk membuka akses laporan & pengaturan</p>
+        <input type="password" id="kataSandiAksesPemilik" placeholder="Masukkan Kata Sandi"
+       onkeypress="if(event.key === 'Enter') bukaAksesPemilik()"
+       style="padding:10px; font-size:15px; width:260px; text-align:center; border:1px solid #ccc; border-radius:5px;">
+        <button onclick="bukaAksesPemilik()" style="padding:10px 22px; background:#27ae60; color:white; border:none; border-radius:5px; cursor:pointer; margin-left:10px; font-size:15px;">🔓 Buka Akses</button>
+        <p style="margin-top:10px; font-size:13px; color:#666;">Kata sandi bawaan: <b>1234</b> — wajib diganti setelah pertama kali dibuka</p>
+    </div>
+
+    <!-- ✅ ISI BAGIAN PEMILIK (TERSEMBUNYI SEBELUM SANDI BENAR) -->
+    <div id="bagianIsiPemilik" style="display:none;">
+
+        <hr style="margin:20px 0; border:none; border-top:1px dashed #ccc;">
+        <div class="card sembunyi-cetak" style="margin:0; box-shadow:none; padding:0;">
+            <h2>📊 LAPORAN LABA-RUGI & ANALISIS</h2>
+        </div>
+
+        <hr style="margin:20px 0; border:none; border-top:1px dashed #ccc;">
+        <div class="card sembunyi-cetak" style="margin:0; box-shadow:none; padding:0;">
+            <h2>📈 GRAFIK PENJUALAN & LABA</h2>
+            <div class="tab-grafik">
+                <button class="aktif" onclick="ubahGrafik('harian', this)">Harian</button>
+                <button onclick="ubahGrafik('bulanan', this)">Bulanan</button>
+                <button onclick="ubahGrafik('tahunan', this)">Tahunan</button>
+            </div>
+            <div class="grafik-baris">
+                <div class="grafik-kotak">
+                    <canvas id="grafikPenjualan" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+
+<!-- ✅ RINGKASAN LABA — DI DALAM BAGIAN PEMILIK SAJA -->
+        <div class="ringkas">
+            <div class="kotak">💰 Penjualan Barang:<br><span style="font-size:18px;" id="lapPenjualanBarang">Rp 0</span></div>
+            <div class="kotak">📦 Modal Keluar:<br><span style="font-size:18px; color:#e74c3c;" id="lapModalKeluar">Rp 0</span></div>
+            <div class="kotak kotak-hijau">✅ Laba Barang:<br><span style="font-size:18px;" id="lapLabaBarang">Rp 0</span></div>
+            <div class="kotak kotak-kuning">🔧 Jasa:<br><span style="font-size:18px;" id="lapJasa">Rp 0</span></div>
+            <div class="kotak" style="border-left-color:#8e44ad; background:#f8f0fc;">📊 Laba Kotor:<br><span style="font-size:18px; color:#6a1b9a;" id="lapLabaKotor">Rp 0</span></div>
+        </div>
+
+        <!-- ⚙️ PENGATURAN — KOLOM SUDAH DIPERBESAR -->
+        <div style="background:#e8f4f8; padding:18px; border-radius:8px; margin-bottom:18px; border:1px solid #d0e9f2;">
+            <h3 style="margin-top:0; margin-bottom:12px;">⚙️ Pengaturan Pembagian Hasil</h3>
+            <label style="font-size:15px; display:inline-block; margin-bottom:12px;">
+                <input type="checkbox" id="centangSudahGajiTetap" onchange="hitungUlangSemuaAngka()">
+                ✅ Sudah Beri Gaji Tetap → hentikan bagi hasil jasa mekanik
+            </label>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:15px;">
+                <label style="display:block; padding:10px; background:white; border-radius:6px; font-size:14px; line-height:1.8;">
+                    🤝 Mekanik Tetap<br>
+                    Jumlah: <input type="number" id="inputJumlahMekanik" value="1" min="0" max="10" style="width:80px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()"> orang<br>
+                    Persentase Jasa: <input type="number" id="inputPersenMekanik" value="12" min="10" max="15" style="width:75px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()">% (10–15%)
+                </label>
+
+                <label style="display:block; padding:10px; background:white; border-radius:6px; font-size:14px; line-height:1.8;">
+                    🧑‍🎓 Siswa Magang<br>
+                    Jumlah: <input type="number" id="inputJumlahMagang" value="0" min="0" max="10" style="width:80px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()"> orang<br>
+                    Uang Makan: Rp<input type="number" id="inputUangMakan" value="15000" style="width:100px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()">
+                    &nbsp;Transport: Rp<input type="number" id="inputUangTransport" value="10000" style="width:100px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()">
+                </label>
+
+                <label style="display:block; padding:10px; background:white; border-radius:6px; font-size:14px; line-height:1.8;">
+                    📅 Bagi Hasil Investor<br>
+                    Persentase Laba Bersih: <input type="number" id="inputPersenInvestor" value="15" min="10" max="20" style="width:75px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()">% (10–20%)
+                </label>
+
+                <label style="display:block; padding:10px; background:white; border-radius:6px; font-size:14px; line-height:1.8;">
+                    🎁 Bonus Karyawan<br>
+                    Jumlah Penerima: <input type="number" id="inputJumlahBonusKaryawan" value="1" min="0" max="20" style="width:80px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()"> orang<br>
+                    Persentase Omset: <input type="number" id="inputPersenBonus" value="3" min="0" max="10" style="width:75px; padding:8px 5px; font-size:16px; text-align:center; border:1px solid #bbb; border-radius:4px;" oninput="hitungUlangSemuaAngka()">%
+                </label>
+            </div>
+
+            <div style="margin-top:15px; padding-top:12px; border-top:1px dashed #ccc;">
+                <label style="font-size:14px; font-weight:bold;">🔑 Ubah Kata Sandi Pemilik: </label>
+                <input type="password" id="inputSandiBaru" placeholder="Masukkan Sandi Baru (min. 4 karakter)" style="width:280px; padding:9px 6px; font-size:15px; border:1px solid #bbb; border-radius:4px; margin:0 8px;">
+                <button onclick="simpanKataSandiPemilik()" style="padding:9px 18px; background:#3498db; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">✅ Simpan Sandi</button>
+            </div>
+        </div>
+
+        <!-- 📝 FORM INPUT PENGELOUARAN -->
+        <div style="display:flex; flex-wrap:wrap; gap:18px; margin-bottom:18px;">
+            <div style="flex:1; min-width:220px; background:#fff9e6; padding:14px; border-radius:8px;">
+                <h3 style="margin-top:0; margin-bottom:10px; font-size:15px;">📦 Pengeluaran Operasional</h3>
+                <input type="date" id="inputTglOperasional" style="width:100%; margin-bottom:6px; padding:7px;">
+                <input type="text" id="inputKetOperasional" placeholder="Keterangan (contoh: beli barang, listrik)" style="width:100%; margin-bottom:6px; padding:7px;">
+                <input type="number" id="inputJumlahOperasional" placeholder="Jumlah Rp" style="width:100%; margin-bottom:8px; padding:7px;">
+                <button onclick="tambahDataOperasional()" style="width:100%; padding:8px; background:#27ae60; color:white; border:none; border-radius:5px; cursor:pointer; font-size:14px;">✅ Simpan Operasional</button>
+            </div>
+
+            <div style="flex:1; min-width:220px; background:#e6f2ff; padding:14px; border-radius:8px;">
+                <h3 style="margin-top:0; margin-bottom:10px; font-size:15px;">🔧 Pengeluaran Maintenance</h3>
+                <input type="date" id="inputTglMaintenance" style="width:100%; margin-bottom:6px; padding:7px;">
+                <input type="text" id="inputKetMaintenance" placeholder="Keterangan (contoh: peralatan, servis alat)" style="width:100%; margin-bottom:6px; padding:7px;">
+                <input type="number" id="inputJumlahMaintenance" placeholder="Jumlah Rp" style="width:100%; margin-bottom:8px; padding:7px;">
+                <button onclick="tambahDataMaintenance()" style="width:100%; padding:8px; background:#3498db; color:white; border:none; border-radius:5px; cursor:pointer; font-size:14px;">✅ Simpan Maintenance</button>
+            </div>
+
+            <div style="flex:1; min-width:220px; background:#f4e6ff; padding:14px; border-radius:8px;">
+                <h3 style="margin-top:0; margin-bottom:10px; font-size:15px;">💵 Pembayaran Gaji Karyawan</h3>
+                <input type="date" id="inputBulanGaji" style="width:100%; margin-bottom:6px; padding:7px;">
+                <input type="text" id="inputNamaKaryawan" placeholder="Nama Karyawan / Mekanik" style="width:100%; margin-bottom:6px; padding:7px;">
+                <input type="number" id="inputJumlahGaji" placeholder="Jumlah Gaji Rp" style="width:100%; margin-bottom:8px; padding:7px;">
+                <button onclick="tambahDataGaji()" style="width:100%; padding:8px; background:#9b59b6; color:white; border:none; border-radius:5px; cursor:pointer; font-size:14px;">✅ Simpan Gaji</button>
+            </div>
+        </div>
+
+        <!-- 🔍 FILTER TANGGAL & BACKUP -->
+        <div style="background:#f0f0f0; padding:14px; border-radius:8px; margin-bottom:18px;">
+            <h3 style="margin-top:0; margin-bottom:10px; font-size:15px;">🔍 Filter Tanggal & 💾 Backup Data Bulanan</h3>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                <label style="font-size:14px;">Dari Tanggal: <input type="date" id="filterTanggalDari" onchange="terapkanFilterTanggal()" style="padding:6px;"></label>
+                <label style="font-size:14px;">Sampai Tanggal: <input type="date" id="filterTanggalSampai" onchange="terapkanFilterTanggal()" style="padding:6px;"></label>
+                <button onclick="terapkanFilterTanggal()" style="padding:7px 14px; font-size:14px; cursor:pointer;">🔍 Tampilkan Periode</button>
+                <button onclick="resetFilterTanggal()" style="padding:7px 14px; font-size:14px; cursor:pointer;">↩️ Tampilkan Semua</button>
+                <button onclick="unduhBackupKeExcel()" style="padding:7px 16px; background:#27ae60; color:white; border:none; border-radius:5px; cursor:pointer; font-size:14px;">💾 Unduh Backup Excel</button>
+            </div>
+        </div>
+
+        <!-- 📋 TABEL RIWAYAT PENGELOUARAN -->
+        <h3 style="font-size:15px;">📋 Riwayat Pengeluaran & Pembayaran</h3>
+        <div style="overflow-x:auto; margin-bottom:20px;">
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f0f0f0;">
+                        <th style="padding:10px; border:1px solid #ddd;">Tanggal</th>
+                        <th style="padding:10px; border:1px solid #ddd;">Jenis Pengeluaran</th>
+                        <th style="padding:10px; border:1px solid #ddd;">Keterangan / Nama</th>
+                        <th style="padding:10px; border:1px solid #ddd; text-align:right;">Jumlah (Rp)</th>
+                        <th style="padding:10px; border:1px solid #ddd; text-align:center;">Hapus</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelRiwayatPengeluaran"></tbody>
+            </table>
+        </div>
+
+        <!-- 📊 RINGKASAN LABA & PEMBAGIAN HASIL -->
+        <div style="padding:18px; background:#f8f9fa; border-radius:8px; border:2px solid #ddd;">
+            <h3 style="margin-top:0; margin-bottom:15px; font-size:16px;">📊 Ringkasan Laba & Pembagian Hasil</h3>
+            <table style="width:100%; font-size:15px; border-collapse:collapse;">
+                <tr>
+                    <td style="padding:8px 10px;">💰 Omset Penjualan Barang</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaOmset">Rp 0</td>
+                </tr>
+                <tr>
+                    <td style="padding:8px 10px;">🔧 Total Biaya Jasa Service</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaTotalJasa">Rp 0</td>
+                </tr>
+                <tr style="font-weight:bold; background:#eafafb;">
+                    <td style="padding:8px 10px;">📈 Laba Kotor (Penjualan + Jasa)</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaLabaKotor">Rp 0</td>
+                </tr>
+                <tr style="color:#d35400;">
+                    <td style="padding:8px 10px;">− Pengeluaran Operasional</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaTotalOperasional">Rp 0</td>
+                </tr>
+                <tr style="color:#e67e22;">
+                    <td style="padding:8px 10px;">− Pengeluaran Maintenance</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaTotalMaintenance">Rp 0</td>
+                </tr>
+                <tr style="color:#8e44ad;">
+                    <td style="padding:8px 10px;">− Pembayaran Gaji Karyawan</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaTotalGaji">Rp 0</td>
+                </tr>
+                <tr style="border-top:2px dashed #999; font-weight:bold; font-size:16px; background:#f2f8fb;">
+                    <td style="padding:10px;">📊 LABA BERSIH</td>
+                    <td style="padding:10px; text-align:right;" id="angkaLabaBersih">Rp 0</td>
+                </tr>
+                <tr id="barisMekanikTampil" style="color:#27ae60;">
+                    <td style="padding:8px 10px;">🤝 Bagi Hasil Mekanik (<span id="tampilPersenMek">12</span>% dari Jasa, <span id="tampilJumlahMek">1</span> orang)</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaBagiMekanik">Rp 0</td>
+                </tr>
+                <tr id="barisMekanikPerOrang" style="color:#27ae60; font-size:14px;">
+                    <td style="padding:6px 10px; padding-left:30px;">↳ Diterima Per Orang</td>
+                    <td style="padding:6px 10px; text-align:right;" id="angkaMekanikPerOrang">Rp 0</td>
+                </tr>
+                <tr id="barisMagangTampil" style="color:#3498db;">
+                    <td style="padding:8px 10px;">🧑‍🎓 Biaya Siswa Magang (Makan + Transport, <span id="tampilJumlahMag">0</span> orang)</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaBiayaMagang">Rp 0</td>
+                </tr>
+                <tr style="color:#e91e63;">
+                    <td style="padding:8px 10px;">🎁 Bonus Karyawan (<span id="tampilPersenBonus">3</span>% dari Omset, <span id="tampilJumlahBonus">1</span> orang)</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaBonusTotal">Rp 0</td>
+                </tr>
+                <tr style="color:#e91e63; font-size:14px;">
+                    <td style="padding:6px 10px; padding-left:30px;">↳ Diterima Per Orang</td>
+                    <td style="padding:6px 10px; text-align:right;" id="angkaBonusPerOrang">Rp 0</td>
+                </tr>
+                <tr style="color:#2980b9; font-weight:bold;">
+                    <td style="padding:8px 10px;">📅 Bagi Hasil Investor (<span id="tampilPersenInvestor">15</span>% dari Laba Bersih)</td>
+                    <td style="padding:8px 10px; text-align:right;" id="angkaBagiInvestor">Rp 0</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+<!-- ================================================= -->
+</body>
+</html>
