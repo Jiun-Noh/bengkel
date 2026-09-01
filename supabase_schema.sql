@@ -51,6 +51,13 @@ create table absensi (
   unique (tanggal, nama)
 );
 
+create table staff (
+  kode text primary key,
+  nama text not null,
+  jabatan text,
+  aktif boolean default true
+);
+
 create table pengaturan (
   id int primary key default 1,
   operasional integer default 0,
@@ -65,6 +72,7 @@ insert into pengaturan (id) values (1);
 alter table barang enable row level security;
 alter table riwayat enable row level security;
 alter table absensi enable row level security;
+alter table staff enable row level security;
 alter table pengaturan enable row level security;
 
 create policy "auth full access" on barang for all
@@ -72,6 +80,8 @@ create policy "auth full access" on barang for all
 create policy "auth full access" on riwayat for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "auth full access" on absensi for all
+  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "auth full access" on staff for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "auth full access" on pengaturan for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

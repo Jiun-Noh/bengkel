@@ -215,11 +215,12 @@
         <div class="navbar-container">
             <div class="navbar-logo">📦 BENGKEL MANAGER</div>
             <ul class="navbar-menu" id="navbarMenu">
-                <li><a class="navbar-item active" data-tab="home" onclick="switchTab('home')">🏠 Beranda</a></li>
+                <li><a class="navbar-item active" data-tab="home" onclick="switchTab('home')">🏠 Beranda</a></li>  
                 <li><a class="navbar-item" data-tab="absensi" onclick="switchTab('absensi')">📅 Absensi</a></li>
                 <li><a class="navbar-item" data-tab="stok" onclick="switchTab('stok')">📦 Stok</a></li>
                 <li><a class="navbar-item" data-tab="transaksi" onclick="switchTab('transaksi')">🛒 Transaksi</a></li>
                 <li><a class="navbar-item" data-tab="laporan" onclick="switchTab('laporan')">💰 Laporan</a></li>
+                <li><a class="navbar-item" data-tab="staff" onclick="switchTab('staff')">👤 Staff</a></li>
             </ul>
             <div class="hamburger" onclick="toggleMobileMenu()">
                 <span></span>
@@ -260,6 +261,7 @@
                 <p style="line-height: 1.8;">
                     👋 Selamat datang di <strong>Sistem Manajemen Bengkel</strong>!<br><br>
                     📍 <strong>Menu Navigasi:</strong><br>
+                    • 👤 <strong>Staff</strong> - Kelola data karyawan<br>
                     • 📅 <strong>Absensi</strong> - Catat masuk/keluar karyawan<br>
                     • 📦 <strong>Stok</strong> - Kelola inventaris parts<br>
                     • 🛒 <strong>Transaksi</strong> - Catat penjualan & service<br>
@@ -282,13 +284,73 @@
             </div>
         </div>
 
+        <!-- ==================== TAB: STAFF ==================== -->
+        <div class="tab-content" id="tab-staff">
+            <h1>👤 Manajemen Data Staff</h1>
+
+            <div class="card">
+                <h2>➕ Tambah / Ubah Staff</h2>
+                <div id="infoModeEditStaff" class="edit-mode sembunyi">✏️ SEDANG MODE EDIT — Ubah data lalu simpan</div>
+
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Kode Staff</label>
+                    <input type="text" id="staffKode" readonly style="width:calc(100% - 140px); background:#eee; color:#666; cursor:not-allowed;">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Nama Staff</label>
+                    <input type="text" id="staffNama" placeholder="Nama Lengkap" oninput="kapitalNama(this)" style="width:calc(100% - 140px);">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Jabatan</label>
+                    <select id="staffJabatan" style="width:calc(100% - 140px);">
+                        <option value="Mekanik">🔧 Mekanik</option>
+                        <option value="Kasir">💰 Kasir</option>
+                        <option value="Magang">🧑‍🎓 Magang</option>
+                        <option value="Lainnya">📋 Lainnya</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:inline-block; width:130px; font-weight:500;">Status</label>
+                    <select id="staffAktif" style="width:calc(100% - 140px);">
+                        <option value="1">✅ Aktif</option>
+                        <option value="0">🚫 Nonaktif</option>
+                    </select>
+                </div>
+
+                <button onclick="simpanStaff()">✅ Simpan Staff</button>
+                <button class="btn-orange" onclick="kosongkanFormStaff()">🗑️ Kosongkan</button>
+            </div>
+
+            <div class="card">
+                <h2>📋 Daftar Staff</h2>
+                <input type="text" id="cariStaff" placeholder="🔍 Cari Kode / Nama Staff..." style="width:100%;" oninput="tampilkanTabelStaff()">
+                <div style="overflow-x:auto; width:100%; margin-top:10px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="tengah">No</th>
+                                <th>Kode</th>
+                                <th>Nama</th>
+                                <th>Jabatan</th>
+                                <th class="tengah">Status</th>
+                                <th class="tengah">Ubah</th>
+                                <th class="tengah">Hapus</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelStaffIsi"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- ==================== TAB 2: ABSENSI ==================== -->
         <div class="tab-content" id="tab-absensi">
             <h1>📅 Manajemen Absensi Karyawan</h1>
 
             <div class="card" style="background:#fff9e6; border:2px solid #ffc107;">
                 <h2>📋 Input Absensi Harian</h2>
-                
+                <div id="infoModeEditAbsensi" class="edit-mode sembunyi">✏️ SEDANG MODE EDIT — Ubah data lalu simpan &nbsp; <a href="javascript:void(0)" onclick="batalEditAbsensi()" style="color:#c0392b; font-weight:bold; text-decoration:underline;">❌ Batal</a></div>
+
                 <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center;">
                     <label style="font-weight:500;">Tanggal:</label>
                     <input type="date" id="absensiTanggal" style="width:160px; padding:6px;">
@@ -300,21 +362,27 @@
                 
                 <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center;">
                     <label style="font-weight:500;">💼 Jabatan:</label>
-                    <select id="absensiJabatan" style="width:160px; padding:6px; font-size:14px;">
+                    <select id="absensiJabatan" style="width:160px; padding:6px; font-size:14px;" onchange="isiComboStaffAbsensi()">
+                        <option value="">🗂️ Semua</option>
                         <option value="Mekanik">🔧 Mekanik</option>
                         <option value="Kasir">💰 Kasir</option>
                         <option value="Magang">🧑‍🎓 Magang</option>
                         <option value="Lainnya">📋 Lainnya</option>
                     </select>
                     <label style="font-weight:500; margin-left:10px;">👤 Nama Staff:</label>
-                    <input type="text" id="absensiNama" placeholder="Nama Lengkap" style="width:220px; padding:6px;" oninput="kapitalNamaAbsensi(this)">
+                    <select id="absensiNama" style="width:220px; padding:6px;" onchange="pilihStaffAbsensi(this)">
+                        <option value="">— Pilih Staff —</option>
+                    </select>
                 </div>
                 
-                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-                    <button onclick="aturStatusAbsensi('Hadir')" style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">✅ Hadir</button>
-                    <button onclick="aturStatusAbsensi('Setengah Hari')" style="background:#f39c12; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">⛔ ½ Hari</button>
-                    <button onclick="aturStatusAbsensi('Izin')" style="background:#9b59b6; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">📝 Izin</button>
-                    <button onclick="aturStatusAbsensi('Tanpa Keterangan')" style="background:#e74c3c; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">❌ TanpaKet</button>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center;">
+                    <label style="font-weight:500;">📌 Status:</label>
+                    <select id="absensiStatus" style="width:180px; padding:6px; font-size:14px;">
+                        <option value="Hadir">✅ Hadir</option>
+                        <option value="Setengah Hari">⛔ ½ Hari</option>
+                        <option value="Izin">📝 Izin</option>
+                        <option value="Tanpa Keterangan">❌ TanpaKet</option>
+                    </select>
                 </div>
                 
                 <div style="margin-bottom:10px;">
@@ -323,9 +391,8 @@
                 </div>
                 
                 <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
-                    <button onclick="simpanAbsensiDatang()" style="background:#27ae60; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">✅ ABSEN DATANG</button>
-                    <button onclick="isiJamPulangOtomatis()" style="background:#1976d2; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">🏠 ABSEN PULANG</button>
-                    <button onclick="simpanAbsensi()" style="background:#f57c00; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">✅ SIMPAN ABSENSI</button>
+                    <button onclick="simpanAbsensi()" style="background:#27ae60; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">✅ SIMPAN ABSENSI</button>
+                    <button onclick="isiJamPulangOtomatis()" style="background:#1976d2; color:white; border:none; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">🏠 ISI JAM PULANG SEKARANG</button>
                 </div>
             </div>
 
@@ -780,8 +847,12 @@ function switchTab(tabName) {
     // Inisialisasi konten tab jika perlu
     if (tabName === 'home') {
         updateDashboard();
+    } else if (tabName === 'staff') {
+        tampilkanTabelStaff();
+        perbaruiKodeStaffOtomatis();
     } else if (tabName === 'absensi') {
         tampilkanRekapAbsensi();
+        isiComboStaffAbsensi();
     } else if (tabName === 'laporan') {
         let laporanContent = document.getElementById('kunciLaporan');
         if (laporanContent && !laporanContent.classList.contains('sembunyi')) {
@@ -828,6 +899,8 @@ const stokMinim = 3;
 let barang = [];
 let riwayat = [];
 let dataEdit = null;
+let staffList = []; // dimuat dari cloud saat login, lihat muatDataDariCloud()
+let staffDiedit = null;
 
 document.addEventListener('keypress', function(e){
     if(e.key === 'Enter' && document.activeElement.id === 'inputSandi') verifikasiSandi();
@@ -874,23 +947,41 @@ async function bukaGantiSandi(){
     alert('✅ Kata sandi berhasil diganti!');
 }
 
+// Supabase membatasi hasil select ke maksimal 1000 baris per query secara default.
+// Semua tabel yang bisa tumbuh besar (riwayat, absensi, dst) diambil bertahap per halaman
+// supaya data lama tidak diam-diam hilang saat baris sudah melewati 1000.
+async function ambilSemuaBaris(tabel, kolomUrut, menurun){
+    let semua = [];
+    const ukuranHalaman = 1000;
+    let dari = 0;
+    while(true){
+        let { data, error } = await db.from(tabel).select('*').order(kolomUrut, { ascending: true }).range(dari, dari + ukuranHalaman - 1);
+        if(error) throw error;
+        semua = semua.concat(data || []);
+        if(!data || data.length < ukuranHalaman) break;
+        dari += ukuranHalaman;
+    }
+    if(menurun) semua.reverse();
+    return semua;
+}
+
 async function muatDataDariCloud(){
     try {
-        let [rBarang, rRiwayat, rAbsensi, rPengaturan] = await Promise.all([
-            db.from('barang').select('*').order('nama'),
-            db.from('riwayat').select('*').order('created_at', { ascending: false }),
-            db.from('absensi').select('*'),
+        let [barangSemua, riwayatSemua, absensiSemua, staffSemua, rPengaturan] = await Promise.all([
+            ambilSemuaBaris('barang', 'nama'),
+            ambilSemuaBaris('riwayat', 'created_at', true),
+            ambilSemuaBaris('absensi', 'tanggal'),
+            ambilSemuaBaris('staff', 'nama'),
             db.from('pengaturan').select('*').eq('id', 1).single()
         ]);
 
-        if(rBarang.error) throw rBarang.error;
-        if(rRiwayat.error) throw rRiwayat.error;
-        if(rAbsensi.error) throw rAbsensi.error;
         if(rPengaturan.error) throw rPengaturan.error;
 
-        barang = (rBarang.data || []).map(kolomBarangKeInternal);
-        riwayat = (rRiwayat.data || []).map(kolomRiwayatKeInternal);
-        daftarAbsensi = (rAbsensi.data || []).map(kolomAbsensiKeInternal);
+        barang = barangSemua.map(kolomBarangKeInternal);
+        riwayat = riwayatSemua.map(kolomRiwayatKeInternal);
+        daftarAbsensi = absensiSemua.map(kolomAbsensiKeInternal);
+        staffList = staffSemua.map(kolomStaffKeInternal);
+        isiComboStaffAbsensi();
 
         if(rPengaturan.data){
             pengaturan.operasional = rPengaturan.data.operasional || 0;
@@ -903,7 +994,7 @@ async function muatDataDariCloud(){
         if(!migrasiSelesai) tampilkanTombolMigrasi();
     } catch(e) {
         alert('⚠️ Gagal memuat data dari cloud: ' + e.message);
-        barang = []; riwayat = []; daftarAbsensi = [];
+        barang = []; riwayat = []; daftarAbsensi = []; staffList = [];
     }
 }
 
@@ -933,25 +1024,30 @@ function kolomAbsensiKeInternal(row){
         keterangan: row.keterangan, bulan: row.bulan
     };
 }
+function kolomStaffKeInternal(row){
+    return { kode: row.kode, nama: row.nama, jabatan: row.jabatan, aktif: row.aktif };
+}
 
 // ============ SINKRONISASI REALTIME ANTAR PERANGKAT ============
 function aktifkanSinkronisasiRealtime(){
     db.channel('sinkronisasi-bengkel')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'barang' }, async () => {
-            let { data } = await db.from('barang').select('*').order('nama');
-            barang = (data || []).map(kolomBarangKeInternal);
+            barang = (await ambilSemuaBaris('barang', 'nama')).map(kolomBarangKeInternal);
             tampilkanTabel(); updateDashboard();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'riwayat' }, async () => {
-            let { data } = await db.from('riwayat').select('*').order('created_at', { ascending: false });
-            riwayat = (data || []).map(kolomRiwayatKeInternal);
+            riwayat = (await ambilSemuaBaris('riwayat', 'created_at', true)).map(kolomRiwayatKeInternal);
             riwayatAsliFilter = [...riwayat];
             tampilkanRiwayat(); updateDashboard();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'absensi' }, async () => {
-            let { data } = await db.from('absensi').select('*');
-            daftarAbsensi = (data || []).map(kolomAbsensiKeInternal);
+            daftarAbsensi = (await ambilSemuaBaris('absensi', 'tanggal')).map(kolomAbsensiKeInternal);
             tampilkanRekapAbsensi();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, async () => {
+            staffList = (await ambilSemuaBaris('staff', 'nama')).map(kolomStaffKeInternal);
+            tampilkanTabelStaff();
+            isiComboStaffAbsensi();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, async () => {
             let { data } = await db.from('pengaturan').select('*').eq('id', 1).single();
@@ -1182,6 +1278,117 @@ async function hapusBarang(kode){
     if(error) { alert('❌ Gagal menghapus di cloud: ' + error.message); return; }
     barang = barang.filter(x=>x.kode !== kode);
     tampilkanTabel();
+}
+
+// ============ MANAJEMEN STAFF ============
+function generateKodeStaffBaru(){
+    let maks = 0;
+    staffList.forEach(s => {
+        let m = /^S(\d+)$/.exec(s.kode||'');
+        if(m) maks = Math.max(maks, parseInt(m[1]));
+    });
+    return 'S' + String(maks+1).padStart(3,'0');
+}
+
+function perbaruiKodeStaffOtomatis(){
+    if(staffDiedit) return; // sedang mengedit staff yang sudah ada, kode tidak boleh berubah
+    let el = document.getElementById('staffKode');
+    if(el) el.value = generateKodeStaffBaru();
+}
+
+async function simpanStaff(){
+    let kode = document.getElementById('staffKode').value.trim().toUpperCase() || generateKodeStaffBaru();
+    let nama = document.getElementById('staffNama').value.trim();
+    let jabatan = document.getElementById('staffJabatan').value;
+    let aktif = document.getElementById('staffAktif').value === '1';
+
+    if(!nama) { alert('⚠️ Isi Nama Staff!'); return; }
+
+    let baris = { kode: kode, nama: nama, jabatan: jabatan, aktif: aktif };
+    let { error } = await db.from('staff').upsert(baris);
+    if(error) { alert('❌ Gagal menyimpan ke cloud: ' + error.message); return; }
+
+    let idx = staffList.findIndex(x => x.kode === kode);
+    if(idx >= 0) staffList[idx] = baris; else staffList.push(baris);
+
+    alert(staffDiedit ? '✅ Data staff berhasil diubah!' : `✅ Staff baru berhasil ditambahkan!\nKode: ${kode}`);
+    tampilkanTabelStaff();
+    isiComboStaffAbsensi();
+    kosongkanFormStaff();
+}
+
+function kosongkanFormStaff(){
+    document.getElementById('staffNama').value = '';
+    document.getElementById('staffJabatan').value = 'Mekanik';
+    document.getElementById('staffAktif').value = '1';
+    staffDiedit = null;
+    document.getElementById('infoModeEditStaff').classList.add('sembunyi');
+    perbaruiKodeStaffOtomatis();
+}
+
+function tampilkanTabelStaff(){
+    let tb = document.getElementById('tabelStaffIsi'); if(!tb) return;
+    tb.innerHTML = '';
+    let cari = document.getElementById('cariStaff').value.trim().toUpperCase();
+    let hasil = staffList;
+    if(cari) hasil = staffList.filter(s => s.kode.toUpperCase().includes(cari) || s.nama.toUpperCase().includes(cari));
+
+    hasil.forEach(s => {
+        let no = staffList.indexOf(s)+1;
+        let statusTeks = s.aktif ? '✅ Aktif' : '🚫 Nonaktif';
+        tb.innerHTML += `<tr><td class="tengah">${no}</td><td>${s.kode}</td><td>${s.nama}</td><td>${s.jabatan}</td><td class="tengah">${statusTeks}</td><td class="tengah"><button class="btn-orange btn-sm" onclick="ambilDataEditStaff('${s.kode}')">✏️</button></td><td class="tengah"><button class="btn-red btn-sm" onclick="hapusStaff('${s.kode}')">🗑️</button></td></tr>`;
+    });
+}
+
+function ambilDataEditStaff(kode){
+    let s = staffList.find(x => x.kode === kode);
+    if(!s) return;
+    staffDiedit = kode;
+    document.getElementById('staffKode').value = s.kode;
+    document.getElementById('staffNama').value = s.nama;
+    document.getElementById('staffJabatan').value = s.jabatan;
+    document.getElementById('staffAktif').value = s.aktif ? '1' : '0';
+    document.getElementById('infoModeEditStaff').classList.remove('sembunyi');
+    switchTab('staff');
+}
+
+async function hapusStaff(kode){
+    if(!confirm(`⚠️ Hapus staff ${kode}? (Data absensi lama tidak akan ikut terhapus)`)) return;
+    let { error } = await db.from('staff').delete().eq('kode', kode);
+    if(error) { alert('❌ Gagal menghapus di cloud: ' + error.message); return; }
+    staffList = staffList.filter(x => x.kode !== kode);
+    tampilkanTabelStaff();
+    isiComboStaffAbsensi();
+}
+
+function isiComboStaffAbsensi(){
+    let sel = document.getElementById('absensiNama');
+    if(!sel) return;
+    let nilaiSekarang = sel.value;
+    let optSekarang = sel.options[sel.selectedIndex];
+    let jabatanArsip = optSekarang ? optSekarang.dataset.jabatan : '';
+    let jabatanFilter = document.getElementById('absensiJabatan').value;
+    let aktifList = staffList
+        .filter(s => s.aktif && (!jabatanFilter || s.jabatan === jabatanFilter))
+        .sort((a,b) => a.nama.localeCompare(b.nama));
+    let opsi = aktifList.map(s => `<option value="${s.nama}" data-jabatan="${s.jabatan}">${s.nama} (${s.jabatan})</option>`);
+
+    // Kalau nama yang sedang dipilih sudah tidak ada lagi di data staff (dihapus/berganti nama),
+    // pertahankan sebagai opsi arsip supaya tidak hilang diam-diam saat sedang mode edit.
+    if(nilaiSekarang && !staffList.some(s => s.nama === nilaiSekarang)) {
+        opsi.push(`<option value="${nilaiSekarang}" data-jabatan="${jabatanArsip}">${nilaiSekarang} (arsip)</option>`);
+    }
+
+    sel.innerHTML = '<option value="">— Pilih Staff —</option>' + opsi.join('');
+    sel.value = [...sel.options].some(o => o.value === nilaiSekarang) ? nilaiSekarang : '';
+}
+
+function pilihStaffAbsensi(sel){
+    let opt = sel.options[sel.selectedIndex];
+    let jabatan = opt ? opt.dataset.jabatan : '';
+    if(jabatan) document.getElementById('absensiJabatan').value = jabatan;
+    // Ganti staff di luar mode edit = mulai entri baru, jam pulang lama (jika ada) tidak relevan lagi
+    if(!barisDiedit) document.getElementById('absensiJamPulang').value = '';
 }
 
 function lihatRiwayatRestock(kode){
@@ -2038,11 +2245,6 @@ document.addEventListener('DOMContentLoaded', function(){
     if(elJamDatang && !elJamDatang.value) elJamDatang.value = jam;
 });
 
-function kapitalNamaAbsensi(el) {
-    let teks = el.value;
-    el.value = teks.replace(/\b\w/g, c => c.toUpperCase());
-}
-
 function hitungJamKerja(jamDatang, jamPulang) {
     if(!jamDatang || !jamPulang) return '-';
     let [j1, m1] = jamDatang.split(':').map(Number);
@@ -2054,18 +2256,17 @@ function hitungJamKerja(jamDatang, jamPulang) {
     return jam > 0 ? `${jam}j ${sisa}m` : `${sisa}m`;
 }
 
-function aturStatusAbsensi(status) {
-    window.statusAbsensiSekarang = status;
-    alert(`✅ Status dipilih: ${status}\n👉 Klik SIMPAN untuk menyimpan`);
-}
-
 async function simpanAbsensi() {
     let tgl = document.getElementById('absensiTanggal').value;
     let jamDatang = document.getElementById('absensiJamDatang').value;
     let jamPulang = document.getElementById('absensiJamPulang').value || '';
-    let jabatan = document.getElementById('absensiJabatan').value;
-    let nama = document.getElementById('absensiNama').value.trim();
-    let status = window.statusAbsensiSekarang || 'Hadir';
+    let selNama = document.getElementById('absensiNama');
+    let optNama = selNama.options[selNama.selectedIndex];
+    // Jabatan asli staff yang dipilih (data-jabatan) diprioritaskan, bukan filter Jabatan di atasnya —
+    // filter itu cuma menyaring daftar Nama Staff, bukan penentu jabatan yang tersimpan.
+    let jabatan = (optNama && optNama.dataset.jabatan) || document.getElementById('absensiJabatan').value;
+    let nama = selNama.value.trim();
+    let status = document.getElementById('absensiStatus').value;
     let ket = document.getElementById('absensiKeterangan').value.trim();
 
     if(!tgl) { alert('⚠️ Pilih Tanggal dulu!'); return; }
@@ -2112,6 +2313,9 @@ async function simpanAbsensi() {
     if(error) { alert('❌ Gagal menyimpan ke cloud: ' + error.message); return; }
 
     barisDiedit = null;
+    document.getElementById('infoModeEditAbsensi').classList.add('sembunyi');
+    document.getElementById('absensiJabatan').disabled = false;
+    selNama.disabled = false;
     daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === tgl && x.nama === nama));
     daftarAbsensi.push(data);
     tampilkanRekapAbsensi();
@@ -2120,7 +2324,7 @@ async function simpanAbsensi() {
     document.getElementById('absensiNama').value = '';
     document.getElementById('absensiJamPulang').value = '';
     document.getElementById('absensiKeterangan').value = '';
-    window.statusAbsensiSekarang = null;
+    document.getElementById('absensiStatus').value = 'Hadir';
     document.getElementById('absensiJamDatang').value = new Date().toTimeString().substring(0,5);
 }
 
@@ -2162,11 +2366,17 @@ function bukaEditAbsensi(tgl, jamDatang, jamPulang, jabatan, nama, status, ket) 
     document.getElementById('absensiJamDatang').value = jamDatang;
     document.getElementById('absensiJamPulang').value = jamPulang;
     document.getElementById('absensiJabatan').value = jabatan;
-    document.getElementById('absensiNama').value = nama;
+    let selNama = document.getElementById('absensiNama');
+    if(![...selNama.options].some(o => o.value === nama)) {
+        selNama.insertAdjacentHTML('beforeend', `<option value="${nama}" data-jabatan="${jabatan}">${nama} (arsip)</option>`);
+    }
+    selNama.value = nama;
     document.getElementById('absensiKeterangan').value = ket;
-    window.statusAbsensiSekarang = status;
+    document.getElementById('absensiStatus').value = status;
     barisDiedit = { tanggal:tgl, nama:nama };
-    alert(`✏️ Edit Data:\n📅 ${tgl}\n👤 ${nama} (${jabatan})\n⏰ ${jamDatang} — ${jamPulang||'—'}\n👉 Ubah lalu klik [SIMPAN ABSENSI]`);
+    document.getElementById('infoModeEditAbsensi').classList.remove('sembunyi');
+    document.getElementById('absensiJabatan').disabled = true;
+    selNama.disabled = true;
     switchTab('absensi');
 }
 
@@ -2175,12 +2385,21 @@ async function hapusAbsensi(tanggal, nama) {
     let { error } = await db.from('absensi').delete().eq('tanggal', tanggal).eq('nama', nama);
     if(error) { alert('❌ Gagal menghapus di cloud: ' + error.message); return; }
     daftarAbsensi = daftarAbsensi.filter(x => !(x.tanggal === tanggal && x.nama === nama));
+    if(barisDiedit && barisDiedit.tanggal === tanggal && barisDiedit.nama === nama) batalEditAbsensi();
     tampilkanRekapAbsensi();
 }
 
-function simpanAbsensiDatang() {
+function batalEditAbsensi(){
+    barisDiedit = null;
+    document.getElementById('absensiStatus').value = 'Hadir';
+    document.getElementById('infoModeEditAbsensi').classList.add('sembunyi');
+    document.getElementById('absensiJabatan').disabled = false;
+    document.getElementById('absensiNama').disabled = false;
+    document.getElementById('absensiJabatan').value = '';
+    document.getElementById('absensiNama').value = '';
+    isiComboStaffAbsensi();
     document.getElementById('absensiJamPulang').value = '';
-    simpanAbsensi();
+    document.getElementById('absensiKeterangan').value = '';
 }
 
 function isiJamPulangOtomatis() {
