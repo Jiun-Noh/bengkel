@@ -1,0 +1,35 @@
+export const JASA_OPTIONS = [
+  { value: 'Service CVT 110-150cc', label: '🔧 Service CVT 110-150cc', harga: 80000 },
+  { value: 'Service CVT 250cc Up', label: '🔧 Service CVT 250cc Up', harga: 150000 },
+  { value: 'Service Mesin Matic 110-150cc', label: '🔧 Service Mesin Matic 110cc-150cc', harga: 150000 },
+  { value: 'Service Mesin Matic 250cc Up', label: '🔧 Service Mesin Matic 250cc Up', harga: 250000 },
+  { value: 'Service Mesin Bebek 110-125cc', label: '🔧 Service Mesin Bebek 110-125cc', harga: 100000 },
+  { value: 'Service Mesin Bebek 150-200cc', label: '🔧 Service Mesin Bebek 150-200cc', harga: 150000 },
+  { value: 'Service Mesin Sport 250-300cc', label: '🔧 Service Mesin Sport 250-300cc', harga: 200000 },
+  { value: 'Service Mesin Sport 400-500cc', label: '🔧 Service Mesin Sport 400-500cc', harga: 300000 },
+  { value: 'Service Mesin Sport 600-1000cc', label: '🔧 Service Mesin Sport 600-1000cc', harga: 450000 },
+  { value: 'Service Mesin Sport 1000cc Up', label: '🔧 Service Mesin Sport 1000cc Up', harga: 600000 },
+  { value: 'Service Karburator/TB Matic', label: '🔧 Service Karburator/TB Matic', harga: 60000 },
+  { value: 'Service Karburator/TB Bebek', label: '🔧 Service Karburator/TB Bebek', harga: 50000 },
+  { value: 'Service Karburator/TB Sport/Moge', label: '🔧 Service Karburator/TB Sport/Moge', harga: 100000 },
+  { value: 'Service Rantai & Gir Bebek', label: '🔧 Service Rantai & Gir Bebek', harga: 40000 },
+  { value: 'Service Rantai & Gir Sport/Moge', label: '🔧 Service Rantai & Gir Sport/Moge', harga: 80000 },
+  { value: 'Service Rem Matic', label: '🔧 Service Rem Matic', harga: 40000 },
+  { value: 'Service Rem Bebek', label: '🔧 Service Rem Bebek', harga: 35000 },
+  { value: 'Service Rem Sport/Moge', label: '🔧 Service Rem Sport/Moge', harga: 60000 },
+  { value: 'Service Shock Dpn Matic', label: '🔧 Service Shock Dpn Matic', harga: 35000 },
+  { value: 'Service Shock Blkg Matic', label: '🔧 Service Shock Blkg Matic', harga: 35000 },
+  { value: 'Service Shock Dpn Bebek', label: '🔧 Service Shock Dpn Bebek', harga: 30000 },
+  { value: 'Service Shock Blkg Bebek', label: '🔧 Service Shock Blkg Bebek', harga: 30000 },
+  { value: 'Service Shock Dpn Sport/Moge', label: '🔧 Service Shock Dpn Sport/Moge', harga: 50000 },
+  { value: 'Service Shock Blkg Sport/Moge', label: '🔧 Service Shock Blkg Sport/Moge', harga: 50000 },
+  { value: 'Jasa Ganti Oli Matic', label: '🔧 Jasa Ganti Oli Matic', harga: 35000 },
+  { value: 'Jasa Ganti Oli Bebek', label: '🔧 Jasa Ganti Oli Bebek', harga: 25000 },
+  { value: 'Jasa Ganti Oli Sport/Moge', label: '🔧 Jasa Ganti Oli Sport/Moge', harga: 50000 },
+  { value: 'Jasa Pasang Part', label: '🔧 Jasa Pasang Part', harga: 0 },
+  { value: 'Jasa Lainnya', label: '🔧 Jasa Lainnya', harga: 0 },
+]
+
+export function hargaJasa(value) {
+  return JASA_OPTIONS.find((j) => j.value === value)?.harga || 0
+}
