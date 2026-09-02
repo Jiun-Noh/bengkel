@@ -3,6 +3,7 @@ import { useBarangQuery, useBarangMutations } from '../hooks/useBarang'
 import { useUI } from '../contexts/UIContext'
 import { formatRupiah, kapitalKode, kapitalNama, waktuSekarang } from '../lib/format'
 import Modal from '../components/common/Modal'
+import Fab from '../components/common/Fab'
 
 const STOK_MINIM = 3
 const FORM_KOSONG = { kode: '', nama: '', jenisMotor: '', satuan: 'PCS', hargaPokok: '', hargaJual: '', jumlahStok: '' }
@@ -12,6 +13,7 @@ export default function StokPage() {
   const { simpanBarang, hapusBarang } = useBarangMutations()
   const { notify, confirm } = useUI()
 
+  const [mode, setMode] = useState('list') // 'list' | 'form'
   const [form, setForm] = useState(FORM_KOSONG)
   const [editingKode, setEditingKode] = useState(null)
   const [cari, setCari] = useState('')
@@ -53,6 +55,11 @@ export default function StokPage() {
     setEditingKode(null)
   }
 
+  function bukaTambah() {
+    resetForm()
+    setMode('form')
+  }
+
   function mulaiEdit(b) {
     setEditingKode(b.kode)
     setForm({
@@ -64,6 +71,12 @@ export default function StokPage() {
       hargaJual: b.hargaJual,
       jumlahStok: b.stok,
     })
+    setMode('form')
+  }
+
+  function kembaliKeDaftar() {
+    resetForm()
+    setMode('list')
   }
 
   async function submit(e) {
@@ -142,6 +155,7 @@ export default function StokPage() {
       await simpanBarang(baris)
       notify(pesan)
       resetForm()
+      setMode('list')
     } catch (err) {
       notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
     } finally {
@@ -154,7 +168,7 @@ export default function StokPage() {
     if (!ok) return
     try {
       await hapusBarang(kode)
-      if (editingKode === kode) resetForm()
+      if (editingKode === kode) kembaliKeDaftar()
     } catch (err) {
       notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
     }
@@ -174,91 +188,88 @@ export default function StokPage() {
 
   const barangRiwayat = riwayatKode ? barang.find((b) => b.kode === riwayatKode) : null
 
+  if (mode === 'form') {
+    return (
+      <div>
+        <div className="form-header">
+          <button className="btn-back" onClick={kembaliKeDaftar} aria-label="Kembali">←</button>
+          <h1>{editingKode ? '✏️ Ubah Barang' : kodeCocok ? '📦 Restock Barang' : '➕ Tambah Barang'}</h1>
+        </div>
+
+        <form className="card" onSubmit={submit}>
+          {!editingKode && kodeCocok && (
+            <div className="edit-banner" style={{ background: '#e3f2fd', color: '#0d47a1' }}>
+              <span>📦 Kode sudah ada — mengisi ini akan MENAMBAH stok "{kodeCocok.nama}"</span>
+            </div>
+          )}
+
+          <div className="field">
+            <label>Kode Barang</label>
+            <input value={form.kode} onChange={(e) => ubahKode(e.target.value)} readOnly={!!editingKode} placeholder="Kode Barang" autoFocus />
+          </div>
+          <div className="field">
+            <label>Nama Barang</label>
+            <input
+              value={form.nama}
+              onChange={(e) => setForm((f) => ({ ...f, nama: kapitalNama(e.target.value) }))}
+              placeholder="Nama Barang"
+            />
+          </div>
+          <div className="field">
+            <label>Jenis Motor</label>
+            <input
+              value={form.jenisMotor}
+              onChange={(e) => setForm((f) => ({ ...f, jenisMotor: kapitalNama(e.target.value) }))}
+              placeholder="Contoh: BEAT, SCOOPY"
+            />
+          </div>
+          <div className="field">
+            <label>Satuan</label>
+            <select value={form.satuan} onChange={(e) => setForm((f) => ({ ...f, satuan: e.target.value }))}>
+              <option value="PCS">PCS</option>
+              <option value="BTL">BOTOL</option>
+              <option value="SET">SET</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Harga Pokok</label>
+            <input
+              type="number"
+              value={form.hargaPokok}
+              onChange={(e) => setForm((f) => ({ ...f, hargaPokok: e.target.value }))}
+              placeholder="Harga Modal Beli"
+            />
+          </div>
+          <div className="field">
+            <label>Harga Jual</label>
+            <input
+              type="number"
+              value={form.hargaJual}
+              onChange={(e) => setForm((f) => ({ ...f, hargaJual: e.target.value }))}
+              placeholder="Harga Jual ke Pelanggan"
+            />
+          </div>
+          <div className="field">
+            <label>{editingKode ? 'Jumlah Stok' : 'Jumlah Stok / Restock'}</label>
+            <input
+              type="number"
+              value={form.jumlahStok}
+              onChange={(e) => setForm((f) => ({ ...f, jumlahStok: e.target.value }))}
+              placeholder="Jumlah Stok / Restock"
+            />
+          </div>
+
+          <button className="btn btn-block" type="submit" disabled={saving}>
+            {saving ? 'Menyimpan…' : '✅ Simpan Barang'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
   return (
     <div>
       <h1>📦 Manajemen Stok Barang</h1>
-
-      <form className="card" onSubmit={submit}>
-        <h2>{editingKode ? '✏️ Ubah Barang' : kodeCocok ? '📦 Restock Barang' : '➕ Tambah Barang'}</h2>
-        {editingKode && (
-          <div className="edit-banner">
-            <span>✏️ SEDANG MODE EDIT</span>
-            <button type="button" onClick={resetForm}>
-              ❌ Batal
-            </button>
-          </div>
-        )}
-        {!editingKode && kodeCocok && (
-          <div className="edit-banner" style={{ background: '#e3f2fd', color: '#0d47a1' }}>
-            <span>📦 Kode sudah ada — mengisi ini akan MENAMBAH stok "{kodeCocok.nama}"</span>
-          </div>
-        )}
-
-        <div className="field">
-          <label>Kode Barang</label>
-          <input value={form.kode} onChange={(e) => ubahKode(e.target.value)} readOnly={!!editingKode} placeholder="Kode Barang" />
-        </div>
-        <div className="field">
-          <label>Nama Barang</label>
-          <input
-            value={form.nama}
-            onChange={(e) => setForm((f) => ({ ...f, nama: kapitalNama(e.target.value) }))}
-            placeholder="Nama Barang"
-          />
-        </div>
-        <div className="field">
-          <label>Jenis Motor</label>
-          <input
-            value={form.jenisMotor}
-            onChange={(e) => setForm((f) => ({ ...f, jenisMotor: kapitalNama(e.target.value) }))}
-            placeholder="Contoh: BEAT, SCOOPY"
-          />
-        </div>
-        <div className="field">
-          <label>Satuan</label>
-          <select value={form.satuan} onChange={(e) => setForm((f) => ({ ...f, satuan: e.target.value }))}>
-            <option value="PCS">PCS</option>
-            <option value="BTL">BOTOL</option>
-            <option value="SET">SET</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Harga Pokok</label>
-          <input
-            type="number"
-            value={form.hargaPokok}
-            onChange={(e) => setForm((f) => ({ ...f, hargaPokok: e.target.value }))}
-            placeholder="Harga Modal Beli"
-          />
-        </div>
-        <div className="field">
-          <label>Harga Jual</label>
-          <input
-            type="number"
-            value={form.hargaJual}
-            onChange={(e) => setForm((f) => ({ ...f, hargaJual: e.target.value }))}
-            placeholder="Harga Jual ke Pelanggan"
-          />
-        </div>
-        <div className="field">
-          <label>{editingKode ? 'Jumlah Stok' : 'Jumlah Stok / Restock'}</label>
-          <input
-            type="number"
-            value={form.jumlahStok}
-            onChange={(e) => setForm((f) => ({ ...f, jumlahStok: e.target.value }))}
-            placeholder="Jumlah Stok / Restock"
-          />
-        </div>
-
-        <div className="row">
-          <button className="btn" type="submit" disabled={saving}>
-            {saving ? 'Menyimpan…' : '✅ Simpan Barang'}
-          </button>
-          <button className="btn btn-orange" type="button" onClick={resetForm}>
-            🗑️ Kosongkan
-          </button>
-        </div>
-      </form>
 
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -272,6 +283,7 @@ export default function StokPage() {
           <table>
             <thead>
               <tr>
+                <th className="tengah">Aksi</th>
                 <th className="tengah">No</th>
                 <th>Kode</th>
                 <th>Nama Barang</th>
@@ -281,22 +293,19 @@ export default function StokPage() {
                 <th className="angka">Harga Jual</th>
                 <th className="angka">Stok</th>
                 <th className="angka">Terjual</th>
-                <th className="tengah">Riwayat</th>
-                <th className="tengah">Ubah</th>
-                <th className="tengah">Hapus</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={12} className="tengah" style={{ padding: 12, color: '#888' }}>
+                  <td colSpan={10} className="tengah" style={{ padding: 12, color: '#888' }}>
                     Memuat...
                   </td>
                 </tr>
               )}
               {!isLoading && hasil.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="tengah" style={{ padding: 12, color: '#888' }}>
+                  <td colSpan={10} className="tengah" style={{ padding: 12, color: '#888' }}>
                     📭 Belum ada barang
                   </td>
                 </tr>
@@ -305,6 +314,19 @@ export default function StokPage() {
                 const rendah = (b.stok || 0) <= STOK_MINIM
                 return (
                   <tr key={b.kode} className={rendah ? 'baris-merah' : ''}>
+                    <td className="tengah">
+                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                        <button className="btn btn-blue btn-sm" onClick={() => setRiwayatKode(b.kode)}>
+                          📋
+                        </button>
+                        <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(b)}>
+                          ✏️
+                        </button>
+                        <button className="btn btn-red btn-sm" onClick={() => hapus(b.kode)}>
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
                     <td className="tengah">{i + 1}</td>
                     <td>{b.kode}</td>
                     <td>{b.nama}</td>
@@ -314,21 +336,6 @@ export default function StokPage() {
                     <td className="angka">{formatRupiah(b.hargaJual)}</td>
                     <td className={`angka ${rendah ? 'merah' : ''}`}>{b.stok || 0}</td>
                     <td className="angka">{b.terjual || 0}</td>
-                    <td className="tengah">
-                      <button className="btn btn-blue btn-sm" onClick={() => setRiwayatKode(b.kode)}>
-                        📋
-                      </button>
-                    </td>
-                    <td className="tengah">
-                      <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(b)}>
-                        ✏️
-                      </button>
-                    </td>
-                    <td className="tengah">
-                      <button className="btn btn-red btn-sm" onClick={() => hapus(b.kode)}>
-                        🗑️
-                      </button>
-                    </td>
                   </tr>
                 )
               })}
@@ -360,6 +367,8 @@ export default function StokPage() {
           )}
         </Modal>
       )}
+
+      <Fab onClick={bukaTambah} title="Tambah Barang" />
     </div>
   )
 }

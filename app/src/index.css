@@ -51,6 +51,7 @@ h4 {
 
 .field {
   margin-bottom: 12px;
+  min-width: 0; /* flex 아이템이 내용 크기 때문에 줄어들지 못하고 넘치는 것 방지 (좁은 화면에서 date/time input 겹침 버그) */
 }
 
 .field label {
@@ -63,7 +64,10 @@ h4 {
 input,
 select,
 textarea {
+  box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 10px 12px;
   font-size: 16px;
   border: 1px solid #ccc;
@@ -73,10 +77,25 @@ textarea {
   color: var(--text);
 }
 
+/* iOS Safari는 date/time 네이티브 컨트롤에 자체 여백을 더 얹어서,
+   좁은 화면에서 지정한 padding까지 더해지면 박스 밖으로 삐져나올 수 있음 */
+input[type='date'],
+input[type='time'] {
+  padding: 10px 6px;
+}
+
 input:disabled,
 select:disabled {
   background: #eee;
   color: #666;
+}
+
+/* 폭이 딱 반반으로 나뉘어야 하는 필드 쌍(예: Jam Datang / Jam Pulang) —
+   flexbox의 basis/shrink 계산에 기대지 않고 grid로 확실하게 2등분 */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .btn {
@@ -127,6 +146,10 @@ select:disabled {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.row > * {
+  min-width: 0; /* flex 자식이 콘텐츠 크기 때문에 줄어들지 못하고 gap을 무시한 채 넘치는 것 방지 */
 }
 
 .table-wrap {
@@ -256,6 +279,52 @@ th {
 .bottom-nav button.active {
   color: var(--primary-dark);
   font-weight: 700;
+}
+
+/* ====== FAB (floating action button) ====== */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 15;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.fab:active {
+  opacity: 0.85;
+}
+
+/* ====== FORM SCREEN HEADER (list <-> form 전환) ====== */
+.form-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.form-header .btn-back {
+  background: none;
+  border: none;
+  font-size: 22px;
+  padding: 6px;
+  min-height: auto;
+  cursor: pointer;
+  color: var(--text);
+}
+.form-header h1 {
+  margin: 0;
+  font-size: 19px;
 }
 
 /* ====== LOGIN ====== */

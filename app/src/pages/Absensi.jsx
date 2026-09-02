@@ -3,6 +3,7 @@ import { useStaffQuery } from '../hooks/useStaff'
 import { useAbsensiQuery, useAbsensiMutations } from '../hooks/useAbsensi'
 import { useUI } from '../contexts/UIContext'
 import { hitungJamKerja } from '../lib/format'
+import Fab from '../components/common/Fab'
 
 const JABATAN_OPTIONS = [
   { value: '', label: '🗂️ Semua' },
@@ -43,6 +44,7 @@ export default function AbsensiPage() {
   const { simpanAbsensi, hapusAbsensi } = useAbsensiMutations()
   const { notify, confirm } = useUI()
 
+  const [mode, setMode] = useState('list') // 'list' | 'form'
   const [tanggal, setTanggal] = useState(() => new Date().toISOString().split('T')[0])
   const [jamDatang, setJamDatang] = useState(jamSekarangHHMM)
   const [jamPulang, setJamPulang] = useState('')
@@ -75,17 +77,20 @@ export default function AbsensiPage() {
     if (!editMode) setJamPulang('')
   }
 
-  function resetFormSetelahSimpan() {
+  function bukaTambah() {
     setBarisDiedit(null)
     setArsipJabatan(null)
-    setNamaTerpilih('')
-    setJamPulang('')
-    setKeterangan('')
-    setStatus('Hadir')
+    setTanggal(new Date().toISOString().split('T')[0])
     setJamDatang(jamSekarangHHMM())
+    setJamPulang('')
+    setJabatanFilter('')
+    setNamaTerpilih('')
+    setStatus('Hadir')
+    setKeterangan('')
+    setMode('form')
   }
 
-  function batalEdit() {
+  function kembaliKeDaftar() {
     setBarisDiedit(null)
     setArsipJabatan(null)
     setStatus('Hadir')
@@ -93,6 +98,7 @@ export default function AbsensiPage() {
     setNamaTerpilih('')
     setJamPulang('')
     setKeterangan('')
+    setMode('list')
   }
 
   function mulaiEdit(r) {
@@ -105,6 +111,7 @@ export default function AbsensiPage() {
     setStatus(r.status)
     setKeterangan(r.keterangan || '')
     setBarisDiedit({ tanggal: r.tanggal, nama: r.nama })
+    setMode('form')
   }
 
   async function hapus(r) {
@@ -112,7 +119,7 @@ export default function AbsensiPage() {
     if (!ok) return
     try {
       await hapusAbsensi(r.tanggal, r.nama)
-      if (barisDiedit && barisDiedit.tanggal === r.tanggal && barisDiedit.nama === r.nama) batalEdit()
+      if (barisDiedit && barisDiedit.tanggal === r.tanggal && barisDiedit.nama === r.nama) kembaliKeDaftar()
     } catch (err) {
       notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
     }
@@ -163,7 +170,7 @@ export default function AbsensiPage() {
       notify(
         `${barisDiedit ? '✅ Data Diperbarui!' : '✅ Absensi Disimpan!'}\n📅 ${tanggal}\n👤 ${namaTerpilih} (${jabatanFinal})\n⏰ ${jamDatang} — ${jamPulang || '—'}`,
       )
-      resetFormSetelahSimpan()
+      kembaliKeDaftar()
     } catch (err) {
       notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
     } finally {
@@ -181,89 +188,97 @@ export default function AbsensiPage() {
   const [thn, bln] = bulanFilter.split('-')
   const labelBulan = `${NAMA_BULAN[parseInt(bln, 10) - 1]} ${thn}`
 
-  return (
-    <div>
-      <h1>📅 Manajemen Absensi Karyawan</h1>
+  if (mode === 'form') {
+    return (
+      <div>
+        <div className="form-header">
+          <button className="btn-back" onClick={kembaliKeDaftar} aria-label="Kembali">←</button>
+          <h1>{editMode ? '✏️ Ubah Absensi' : '➕ Input Absensi'}</h1>
+        </div>
 
-      <form className="card" style={{ background: '#fff9e6', border: '2px solid #ffc107' }} onSubmit={submit}>
-        <h2>📋 Input Absensi Harian</h2>
-        {editMode && (
-          <div className="edit-banner">
-            <span>✏️ SEDANG MODE EDIT — Ubah data lalu simpan</span>
-            <button type="button" onClick={batalEdit}>
-              ❌ Batal
-            </button>
-          </div>
-        )}
-
-        <div className="row">
-          <div className="field" style={{ flex: '1 1 140px' }}>
+        <form className="card" style={{ background: '#fff9e6', border: '2px solid #ffc107' }} onSubmit={submit}>
+          <div className="field">
             <label>Tanggal</label>
             <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
           </div>
-          <div className="field" style={{ flex: '1 1 120px' }}>
-            <label>⏰ Jam Datang</label>
-            <input type="time" value={jamDatang} onChange={(e) => setJamDatang(e.target.value)} />
-          </div>
-          <div className="field" style={{ flex: '1 1 120px' }}>
-            <label>🏠 Jam Pulang</label>
-            <input type="time" value={jamPulang} onChange={(e) => setJamPulang(e.target.value)} />
-          </div>
-        </div>
 
-        <div className="row">
-          <div className="field" style={{ flex: '1 1 140px' }}>
-            <label>💼 Jabatan</label>
-            <select value={jabatanFilter} disabled={editMode} onChange={(e) => setJabatanFilter(e.target.value)}>
-              {JABATAN_OPTIONS.map((j) => (
-                <option key={j.value} value={j.value}>
-                  {j.label}
+          <div className="grid-2">
+            <div className="field">
+              <label>⏰ Jam Datang</label>
+              <input type="time" value={jamDatang} onChange={(e) => setJamDatang(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>🏠 Jam Pulang</label>
+              <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+                <input type="time" value={jamPulang} onChange={(e) => setJamPulang(e.target.value)} style={{ flex: 1, minWidth: 0 }} />
+                <button
+                  type="button"
+                  className="btn btn-blue btn-sm"
+                  onClick={isiJamPulangSekarang}
+                  title="Isi jam sekarang"
+                  style={{ flexShrink: 0 }}
+                >
+                  🕐
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="field" style={{ flex: '1 1 140px' }}>
+              <label>💼 Jabatan</label>
+              <select value={jabatanFilter} disabled={editMode} onChange={(e) => setJabatanFilter(e.target.value)}>
+                {JABATAN_OPTIONS.map((j) => (
+                  <option key={j.value} value={j.value}>
+                    {j.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ flex: '1 1 200px' }}>
+              <label>👤 Nama Staff</label>
+              <select value={namaTerpilih} disabled={editMode} onChange={(e) => pilihNama(e.target.value)}>
+                <option value="">— Pilih Staff —</option>
+                {namaOptions.map((s) => (
+                  <option key={s.kode} value={s.nama}>
+                    {s.nama} {s.arsip ? '(arsip)' : `(${s.jabatan})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>📌 Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
                 </option>
               ))}
             </select>
           </div>
-          <div className="field" style={{ flex: '1 1 200px' }}>
-            <label>👤 Nama Staff</label>
-            <select value={namaTerpilih} disabled={editMode} onChange={(e) => pilihNama(e.target.value)}>
-              <option value="">— Pilih Staff —</option>
-              {namaOptions.map((s) => (
-                <option key={s.kode} value={s.nama}>
-                  {s.nama} {s.arsip ? '(arsip)' : `(${s.jabatan})`}
-                </option>
-              ))}
-            </select>
+
+          <div className="field">
+            <label>📝 Keterangan</label>
+            <input
+              placeholder="Alasan izin atau keterangan lain..."
+              value={keterangan}
+              onChange={(e) => setKeterangan(e.target.value)}
+            />
           </div>
-        </div>
 
-        <div className="field">
-          <label>📌 Status</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <label>📝 Keterangan</label>
-          <input
-            placeholder="Alasan izin atau keterangan lain..."
-            value={keterangan}
-            onChange={(e) => setKeterangan(e.target.value)}
-          />
-        </div>
-
-        <div className="row">
-          <button className="btn" type="submit" disabled={saving}>
+          <button className="btn btn-block" type="submit" disabled={saving}>
             {saving ? 'Menyimpan…' : '✅ SIMPAN ABSENSI'}
           </button>
-          <button className="btn btn-blue" type="button" onClick={isiJamPulangSekarang}>
-            🏠 ISI JAM PULANG SEKARANG
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h1>📅 Manajemen Absensi Karyawan</h1>
 
       <div className="card">
         <h2>📋 Rekap Absensi {labelBulan}</h2>
@@ -271,6 +286,7 @@ export default function AbsensiPage() {
           <table>
             <thead>
               <tr>
+                <th className="tengah">Aksi</th>
                 <th>Tanggal</th>
                 <th>Datang</th>
                 <th>Pulang</th>
@@ -279,21 +295,19 @@ export default function AbsensiPage() {
                 <th>Nama Staff</th>
                 <th>Status</th>
                 <th>Keterangan</th>
-                <th className="tengah">Edit</th>
-                <th className="tengah">Hapus</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={10} className="tengah" style={{ padding: 12, color: '#888' }}>
+                  <td colSpan={9} className="tengah" style={{ padding: 12, color: '#888' }}>
                     Memuat...
                   </td>
                 </tr>
               )}
               {!isLoading && dataBulanIni.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="tengah" style={{ padding: 15, color: '#888' }}>
+                  <td colSpan={9} className="tengah" style={{ padding: 15, color: '#888' }}>
                     📭 Belum ada data absensi bulan ini
                   </td>
                 </tr>
@@ -302,6 +316,16 @@ export default function AbsensiPage() {
                 const st = STATUS_TAMPIL[r.status] || { teks: r.status, warna: '#333' }
                 return (
                   <tr key={r.tanggal + '|' + r.nama}>
+                    <td className="tengah">
+                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                        <button className="btn btn-blue btn-sm" onClick={() => mulaiEdit(r)}>
+                          ✏️
+                        </button>
+                        <button className="btn btn-red btn-sm" onClick={() => hapus(r)}>
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{r.tanggal}</td>
                     <td className="tengah" style={{ fontWeight: 700 }}>{r.jamDatang || '—'}</td>
                     <td className="tengah" style={{ fontWeight: 700 }}>{r.jamPulang || '—'}</td>
@@ -310,16 +334,6 @@ export default function AbsensiPage() {
                     <td>{r.nama}</td>
                     <td style={{ color: st.warna, fontWeight: 700 }}>{st.teks}</td>
                     <td>{r.keterangan || '—'}</td>
-                    <td className="tengah">
-                      <button className="btn btn-blue btn-sm" onClick={() => mulaiEdit(r)}>
-                        ✏️
-                      </button>
-                    </td>
-                    <td className="tengah">
-                      <button className="btn btn-red btn-sm" onClick={() => hapus(r)}>
-                        🗑️
-                      </button>
-                    </td>
                   </tr>
                 )
               })}
@@ -370,6 +384,8 @@ export default function AbsensiPage() {
           </table>
         </div>
       </div>
+
+      <Fab onClick={bukaTambah} title="Input Absensi" />
     </div>
   )
 }
