@@ -2,7 +2,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ambilSemuaBaris, db } from '../lib/supabaseClient'
 
 export function kolomStaffKeInternal(row) {
-  return { kode: row.kode, nama: row.nama, jabatan: row.jabatan, aktif: row.aktif }
+  return {
+    kode: row.kode,
+    nama: row.nama,
+    jabatan: row.jabatan,
+    aktif: row.aktif,
+    tanggalMulai: row.tanggal_mulai,
+    tanggalKeluar: row.tanggal_keluar,
+  }
 }
 
 export function useStaffQuery(enabled) {

@@ -94,7 +94,9 @@ select:disabled {
    flexbox의 basis/shrink 계산에 기대지 않고 grid로 확실하게 2등분 */
 .grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* plain 1fr 는 여전히 자식(특히 date/time input)의 콘텐츠 최소 크기를 존중해서 넘칠 수 있음 —
+     minmax(0, 1fr)로 트랙 자체의 최소 크기를 0으로 강제해야 확실하게 반반 나뉨 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
 }
 

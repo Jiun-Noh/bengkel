@@ -55,7 +55,9 @@ create table staff (
   kode text primary key,
   nama text not null,
   jabatan text,
-  aktif boolean default true
+  aktif boolean default true,
+  tanggal_mulai date,   -- tanggal mulai kerja, dipakai di surat pengalaman kerja/keterangan magang
+  tanggal_keluar date   -- tanggal keluar/selesai; kosong (null) berarti masih aktif bekerja
 );
 
 create table pengaturan (

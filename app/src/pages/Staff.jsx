@@ -3,9 +3,10 @@ import { useStaffQuery, useStaffMutations, generateKodeStaffBaru } from '../hook
 import { useUI } from '../contexts/UIContext'
 import { kapitalNama } from '../lib/format'
 import { JABATAN_OPTIONS } from '../lib/jabatanOptions'
+import { cetakSuratStaff } from '../lib/cetakSurat'
 import Fab from '../components/common/Fab'
 
-const FORM_KOSONG = { nama: '', jabatan: 'Mekanik', aktif: true }
+const FORM_KOSONG = { nama: '', jabatan: 'Mekanik', aktif: true, tanggalMulai: '', tanggalKeluar: '' }
 
 export default function StaffPage() {
   const { data: staffList = [], isLoading } = useStaffQuery(true)
@@ -44,7 +45,13 @@ export default function StaffPage() {
 
   function mulaiEdit(s) {
     setEditingKode(s.kode)
-    setForm({ nama: s.nama, jabatan: s.jabatan, aktif: s.aktif })
+    setForm({
+      nama: s.nama,
+      jabatan: s.jabatan,
+      aktif: s.aktif,
+      tanggalMulai: s.tanggalMulai || '',
+      tanggalKeluar: s.tanggalKeluar || '',
+    })
     setMode('form')
   }
 
@@ -62,7 +69,14 @@ export default function StaffPage() {
     }
     setSaving(true)
     try {
-      await simpanStaff({ kode: kodeTampil, nama, jabatan: form.jabatan, aktif: form.aktif })
+      await simpanStaff({
+        kode: kodeTampil,
+        nama,
+        jabatan: form.jabatan,
+        aktif: form.aktif,
+        tanggal_mulai: form.tanggalMulai || null,
+        tanggal_keluar: form.tanggalKeluar || null,
+      })
       notify(editingKode ? '✅ Data staff berhasil diubah!' : `✅ Staff baru berhasil ditambahkan!\nKode: ${kodeTampil}`)
       resetForm()
       setMode('list')
@@ -127,6 +141,26 @@ export default function StaffPage() {
             </select>
           </div>
 
+          <div className="field">
+            <label>📅 Tanggal Mulai Kerja</label>
+            <input
+              type="date"
+              value={form.tanggalMulai}
+              onChange={(e) => setForm((f) => ({ ...f, tanggalMulai: e.target.value }))}
+            />
+          </div>
+          <div className="field">
+            <label>🚪 Tanggal Keluar</label>
+            <input
+              type="date"
+              value={form.tanggalKeluar}
+              onChange={(e) => setForm((f) => ({ ...f, tanggalKeluar: e.target.value }))}
+            />
+          </div>
+          <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
+            ⓘ Dipakai untuk mengisi tanggal di surat pengalaman kerja / keterangan magang. Kosongkan Tanggal Keluar jika masih aktif bekerja.
+          </p>
+
           <button className="btn btn-block" type="submit" disabled={saving}>
             {saving ? 'Menyimpan…' : '✅ Simpan Staff'}
           </button>
@@ -173,6 +207,13 @@ export default function StaffPage() {
                 <tr key={s.kode}>
                   <td className="tengah">
                     <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                      <button
+                        className="btn btn-blue btn-sm"
+                        onClick={() => cetakSuratStaff(s)}
+                        title={s.jabatan === 'Magang' ? 'Cetak Surat Keterangan Magang' : 'Cetak Surat Pengalaman Kerja'}
+                      >
+                        🖨️
+                      </button>
                       <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(s)}>
                         ✏️
                       </button>
