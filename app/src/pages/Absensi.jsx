@@ -3,15 +3,10 @@ import { useStaffQuery } from '../hooks/useStaff'
 import { useAbsensiQuery, useAbsensiMutations } from '../hooks/useAbsensi'
 import { useUI } from '../contexts/UIContext'
 import { hitungJamKerja } from '../lib/format'
+import { JABATAN_OPTIONS as JABATAN_OPTIONS_DASAR } from '../lib/jabatanOptions'
 import Fab from '../components/common/Fab'
 
-const JABATAN_OPTIONS = [
-  { value: '', label: '🗂️ Semua' },
-  { value: 'Mekanik', label: '🔧 Mekanik' },
-  { value: 'Kasir', label: '💰 Kasir' },
-  { value: 'Magang', label: '🧑‍🎓 Magang' },
-  { value: 'Lainnya', label: '📋 Lainnya' },
-]
+const JABATAN_OPTIONS = [{ value: '', label: '🗂️ Semua' }, ...JABATAN_OPTIONS_DASAR]
 
 const STATUS_OPTIONS = [
   { value: 'Hadir', label: '✅ Hadir' },
@@ -57,6 +52,7 @@ export default function AbsensiPage() {
   const [saving, setSaving] = useState(false)
 
   const editMode = !!barisDiedit
+  const absenTanpaJam = status === 'Izin' || status === 'Tanpa Keterangan'
 
   const stafTerpilih = staffList.find((s) => s.nama === namaTerpilih)
 
@@ -102,9 +98,10 @@ export default function AbsensiPage() {
   }
 
   function mulaiEdit(r) {
+    const absen = r.status === 'Izin' || r.status === 'Tanpa Keterangan'
     setTanggal(r.tanggal)
-    setJamDatang(r.jamDatang || '')
-    setJamPulang(r.jamPulang || '')
+    setJamDatang(absen ? '' : r.jamDatang || '')
+    setJamPulang(absen ? '' : r.jamPulang || '')
     setJabatanFilter(r.jabatan)
     setNamaTerpilih(r.nama)
     setArsipJabatan(staffList.some((s) => s.nama === r.nama) ? null : r.jabatan)
@@ -112,6 +109,14 @@ export default function AbsensiPage() {
     setKeterangan(r.keterangan || '')
     setBarisDiedit({ tanggal: r.tanggal, nama: r.nama })
     setMode('form')
+  }
+
+  function ubahStatus(nilai) {
+    setStatus(nilai)
+    if (nilai === 'Izin' || nilai === 'Tanpa Keterangan') {
+      setJamDatang('')
+      setJamPulang('')
+    }
   }
 
   async function hapus(r) {
@@ -205,16 +210,28 @@ export default function AbsensiPage() {
           <div className="grid-2">
             <div className="field">
               <label>⏰ Jam Datang</label>
-              <input type="time" value={jamDatang} onChange={(e) => setJamDatang(e.target.value)} />
+              <input
+                type="time"
+                value={jamDatang}
+                onChange={(e) => setJamDatang(e.target.value)}
+                disabled={absenTanpaJam}
+              />
             </div>
             <div className="field">
               <label>🏠 Jam Pulang</label>
               <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
-                <input type="time" value={jamPulang} onChange={(e) => setJamPulang(e.target.value)} style={{ flex: 1, minWidth: 0 }} />
+                <input
+                  type="time"
+                  value={jamPulang}
+                  onChange={(e) => setJamPulang(e.target.value)}
+                  disabled={absenTanpaJam}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
                 <button
                   type="button"
                   className="btn btn-blue btn-sm"
                   onClick={isiJamPulangSekarang}
+                  disabled={absenTanpaJam}
                   title="Isi jam sekarang"
                   style={{ flexShrink: 0 }}
                 >
@@ -223,6 +240,11 @@ export default function AbsensiPage() {
               </div>
             </div>
           </div>
+          {absenTanpaJam && (
+            <p style={{ fontSize: 13, color: '#856404', margin: '-8px 0 12px' }}>
+              ⓘ Status "{status}" berarti tidak masuk kerja, jadi jam datang/pulang tidak diisi.
+            </p>
+          )}
 
           <div className="row">
             <div className="field" style={{ flex: '1 1 140px' }}>
@@ -250,7 +272,7 @@ export default function AbsensiPage() {
 
           <div className="field">
             <label>📌 Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select value={status} onChange={(e) => ubahStatus(e.target.value)}>
               {STATUS_OPTIONS.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}

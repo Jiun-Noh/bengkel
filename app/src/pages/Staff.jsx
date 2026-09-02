@@ -2,14 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStaffQuery, useStaffMutations, generateKodeStaffBaru } from '../hooks/useStaff'
 import { useUI } from '../contexts/UIContext'
 import { kapitalNama } from '../lib/format'
+import { JABATAN_OPTIONS } from '../lib/jabatanOptions'
 import Fab from '../components/common/Fab'
-
-const JABATAN_OPTIONS = [
-  { value: 'Mekanik', label: '🔧 Mekanik' },
-  { value: 'Kasir', label: '💰 Kasir' },
-  { value: 'Magang', label: '🧑‍🎓 Magang' },
-  { value: 'Lainnya', label: '📋 Lainnya' },
-]
 
 const FORM_KOSONG = { nama: '', jabatan: 'Mekanik', aktif: true }
 

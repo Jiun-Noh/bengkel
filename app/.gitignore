@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Netlify CLI local state (site ID + machine-specific absolute paths)
+.netlify
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
