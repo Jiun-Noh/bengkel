@@ -4,6 +4,7 @@ import { useUI } from '../contexts/UIContext'
 import { formatRupiah, kapitalKode, kapitalNama, waktuSekarang } from '../lib/format'
 import Modal from '../components/common/Modal'
 import Fab from '../components/common/Fab'
+import AksiPemilik from '../components/common/AksiPemilik'
 
 const STOK_MINIM = 3
 const FORM_KOSONG = { kode: '', nama: '', jenisMotor: '', satuan: 'PCS', hargaPokok: '', hargaJual: '', jumlahStok: '' }
@@ -315,17 +316,19 @@ export default function StokPage() {
                 return (
                   <tr key={b.kode} className={rendah ? 'baris-merah' : ''}>
                     <td className="tengah">
-                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
-                        <button className="btn btn-blue btn-sm" onClick={() => setRiwayatKode(b.kode)}>
-                          📋
-                        </button>
-                        <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(b)}>
-                          ✏️
-                        </button>
-                        <button className="btn btn-red btn-sm" onClick={() => hapus(b.kode)}>
-                          🗑️
-                        </button>
-                      </div>
+                      <AksiPemilik>
+                        <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                          <button className="btn btn-blue btn-sm" onClick={() => setRiwayatKode(b.kode)}>
+                            📋
+                          </button>
+                          <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(b)}>
+                            ✏️
+                          </button>
+                          <button className="btn btn-red btn-sm" onClick={() => hapus(b.kode)}>
+                            🗑️
+                          </button>
+                        </div>
+                      </AksiPemilik>
                     </td>
                     <td className="tengah">{i + 1}</td>
                     <td>{b.kode}</td>

@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto'
 import { useRiwayatQuery } from '../hooks/useRiwayat'
 import { usePengaturanQuery, usePengaturanMutations } from '../hooks/usePengaturan'
 import { useUI } from '../contexts/UIContext'
+import { useOwnerMode } from '../contexts/OwnerModeContext'
 import { formatRupiah, waktuSekarang } from '../lib/format'
 import Modal from '../components/common/Modal'
 
@@ -20,15 +21,15 @@ export default function LaporanPage() {
   const { data: riwayat = [] } = useRiwayatQuery(true)
   const { simpanPengaturan, gantiSandiLaporan } = usePengaturanMutations()
   const { notify } = useUI()
+  const { unlocked, unlock } = useOwnerMode()
 
-  const [unlocked, setUnlocked] = useState(false)
   const [sandiInput, setSandiInput] = useState('')
   const [gantiSandiOpen, setGantiSandiOpen] = useState(false)
 
   function coba(e) {
     e.preventDefault()
-    if (sandiInput === (pengaturan?.kataSandiLaporan || '1234')) {
-      setUnlocked(true)
+    if (unlock(sandiInput)) {
+      setSandiInput('')
     } else {
       notify('❌ Kata sandi laporan salah!', 'error')
       setSandiInput('')

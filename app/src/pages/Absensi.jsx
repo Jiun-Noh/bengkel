@@ -5,6 +5,7 @@ import { useUI } from '../contexts/UIContext'
 import { hitungJamKerja } from '../lib/format'
 import { JABATAN_OPTIONS as JABATAN_OPTIONS_DASAR } from '../lib/jabatanOptions'
 import Fab from '../components/common/Fab'
+import AksiPemilik from '../components/common/AksiPemilik'
 
 const JABATAN_OPTIONS = [{ value: '', label: '🗂️ Semua' }, ...JABATAN_OPTIONS_DASAR]
 
@@ -339,14 +340,16 @@ export default function AbsensiPage() {
                 return (
                   <tr key={r.tanggal + '|' + r.nama}>
                     <td className="tengah">
-                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
-                        <button className="btn btn-blue btn-sm" onClick={() => mulaiEdit(r)}>
-                          ✏️
-                        </button>
-                        <button className="btn btn-red btn-sm" onClick={() => hapus(r)}>
-                          🗑️
-                        </button>
-                      </div>
+                      <AksiPemilik>
+                        <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                          <button className="btn btn-blue btn-sm" onClick={() => mulaiEdit(r)}>
+                            ✏️
+                          </button>
+                          <button className="btn btn-red btn-sm" onClick={() => hapus(r)}>
+                            🗑️
+                          </button>
+                        </div>
+                      </AksiPemilik>
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{r.tanggal}</td>
                     <td className="tengah" style={{ fontWeight: 700 }}>{r.jamDatang || '—'}</td>

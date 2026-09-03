@@ -5,6 +5,7 @@ import { kapitalNama } from '../lib/format'
 import { JABATAN_OPTIONS } from '../lib/jabatanOptions'
 import { cetakSuratStaff } from '../lib/cetakSurat'
 import Fab from '../components/common/Fab'
+import AksiPemilik from '../components/common/AksiPemilik'
 
 const FORM_KOSONG = { nama: '', jabatan: 'Mekanik', aktif: true, tanggalMulai: '', tanggalKeluar: '' }
 
@@ -206,21 +207,23 @@ export default function StaffPage() {
               {hasil.map((s, i) => (
                 <tr key={s.kode}>
                   <td className="tengah">
-                    <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
-                      <button
-                        className="btn btn-blue btn-sm"
-                        onClick={() => cetakSuratStaff(s)}
-                        title={s.jabatan === 'Magang' ? 'Cetak Surat Keterangan Magang' : 'Cetak Surat Pengalaman Kerja'}
-                      >
-                        🖨️
-                      </button>
-                      <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(s)}>
-                        ✏️
-                      </button>
-                      <button className="btn btn-red btn-sm" onClick={() => hapus(s.kode)}>
-                        🗑️
-                      </button>
-                    </div>
+                    <AksiPemilik>
+                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                        <button
+                          className="btn btn-blue btn-sm"
+                          onClick={() => cetakSuratStaff(s)}
+                          title={s.jabatan === 'Magang' ? 'Cetak Surat Keterangan Magang' : 'Cetak Surat Pengalaman Kerja'}
+                        >
+                          🖨️
+                        </button>
+                        <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(s)}>
+                          ✏️
+                        </button>
+                        <button className="btn btn-red btn-sm" onClick={() => hapus(s.kode)}>
+                          🗑️
+                        </button>
+                      </div>
+                    </AksiPemilik>
                   </td>
                   <td className="tengah">{i + 1}</td>
                   <td>{s.kode}</td>
