@@ -226,7 +226,7 @@ export default function TransaksiPage() {
       const t = ambilTanggalDariTeks(r.tgl)
       return t && t.getMonth() === sekarang.getMonth() && t.getFullYear() === sekarang.getFullYear()
     })
-    let total = 0, tunai = 0, qris = 0, transfer = 0
+    let total = 0, tunai = 0, qris = 0, transfer = 0, kartuDebit = 0, kartuKredit = 0
     bulanIni.forEach((r) => {
       const n = r.totalBayar || 0
       total += n
@@ -234,8 +234,10 @@ export default function TransaksiPage() {
       if (c.includes('TUNAI')) tunai += n
       else if (c.includes('QRIS')) qris += n
       else if (c.includes('TRANSFER')) transfer += n
+      else if (c.includes('KREDIT')) kartuKredit += n
+      else if (c.includes('DEBIT')) kartuDebit += n
     })
-    return { jumlah: bulanIni.length, total, tunai, qris, transfer }
+    return { jumlah: bulanIni.length, total, tunai, qris, transfer, kartuDebit, kartuKredit }
   }, [dataTampil])
 
   async function hapus(r) {
@@ -369,10 +371,10 @@ export default function TransaksiPage() {
         <div style={{ marginTop: 12, padding: 10, background: '#f0f8ff', borderRadius: 6 }}>
           <h3 style={{ fontSize: 15 }}>💳 Cara Pembayaran</h3>
           <div className="row">
-            {['Tunai', 'QRIS', 'Transfer'].map((c) => (
+            {['Tunai', 'QRIS', 'Transfer', 'Kartu Debit', 'Kartu Kredit'].map((c) => (
               <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input type="radio" name="caraBayar" checked={form.caraBayar === c} onChange={() => setForm((f) => ({ ...f, caraBayar: c }))} style={{ width: 'auto', minHeight: 'auto' }} />
-                {c === 'Tunai' ? '💵' : c === 'QRIS' ? '📱' : '🏦'} {c}
+                {c === 'Tunai' ? '💵' : c === 'QRIS' ? '📱' : c === 'Transfer' ? '🏦' : c === 'Kartu Debit' ? '🏧' : '💳'} {c}
               </label>
             ))}
           </div>
@@ -457,6 +459,8 @@ export default function TransaksiPage() {
           <div>💰 Total Semua Bayar: {formatRupiah(ringkasan.total)}</div>
           <div style={{ color: '#2e7d32' }}>
             💵 Tunai: {formatRupiah(ringkasan.tunai)} &nbsp;|&nbsp; 📱 QRIS: {formatRupiah(ringkasan.qris)} &nbsp;|&nbsp; 🏦 Transfer: {formatRupiah(ringkasan.transfer)}
+            <br />
+            🏧 Kartu Debit: {formatRupiah(ringkasan.kartuDebit)} &nbsp;|&nbsp; 💳 Kartu Kredit: {formatRupiah(ringkasan.kartuKredit)}
           </div>
         </div>
       </div>
