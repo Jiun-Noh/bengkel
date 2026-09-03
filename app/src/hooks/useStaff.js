@@ -9,6 +9,9 @@ export function kolomStaffKeInternal(row) {
     aktif: row.aktif,
     tanggalMulai: row.tanggal_mulai,
     tanggalKeluar: row.tanggal_keluar,
+    gajiPokok: row.gaji_pokok || 0,
+    uangMakan: row.uang_makan || 0,
+    uangBensin: row.uang_bensin || 0,
   }
 }
 

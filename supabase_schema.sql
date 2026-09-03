@@ -57,25 +57,48 @@ create table staff (
   jabatan text,
   aktif boolean default true,
   tanggal_mulai date,   -- tanggal mulai kerja, dipakai di surat pengalaman kerja/keterangan magang
-  tanggal_keluar date   -- tanggal keluar/selesai; kosong (null) berarti masih aktif bekerja
+  tanggal_keluar date,  -- tanggal keluar/selesai; kosong (null) berarti masih aktif bekerja
+  gaji_pokok integer default 0,   -- gaji pokok bulanan (Mekanik/Kasir/Freelance/Lainnya), dipakai di slip gaji
+  uang_makan integer default 0,   -- uang makan bulanan (khusus Magang)
+  uang_bensin integer default 0   -- uang bensin bulanan (khusus Magang)
 );
 
 create table pengaturan (
   id int primary key default 1,
-  operasional integer default 0,
-  maintenance integer default 0,
-  persen_mekanik integer default 15,
+  operasional integer default 0,   -- legacy, tidak dipakai lagi sejak tabel `pengeluaran` ada (lihat di bawah)
+  maintenance integer default 0,   -- legacy, tidak dipakai lagi sejak tabel `pengeluaran` ada
+  persen_mekanik integer default 8,
   persen_investor integer default 15,
   kata_sandi_laporan text default '1234',
   check (id = 1)
 );
 insert into pengaturan (id) values (1);
 
+create table pengeluaran (
+  id uuid primary key default gen_random_uuid(),
+  tanggal date not null,
+  kategori text not null,   -- 'Operasional' | 'Maintenance'
+  deskripsi text not null,
+  nominal integer default 0,
+  bulan text,                -- YYYY-MM, buat filter cepat "bulan berjalan" di Laporan
+  created_at timestamptz default now()
+);
+
+create table lembur (
+  id uuid primary key default gen_random_uuid(),
+  staff_kode text not null,
+  bulan text not null,   -- YYYY-MM
+  jam numeric default 0,
+  unique (staff_kode, bulan)
+);
+
 alter table barang enable row level security;
 alter table riwayat enable row level security;
 alter table absensi enable row level security;
 alter table staff enable row level security;
 alter table pengaturan enable row level security;
+alter table pengeluaran enable row level security;
+alter table lembur enable row level security;
 
 create policy "auth full access" on barang for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -86,4 +109,8 @@ create policy "auth full access" on absensi for all
 create policy "auth full access" on staff for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "auth full access" on pengaturan for all
+  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "auth full access" on pengeluaran for all
+  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "auth full access" on lembur for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

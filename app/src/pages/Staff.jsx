@@ -7,7 +7,16 @@ import { cetakSuratStaff } from '../lib/cetakSurat'
 import Fab from '../components/common/Fab'
 import AksiPemilik from '../components/common/AksiPemilik'
 
-const FORM_KOSONG = { nama: '', jabatan: 'Mekanik', aktif: true, tanggalMulai: '', tanggalKeluar: '' }
+const FORM_KOSONG = {
+  nama: '',
+  jabatan: 'Mekanik',
+  aktif: true,
+  tanggalMulai: '',
+  tanggalKeluar: '',
+  gajiPokok: '',
+  uangMakan: '',
+  uangBensin: '',
+}
 
 export default function StaffPage() {
   const { data: staffList = [], isLoading } = useStaffQuery(true)
@@ -52,6 +61,9 @@ export default function StaffPage() {
       aktif: s.aktif,
       tanggalMulai: s.tanggalMulai || '',
       tanggalKeluar: s.tanggalKeluar || '',
+      gajiPokok: s.gajiPokok || '',
+      uangMakan: s.uangMakan || '',
+      uangBensin: s.uangBensin || '',
     })
     setMode('form')
   }
@@ -77,6 +89,9 @@ export default function StaffPage() {
         aktif: form.aktif,
         tanggal_mulai: form.tanggalMulai || null,
         tanggal_keluar: form.tanggalKeluar || null,
+        gaji_pokok: parseInt(form.gajiPokok, 10) || 0,
+        uang_makan: parseInt(form.uangMakan, 10) || 0,
+        uang_bensin: parseInt(form.uangBensin, 10) || 0,
       })
       notify(editingKode ? '✅ Data staff berhasil diubah!' : `✅ Staff baru berhasil ditambahkan!\nKode: ${kodeTampil}`)
       resetForm()
@@ -160,6 +175,45 @@ export default function StaffPage() {
           </div>
           <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
             ⓘ Dipakai untuk mengisi tanggal di surat pengalaman kerja / keterangan magang. Kosongkan Tanggal Keluar jika masih aktif bekerja.
+          </p>
+
+          {form.jabatan === 'Magang' ? (
+            <>
+              <div className="field">
+                <label>🍽️ Uang Makan / Bulan (Rp)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.uangMakan}
+                  onChange={(e) => setForm((f) => ({ ...f, uangMakan: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="field">
+                <label>🛵 Uang Bensin / Bulan (Rp)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.uangBensin}
+                  onChange={(e) => setForm((f) => ({ ...f, uangBensin: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="field">
+              <label>💰 Gaji Pokok / Bulan (Rp)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.gajiPokok}
+                onChange={(e) => setForm((f) => ({ ...f, gajiPokok: e.target.value }))}
+                placeholder="0"
+              />
+            </div>
+          )}
+          <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
+            ⓘ Dipakai untuk hitung slip gaji bulanan di Laporan (Mode Pemilik). Boleh dikosongkan/0 dulu, isi kapan saja.
           </p>
 
           <button className="btn btn-block" type="submit" disabled={saving}>

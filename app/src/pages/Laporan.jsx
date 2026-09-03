@@ -2,9 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Chart from 'chart.js/auto'
 import { useRiwayatQuery } from '../hooks/useRiwayat'
 import { usePengaturanQuery, usePengaturanMutations } from '../hooks/usePengaturan'
+import { usePengeluaranQuery, usePengeluaranMutations } from '../hooks/usePengeluaran'
+import { useStaffQuery } from '../hooks/useStaff'
+import { useAbsensiQuery } from '../hooks/useAbsensi'
+import { useLemburQuery, useLemburMutations } from '../hooks/useLembur'
 import { useUI } from '../contexts/UIContext'
 import { useOwnerMode } from '../contexts/OwnerModeContext'
 import { formatRupiah, waktuSekarang } from '../lib/format'
+import { cetakSlipGaji } from '../lib/cetakSlipGaji'
 import Modal from '../components/common/Modal'
 
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -94,17 +99,46 @@ export default function LaporanPage() {
   } />
 }
 
+function bulanIniISO() {
+  const s = new Date()
+  return s.getFullYear() + '-' + String(s.getMonth() + 1).padStart(2, '0')
+}
+
+const KATEGORI_PENGELUARAN = ['Operasional', 'Maintenance']
+
 function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, gantiSandiModal }) {
-  const { notify } = useUI()
+  const { notify, confirm } = useUI()
+  const { data: pengeluaran = [] } = usePengeluaranQuery(true)
+  const { tambahPengeluaran, hapusPengeluaran } = usePengeluaranMutations()
+  const { data: staffList = [] } = useStaffQuery(true)
+  const { data: daftarAbsensi = [] } = useAbsensiQuery(true)
+  const { data: lembur = [] } = useLemburQuery(true)
+  const { simpanLembur } = useLemburMutations()
+
   const [dari, setDari] = useState('')
   const [sampai, setSampai] = useState('')
   const [jenisGrafik, setJenisGrafik] = useState('bulanan')
   const [pengSetting, setPengSetting] = useState({
-    operasional: pengaturan?.operasional || 0,
-    maintenance: pengaturan?.maintenance || 0,
-    persenMekanik: pengaturan?.persenMekanik ?? 15,
+    persenMekanik: pengaturan?.persenMekanik ?? 8,
     persenInvestor: pengaturan?.persenInvestor ?? 15,
   })
+
+  const [formPengeluaran, setFormPengeluaran] = useState({
+    tanggal: new Date().toISOString().split('T')[0],
+    kategori: 'Operasional',
+    deskripsi: '',
+    nominal: '',
+  })
+  const [savingPengeluaran, setSavingPengeluaran] = useState(false)
+
+  const bulanIni = bulanIniISO()
+  const [thnIni, blnIni] = bulanIni.split('-')
+  const labelBulanIni = `${NAMA_BULAN[parseInt(blnIni, 10) - 1]} ${thnIni}`
+
+  const pengeluaranBulanIni = useMemo(
+    () => pengeluaran.filter((p) => p.bulan === bulanIni).sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
+    [pengeluaran, bulanIni],
+  )
 
   const dataFilter = useMemo(() => {
     if (!dari && !sampai) return riwayat
@@ -123,19 +157,57 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
     const totalJasa = dataFilter.reduce((s, r) => s + (r.biayaJasa || 0), 0)
     const labaBarang = dataFilter.reduce((s, r) => s + (r.labaBarang || 0), 0)
     const labaKotor = labaBarang + totalJasa
-    const biayaOp = pengSetting.operasional
-    const biayaMt = pengSetting.maintenance
+    const biayaOp = pengeluaranBulanIni.filter((p) => p.kategori === 'Operasional').reduce((s, p) => s + (p.nominal || 0), 0)
+    const biayaMt = pengeluaranBulanIni.filter((p) => p.kategori === 'Maintenance').reduce((s, p) => s + (p.nominal || 0), 0)
     const bagiMekanik = Math.round((totalJasa * pengSetting.persenMekanik) / 100)
     const bagiInvestor = Math.round((labaKotor * pengSetting.persenInvestor) / 100)
     const labaBersih = labaKotor - biayaOp - biayaMt - bagiMekanik - bagiInvestor
     return { omset, totalJasa, labaBarang, labaKotor, biayaOp, biayaMt, bagiMekanik, bagiInvestor, labaBersih }
-  }, [dataFilter, pengSetting])
+  }, [dataFilter, pengSetting, pengeluaranBulanIni])
 
   async function simpanSetting() {
     try {
       await simpanPengaturan(pengSetting)
     } catch (err) {
       notify('❌ Gagal menyimpan pengaturan: ' + err.message, 'error')
+    }
+  }
+
+  async function submitPengeluaran(e) {
+    e.preventDefault()
+    const nominal = parseInt(formPengeluaran.nominal, 10) || 0
+    if (!formPengeluaran.deskripsi.trim()) {
+      notify('⚠️ Isi deskripsi pengeluaran!', 'error')
+      return
+    }
+    if (nominal <= 0) {
+      notify('⚠️ Isi nominal yang benar!', 'error')
+      return
+    }
+    setSavingPengeluaran(true)
+    try {
+      await tambahPengeluaran({
+        tanggal: formPengeluaran.tanggal,
+        kategori: formPengeluaran.kategori,
+        deskripsi: formPengeluaran.deskripsi.trim(),
+        nominal,
+      })
+      notify('✅ Pengeluaran dicatat!')
+      setFormPengeluaran((f) => ({ ...f, deskripsi: '', nominal: '' }))
+    } catch (err) {
+      notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    } finally {
+      setSavingPengeluaran(false)
+    }
+  }
+
+  async function hapusPengeluaranBaris(p) {
+    const ok = await confirm(`⚠️ Hapus pengeluaran "${p.deskripsi}" (${formatRupiah(p.nominal)})?`)
+    if (!ok) return
+    try {
+      await hapusPengeluaran(p.id)
+    } catch (err) {
+      notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
     }
   }
 
@@ -198,15 +270,119 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
         <div style={{ margin: '15px 0', padding: 15, background: '#fafafa', borderRadius: 6, border: '1px solid #e0e0e0' }}>
           <h3>⚙️ Pengaturan Pembagian Hasil</h3>
           <div className="row">
-            <SettingField label="Operasional (Rp)" value={pengSetting.operasional} onChange={(v) => setPengSetting((s) => ({ ...s, operasional: v }))} onBlur={simpanSetting} />
-            <SettingField label="Maintenance (Rp)" value={pengSetting.maintenance} onChange={(v) => setPengSetting((s) => ({ ...s, maintenance: v }))} onBlur={simpanSetting} />
             <SettingField label="% Bagi Hasil Mekanik" value={pengSetting.persenMekanik} onChange={(v) => setPengSetting((s) => ({ ...s, persenMekanik: v }))} onBlur={simpanSetting} />
             <SettingField label="% Bagi Hasil Investor" value={pengSetting.persenInvestor} onChange={(v) => setPengSetting((s) => ({ ...s, persenInvestor: v }))} onBlur={simpanSetting} />
           </div>
         </div>
 
+        <div style={{ margin: '15px 0', padding: 15, background: '#fdf2f8', borderRadius: 6, border: '1px solid #fbcfe8' }}>
+          <h3>💸 Pengeluaran Bulan Ini — {labelBulanIni}</h3>
+          <form onSubmit={submitPengeluaran} className="row" style={{ alignItems: 'flex-end' }}>
+            <div className="field" style={{ flex: '1 1 140px' }}>
+              <label>Kategori</label>
+              <select value={formPengeluaran.kategori} onChange={(e) => setFormPengeluaran((f) => ({ ...f, kategori: e.target.value }))}>
+                {KATEGORI_PENGELUARAN.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ flex: '2 1 200px' }}>
+              <label>Deskripsi</label>
+              <input
+                value={formPengeluaran.deskripsi}
+                onChange={(e) => setFormPengeluaran((f) => ({ ...f, deskripsi: e.target.value }))}
+                placeholder="Contoh: Listrik, Sewa, Beli sabun cuci"
+              />
+            </div>
+            <div className="field" style={{ flex: '1 1 140px' }}>
+              <label>Nominal (Rp)</label>
+              <input
+                type="number"
+                min="0"
+                value={formPengeluaran.nominal}
+                onChange={(e) => setFormPengeluaran((f) => ({ ...f, nominal: e.target.value }))}
+                placeholder="0"
+              />
+            </div>
+            <div className="field" style={{ flex: '1 1 140px' }}>
+              <label>Tanggal</label>
+              <input
+                type="date"
+                value={formPengeluaran.tanggal}
+                onChange={(e) => setFormPengeluaran((f) => ({ ...f, tanggal: e.target.value }))}
+              />
+            </div>
+            <button className="btn btn-sm" type="submit" disabled={savingPengeluaran} style={{ marginBottom: 12 }}>
+              {savingPengeluaran ? 'Menyimpan…' : '➕ Tambah'}
+            </button>
+          </form>
+
+          <div className="table-wrap">
+            <table style={{ fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Kategori</th>
+                  <th>Deskripsi</th>
+                  <th className="angka">Nominal</th>
+                  <th className="tengah">Hapus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pengeluaranBulanIni.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="tengah" style={{ padding: 10, color: '#888' }}>
+                      📭 Belum ada pengeluaran bulan ini
+                    </td>
+                  </tr>
+                )}
+                {pengeluaranBulanIni.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.tanggal}</td>
+                    <td>{p.kategori}</td>
+                    <td>{p.deskripsi}</td>
+                    <td className="angka">{formatRupiah(p.nominal)}</td>
+                    <td className="tengah">
+                      <button className="btn btn-red btn-sm" onClick={() => hapusPengeluaranBaris(p)}>
+                        🗑️
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p style={{ marginTop: 10, fontWeight: 700 }}>
+            Total Operasional: {formatRupiah(ringkasan.biayaOp)} &nbsp;|&nbsp; Total Maintenance: {formatRupiah(ringkasan.biayaMt)}
+          </p>
+        </div>
+
+        <TabelGajiStaf
+          staffList={staffList}
+          daftarAbsensi={daftarAbsensi}
+          riwayat={riwayat}
+          lembur={lembur}
+          bulanIni={bulanIni}
+          labelBulanIni={labelBulanIni}
+          persenMekanik={pengSetting.persenMekanik}
+          simpanLembur={simpanLembur}
+        />
+
+        <TabelUangSakuMagang
+          staffList={staffList}
+          daftarAbsensi={daftarAbsensi}
+          lembur={lembur}
+          bulanIni={bulanIni}
+          labelBulanIni={labelBulanIni}
+          simpanLembur={simpanLembur}
+        />
+
         <div style={{ margin: '15px 0', padding: 15, background: '#fff8e1', borderRadius: 6 }}>
           <h3>📊 Rincian Pembagian</h3>
+          <p style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 10 }}>
+            ⓘ Laba Kotor mengikuti filter periode di atas, tapi Biaya Operasional/Maintenance selalu dari pengeluaran <strong>{labelBulanIni}</strong> (bulan berjalan).
+          </p>
           <table>
             <tbody>
               <tr><td>💰 Laba Kotor</td><td className="angka">{formatRupiah(ringkasan.labaKotor)}</td></tr>
@@ -226,6 +402,245 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
       </div>
 
       {gantiSandiModal}
+    </div>
+  )
+}
+
+function hitungRekapAbsensi(daftarAbsensi, bulan, nama) {
+  const data = daftarAbsensi.filter((a) => a.bulan === bulan && a.nama === nama)
+  return {
+    hadir: data.filter((a) => a.status === 'Hadir').length,
+    setengah: data.filter((a) => a.status === 'Setengah Hari').length,
+    izin: data.filter((a) => a.status === 'Izin').length,
+    tanpaKabar: data.filter((a) => a.status === 'Tanpa Keterangan').length,
+  }
+}
+
+// Hanya transaksi yang mekaniknya persis nama ini yang dihitung — transaksi "Semua Mekanik" (dibagi rata/tim)
+// belum diatribusikan ke siapa pun secara otomatis.
+function hitungJasaBulanIni(riwayat, bulan, namaMekanik) {
+  const [thn, bln] = bulan.split('-').map(Number)
+  const data = riwayat.filter((r) => {
+    if (r.namaMekanik !== namaMekanik) return false
+    const t = ambilTanggalDariTeks(r.tgl)
+    return t && t.getFullYear() === thn && t.getMonth() + 1 === bln
+  })
+  return { jumlah: data.length, nilai: data.reduce((s, r) => s + (r.biayaJasa || 0), 0) }
+}
+
+function InputLembur({ nilaiAwal, onSimpan }) {
+  const [nilai, setNilai] = useState(nilaiAwal)
+  return (
+    <input
+      type="number"
+      min="0"
+      value={nilai}
+      onChange={(e) => setNilai(e.target.value)}
+      onBlur={() => onSimpan(parseFloat(nilai) || 0)}
+      style={{ width: 60, padding: 4, minHeight: 'auto' }}
+    />
+  )
+}
+
+function TabelGajiStaf({ staffList, daftarAbsensi, riwayat, lembur, bulanIni, labelBulanIni, persenMekanik, simpanLembur }) {
+  const { notify } = useUI()
+
+  const daftar = useMemo(() => {
+    return staffList
+      .filter((s) => s.aktif && s.jabatan !== 'Magang')
+      .map((s) => {
+        const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
+        const jasa = hitungJasaBulanIni(riwayat, bulanIni, s.nama)
+        const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
+        const gajiPerHari = (s.gajiPokok || 0) / 26
+        const bagiHasil = Math.round((jasa.nilai * persenMekanik) / 100)
+        const lemburNominal = Math.round((gajiPerHari / 8) * 1.5 * jamLembur)
+        const potongan = Math.round(gajiPerHari * rekap.tanpaKabar)
+        const total = (s.gajiPokok || 0) - potongan + bagiHasil + lemburNominal
+        return { ...s, rekap, jasa, jamLembur, bagiHasil, lemburNominal, potongan, total }
+      })
+  }, [staffList, daftarAbsensi, riwayat, lembur, bulanIni, persenMekanik])
+
+  async function ubahLembur(kode, nilai) {
+    try {
+      await simpanLembur(kode, bulanIni, nilai)
+    } catch (err) {
+      notify('❌ Gagal menyimpan jam lembur: ' + err.message, 'error')
+    }
+  }
+
+  function cetak(s) {
+    cetakSlipGaji({
+      judul: 'SLIP GAJI & BAGI HASIL',
+      nama: s.nama,
+      jabatan: s.jabatan,
+      labelPeriode: labelBulanIni,
+      rekap: s.rekap,
+      rincian: [
+        { label: 'Gaji Pokok', nilai: s.gajiPokok || 0 },
+        { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
+        { label: `Bagi Hasil Jasa (${persenMekanik}%)`, nilai: s.bagiHasil },
+        { label: `Uang Lembur (${s.jamLembur} jam)`, nilai: s.lemburNominal },
+      ],
+      total: s.total,
+    })
+  }
+
+  return (
+    <div style={{ margin: '15px 0', padding: 15, background: '#eef2ff', borderRadius: 6, border: '1px solid #c7d2fe' }}>
+      <h3>🔧 Gaji Staf (Mekanik/Kasir/Lainnya) — {labelBulanIni}</h3>
+      <div className="table-wrap">
+        <table style={{ fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th className="tengah">Aksi</th>
+              <th>Nama</th>
+              <th>Jabatan</th>
+              <th className="angka">Gaji Pokok</th>
+              <th className="tengah">Jasa Dilayani</th>
+              <th className="angka">Bagi Hasil</th>
+              <th className="tengah">Jam Lembur</th>
+              <th className="angka">Nominal Lembur</th>
+              <th className="angka">Potongan</th>
+              <th className="angka">Total Diterima</th>
+            </tr>
+          </thead>
+          <tbody>
+            {daftar.length === 0 && (
+              <tr>
+                <td colSpan={10} className="tengah" style={{ padding: 10, color: '#888' }}>
+                  📭 Belum ada staf aktif (Mekanik/Kasir/Freelance/Lainnya)
+                </td>
+              </tr>
+            )}
+            {daftar.map((s) => (
+              <tr key={s.kode}>
+                <td className="tengah">
+                  <button className="btn btn-blue btn-sm" onClick={() => cetak(s)}>
+                    🖨️
+                  </button>
+                </td>
+                <td>{s.nama}</td>
+                <td>{s.jabatan}</td>
+                <td className="angka">{formatRupiah(s.gajiPokok || 0)}</td>
+                <td className="tengah">
+                  {s.jasa.jumlah}× ({formatRupiah(s.jasa.nilai)})
+                </td>
+                <td className="angka">{formatRupiah(s.bagiHasil)}</td>
+                <td className="tengah">
+                  <InputLembur nilaiAwal={s.jamLembur} onSimpan={(v) => ubahLembur(s.kode, v)} />
+                </td>
+                <td className="angka">{formatRupiah(s.lemburNominal)}</td>
+                <td className="angka merah">{formatRupiah(s.potongan)}</td>
+                <td className="angka" style={{ fontWeight: 700 }}>
+                  {formatRupiah(Math.max(0, s.total))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+        ⓘ "Jasa Dilayani" dihitung otomatis dari Transaksi bulan ini yang mekaniknya persis nama staf ini. Transaksi dengan mekanik "Semua Mekanik" belum ikut terhitung ke siapa pun.
+      </p>
+    </div>
+  )
+}
+
+function TabelUangSakuMagang({ staffList, daftarAbsensi, lembur, bulanIni, labelBulanIni, simpanLembur }) {
+  const { notify } = useUI()
+
+  const daftar = useMemo(() => {
+    return staffList
+      .filter((s) => s.aktif && s.jabatan === 'Magang')
+      .map((s) => {
+        const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
+        const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
+        const umPerHari = ((s.uangMakan || 0) + (s.uangBensin || 0)) / 26
+        const lemburNominal = Math.round((umPerHari / 8) * 1.5 * jamLembur)
+        const potongan = Math.round(umPerHari * rekap.tanpaKabar)
+        const total = (s.uangMakan || 0) + (s.uangBensin || 0) - potongan + lemburNominal
+        return { ...s, rekap, jamLembur, lemburNominal, potongan, total }
+      })
+  }, [staffList, daftarAbsensi, lembur, bulanIni])
+
+  async function ubahLembur(kode, nilai) {
+    try {
+      await simpanLembur(kode, bulanIni, nilai)
+    } catch (err) {
+      notify('❌ Gagal menyimpan jam lembur: ' + err.message, 'error')
+    }
+  }
+
+  function cetak(s) {
+    cetakSlipGaji({
+      judul: 'SLIP UANG SAKU MAGANG',
+      nama: s.nama,
+      jabatan: 'Magang',
+      labelPeriode: labelBulanIni,
+      rekap: s.rekap,
+      rincian: [
+        { label: 'Uang Makan', nilai: s.uangMakan || 0 },
+        { label: 'Uang Bensin', nilai: s.uangBensin || 0 },
+        { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
+        { label: `Uang Lembur (${s.jamLembur} jam)`, nilai: s.lemburNominal },
+      ],
+      total: s.total,
+    })
+  }
+
+  return (
+    <div style={{ margin: '15px 0', padding: 15, background: '#f0fdf4', borderRadius: 6, border: '1px solid #bbf7d0' }}>
+      <h3>🧑‍🎓 Uang Saku Magang — {labelBulanIni}</h3>
+      <div className="table-wrap">
+        <table style={{ fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th className="tengah">Aksi</th>
+              <th>Nama</th>
+              <th>Mulai</th>
+              <th>Selesai</th>
+              <th className="angka">Uang Makan</th>
+              <th className="angka">Uang Bensin</th>
+              <th className="tengah">Jam Lembur</th>
+              <th className="angka">Nominal Lembur</th>
+              <th className="angka">Potongan</th>
+              <th className="angka">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {daftar.length === 0 && (
+              <tr>
+                <td colSpan={10} className="tengah" style={{ padding: 10, color: '#888' }}>
+                  📭 Belum ada staf magang aktif
+                </td>
+              </tr>
+            )}
+            {daftar.map((s) => (
+              <tr key={s.kode}>
+                <td className="tengah">
+                  <button className="btn btn-blue btn-sm" onClick={() => cetak(s)}>
+                    🖨️
+                  </button>
+                </td>
+                <td>{s.nama}</td>
+                <td>{s.tanggalMulai || '—'}</td>
+                <td>{s.tanggalKeluar || '—'}</td>
+                <td className="angka">{formatRupiah(s.uangMakan || 0)}</td>
+                <td className="angka">{formatRupiah(s.uangBensin || 0)}</td>
+                <td className="tengah">
+                  <InputLembur nilaiAwal={s.jamLembur} onSimpan={(v) => ubahLembur(s.kode, v)} />
+                </td>
+                <td className="angka">{formatRupiah(s.lemburNominal)}</td>
+                <td className="angka merah">{formatRupiah(s.potongan)}</td>
+                <td className="angka" style={{ fontWeight: 700 }}>
+                  {formatRupiah(Math.max(0, s.total))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
