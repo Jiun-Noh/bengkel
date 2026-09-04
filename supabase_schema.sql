@@ -68,7 +68,9 @@ create table pengaturan (
   operasional integer default 0,   -- legacy, tidak dipakai lagi sejak tabel `pengeluaran` ada (lihat di bawah)
   maintenance integer default 0,   -- legacy, tidak dipakai lagi sejak tabel `pengeluaran` ada
   persen_mekanik integer default 8,
-  persen_investor integer default 15,
+  persen_investor integer default 15,   -- legacy, tidak dipakai lagi sejak tabel `investor` per-investor punya % sendiri
+  persen_pemilik integer default 60,    -- bagian pemilik dari Laba Bersih (kartu Pembagian Laba Bersih)
+  persen_cadangan integer default 15,   -- dana cadangan/lainnya dari Laba Bersih
   kata_sandi_laporan text default '1234',
   check (id = 1)
 );
@@ -92,6 +94,13 @@ create table lembur (
   unique (staff_kode, bulan)
 );
 
+create table investor (
+  id uuid primary key default gen_random_uuid(),
+  nama text not null,
+  persen numeric default 0,   -- % bagian dari Laba Bersih bulanan (kartu Pembagian Laba Bersih)
+  dibuat_pada timestamptz default now()
+);
+
 alter table barang enable row level security;
 alter table riwayat enable row level security;
 alter table absensi enable row level security;
@@ -99,6 +108,7 @@ alter table staff enable row level security;
 alter table pengaturan enable row level security;
 alter table pengeluaran enable row level security;
 alter table lembur enable row level security;
+alter table investor enable row level security;
 
 create policy "auth full access" on barang for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -113,4 +123,6 @@ create policy "auth full access" on pengaturan for all
 create policy "auth full access" on pengeluaran for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "auth full access" on lembur for all
+  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "auth full access" on investor for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

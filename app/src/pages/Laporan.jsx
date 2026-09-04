@@ -6,10 +6,12 @@ import { usePengeluaranQuery, usePengeluaranMutations } from '../hooks/usePengel
 import { useStaffQuery } from '../hooks/useStaff'
 import { useAbsensiQuery } from '../hooks/useAbsensi'
 import { useLemburQuery, useLemburMutations } from '../hooks/useLembur'
+import { useInvestorQuery, useInvestorMutations } from '../hooks/useInvestor'
 import { useUI } from '../contexts/UIContext'
 import { useOwnerMode } from '../contexts/OwnerModeContext'
 import { formatRupiah, waktuSekarang } from '../lib/format'
 import { cetakSlipGaji } from '../lib/cetakSlipGaji'
+import { cetakSlipInvestor } from '../lib/cetakSlipInvestor'
 import Modal from '../components/common/Modal'
 
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -114,13 +116,16 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
   const { data: daftarAbsensi = [] } = useAbsensiQuery(true)
   const { data: lembur = [] } = useLemburQuery(true)
   const { simpanLembur } = useLemburMutations()
+  const { data: investorList = [] } = useInvestorQuery(true)
+  const { tambahInvestor, ubahInvestor, hapusInvestor } = useInvestorMutations()
 
   const [dari, setDari] = useState('')
   const [sampai, setSampai] = useState('')
   const [jenisGrafik, setJenisGrafik] = useState('bulanan')
   const [pengSetting, setPengSetting] = useState({
     persenMekanik: pengaturan?.persenMekanik ?? 8,
-    persenInvestor: pengaturan?.persenInvestor ?? 15,
+    persenPemilik: pengaturan?.persenPemilik ?? 60,
+    persenCadangan: pengaturan?.persenCadangan ?? 15,
   })
 
   const [formPengeluaran, setFormPengeluaran] = useState({
@@ -152,18 +157,48 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
     })
   }, [riwayat, dari, sampai])
 
+  const dataBulanIni = useMemo(
+    () =>
+      riwayat.filter((r) => {
+        const t = ambilTanggalDariTeks(r.tgl)
+        if (!t) return false
+        const iso = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0')
+        return iso === bulanIni
+      }),
+    [riwayat, bulanIni],
+  )
+
+  const daftarGajiStaf = useMemo(
+    () => hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.persenMekanik),
+    [staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.persenMekanik],
+  )
+  const daftarUangSakuMagang = useMemo(
+    () => hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni),
+    [staffList, daftarAbsensi, lembur, bulanIni],
+  )
+  const totalGajiStaf = useMemo(() => daftarGajiStaf.reduce((s, x) => s + Math.max(0, x.total), 0), [daftarGajiStaf])
+  const totalUangSakuMagang = useMemo(() => daftarUangSakuMagang.reduce((s, x) => s + Math.max(0, x.total), 0), [daftarUangSakuMagang])
+
+  // Metrik untuk grafik & kartu ringkasan atas — ikut filter periode Dari~Sampai (bebas dipilih user).
   const ringkasan = useMemo(() => {
     const omset = dataFilter.reduce((s, r) => s + (r.totalBarang || 0), 0)
     const totalJasa = dataFilter.reduce((s, r) => s + (r.biayaJasa || 0), 0)
     const labaBarang = dataFilter.reduce((s, r) => s + (r.labaBarang || 0), 0)
     const labaKotor = labaBarang + totalJasa
+    return { omset, totalJasa, labaBarang, labaKotor }
+  }, [dataFilter])
+
+  // Kartu "Ringkasan Bulan Ini" — selalu bulan berjalan, tidak ikut filter Dari~Sampai, reset tiap awal bulan.
+  const ringkasanBulanIni = useMemo(() => {
+    const omset = dataBulanIni.reduce((s, r) => s + (r.totalBarang || 0), 0)
+    const totalJasa = dataBulanIni.reduce((s, r) => s + (r.biayaJasa || 0), 0)
+    const labaBarang = dataBulanIni.reduce((s, r) => s + (r.labaBarang || 0), 0)
+    const labaKotor = labaBarang + totalJasa
     const biayaOp = pengeluaranBulanIni.filter((p) => p.kategori === 'Operasional').reduce((s, p) => s + (p.nominal || 0), 0)
     const biayaMt = pengeluaranBulanIni.filter((p) => p.kategori === 'Maintenance').reduce((s, p) => s + (p.nominal || 0), 0)
-    const bagiMekanik = Math.round((totalJasa * pengSetting.persenMekanik) / 100)
-    const bagiInvestor = Math.round((labaKotor * pengSetting.persenInvestor) / 100)
-    const labaBersih = labaKotor - biayaOp - biayaMt - bagiMekanik - bagiInvestor
-    return { omset, totalJasa, labaBarang, labaKotor, biayaOp, biayaMt, bagiMekanik, bagiInvestor, labaBersih }
-  }, [dataFilter, pengSetting, pengeluaranBulanIni])
+    const labaBersih = labaKotor - biayaOp - biayaMt - totalGajiStaf - totalUangSakuMagang
+    return { omset, totalJasa, labaBarang, labaKotor, biayaOp, biayaMt, totalGajiStaf, totalUangSakuMagang, labaBersih }
+  }, [dataBulanIni, pengeluaranBulanIni, totalGajiStaf, totalUangSakuMagang])
 
   async function simpanSetting() {
     try {
@@ -267,14 +302,6 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
           <RingkasCard label="Laba Kotor" value={ringkasan.labaKotor} bg="#f3e5f5" fg="#4a148c" />
         </div>
 
-        <div style={{ margin: '15px 0', padding: 15, background: '#fafafa', borderRadius: 6, border: '1px solid #e0e0e0' }}>
-          <h3>⚙️ Pengaturan Pembagian Hasil</h3>
-          <div className="row">
-            <SettingField label="% Bagi Hasil Mekanik" value={pengSetting.persenMekanik} onChange={(v) => setPengSetting((s) => ({ ...s, persenMekanik: v }))} onBlur={simpanSetting} />
-            <SettingField label="% Bagi Hasil Investor" value={pengSetting.persenInvestor} onChange={(v) => setPengSetting((s) => ({ ...s, persenInvestor: v }))} onBlur={simpanSetting} />
-          </div>
-        </div>
-
         <div style={{ margin: '15px 0', padding: 15, background: '#fdf2f8', borderRadius: 6, border: '1px solid #fbcfe8' }}>
           <h3>💸 Pengeluaran Bulan Ini — {labelBulanIni}</h3>
           <form onSubmit={submitPengeluaran} className="row" style={{ alignItems: 'flex-end' }}>
@@ -354,49 +381,66 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
           </div>
 
           <p style={{ marginTop: 10, fontWeight: 700 }}>
-            Total Operasional: {formatRupiah(ringkasan.biayaOp)} &nbsp;|&nbsp; Total Maintenance: {formatRupiah(ringkasan.biayaMt)}
+            Total Operasional: {formatRupiah(ringkasanBulanIni.biayaOp)} &nbsp;|&nbsp; Total Maintenance: {formatRupiah(ringkasanBulanIni.biayaMt)}
           </p>
         </div>
 
         <TabelGajiStaf
-          staffList={staffList}
-          daftarAbsensi={daftarAbsensi}
-          riwayat={riwayat}
-          lembur={lembur}
-          bulanIni={bulanIni}
+          daftar={daftarGajiStaf}
           labelBulanIni={labelBulanIni}
           persenMekanik={pengSetting.persenMekanik}
+          onUbahPersenMekanik={(v) => setPengSetting((s) => ({ ...s, persenMekanik: v }))}
+          onSimpanPersenMekanik={simpanSetting}
           simpanLembur={simpanLembur}
+          bulanIni={bulanIni}
         />
 
         <TabelUangSakuMagang
-          staffList={staffList}
-          daftarAbsensi={daftarAbsensi}
-          lembur={lembur}
-          bulanIni={bulanIni}
+          daftar={daftarUangSakuMagang}
           labelBulanIni={labelBulanIni}
           simpanLembur={simpanLembur}
+          bulanIni={bulanIni}
         />
 
         <div style={{ margin: '15px 0', padding: 15, background: '#fff8e1', borderRadius: 6 }}>
-          <h3>📊 Rincian Pembagian</h3>
+          <h3>📈 Ringkasan Bulan Ini — {labelBulanIni}</h3>
           <p style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 10 }}>
-            ⓘ Laba Kotor mengikuti filter periode di atas, tapi Biaya Operasional/Maintenance selalu dari pengeluaran <strong>{labelBulanIni}</strong> (bulan berjalan).
+            ⓘ Semua angka di kartu ini bulan berjalan saja (reset tiap awal bulan), tidak ikut filter periode di grafik atas.
           </p>
           <table>
             <tbody>
-              <tr><td>💰 Laba Kotor</td><td className="angka">{formatRupiah(ringkasan.labaKotor)}</td></tr>
-              <tr><td>➖ Biaya Operasional</td><td className="angka merah">{formatRupiah(ringkasan.biayaOp)}</td></tr>
-              <tr><td>➖ Biaya Maintenance</td><td className="angka merah">{formatRupiah(ringkasan.biayaMt)}</td></tr>
-              <tr><td>➖ Bagi Hasil Mekanik</td><td className="angka merah">{formatRupiah(ringkasan.bagiMekanik)} ({pengSetting.persenMekanik}%)</td></tr>
-              <tr><td>➖ Bagi Hasil Investor</td><td className="angka merah">{formatRupiah(ringkasan.bagiInvestor)} ({pengSetting.persenInvestor}%)</td></tr>
+              <tr><td>💰 Omset Penjualan</td><td className="angka">{formatRupiah(ringkasanBulanIni.omset)}</td></tr>
+              <tr><td>🔧 Total Jasa</td><td className="angka">{formatRupiah(ringkasanBulanIni.totalJasa)}</td></tr>
+              <tr><td>📦 Laba Barang</td><td className="angka">{formatRupiah(ringkasanBulanIni.labaBarang)}</td></tr>
+              <tr><td>📊 Laba Kotor</td><td className="angka">{formatRupiah(ringkasanBulanIni.labaKotor)}</td></tr>
+              <tr><td>➖ Total Gaji Staf</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.totalGajiStaf)}</td></tr>
+              <tr><td>➖ Total Uang Saku Magang</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.totalUangSakuMagang)}</td></tr>
+              <tr><td>➖ Biaya Operasional</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.biayaOp)}</td></tr>
+              <tr><td>➖ Biaya Maintenance</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.biayaMt)}</td></tr>
               <tr style={{ fontWeight: 700, borderTop: '2px solid #ccc' }}>
-                <td>✅ Laba Bersih Pemilik</td>
-                <td className="angka hijau">{formatRupiah(Math.max(0, ringkasan.labaBersih))}</td>
+                <td>✅ Laba Bersih</td>
+                <td className="angka hijau">{formatRupiah(Math.max(0, ringkasanBulanIni.labaBersih))}</td>
               </tr>
             </tbody>
           </table>
+          <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+            ⓘ "Bagi Hasil Mekanik" sudah termasuk di dalam Total Gaji Staf di atas, jadi tidak dipotong dua kali di sini.
+          </p>
         </div>
+
+        <PembagianLabaBersih
+          labaBersih={Math.max(0, ringkasanBulanIni.labaBersih)}
+          labelBulanIni={labelBulanIni}
+          persenPemilik={pengSetting.persenPemilik}
+          persenCadangan={pengSetting.persenCadangan}
+          onUbahPersenPemilik={(v) => setPengSetting((s) => ({ ...s, persenPemilik: v }))}
+          onUbahPersenCadangan={(v) => setPengSetting((s) => ({ ...s, persenCadangan: v }))}
+          onSimpanSetting={simpanSetting}
+          investorList={investorList}
+          tambahInvestor={tambahInvestor}
+          ubahInvestor={ubahInvestor}
+          hapusInvestor={hapusInvestor}
+        />
 
         <button className="btn btn-outline btn-sm" onClick={onGantiSandi}>🔧 Ganti Kata Sandi Laporan</button>
       </div>
@@ -428,6 +472,36 @@ function hitungJasaBulanIni(riwayat, bulan, namaMekanik) {
   return { jumlah: data.length, nilai: data.reduce((s, r) => s + (r.biayaJasa || 0), 0) }
 }
 
+function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni, persenMekanik) {
+  return staffList
+    .filter((s) => s.aktif && s.jabatan !== 'Magang')
+    .map((s) => {
+      const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
+      const jasa = hitungJasaBulanIni(riwayat, bulanIni, s.nama)
+      const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
+      const gajiPerHari = (s.gajiPokok || 0) / 26
+      const bagiHasil = Math.round((jasa.nilai * persenMekanik) / 100)
+      const lemburNominal = Math.round((gajiPerHari / 8) * 1.5 * jamLembur)
+      const potongan = Math.round(gajiPerHari * rekap.tanpaKabar)
+      const total = (s.gajiPokok || 0) - potongan + bagiHasil + lemburNominal
+      return { ...s, rekap, jasa, jamLembur, bagiHasil, lemburNominal, potongan, total }
+    })
+}
+
+function hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni) {
+  return staffList
+    .filter((s) => s.aktif && s.jabatan === 'Magang')
+    .map((s) => {
+      const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
+      const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
+      const umPerHari = ((s.uangMakan || 0) + (s.uangBensin || 0)) / 26
+      const lemburNominal = Math.round((umPerHari / 8) * 1.5 * jamLembur)
+      const potongan = Math.round(umPerHari * rekap.tanpaKabar)
+      const total = (s.uangMakan || 0) + (s.uangBensin || 0) - potongan + lemburNominal
+      return { ...s, rekap, jamLembur, lemburNominal, potongan, total }
+    })
+}
+
 function InputLembur({ nilaiAwal, onSimpan }) {
   const [nilai, setNilai] = useState(nilaiAwal)
   return (
@@ -442,24 +516,8 @@ function InputLembur({ nilaiAwal, onSimpan }) {
   )
 }
 
-function TabelGajiStaf({ staffList, daftarAbsensi, riwayat, lembur, bulanIni, labelBulanIni, persenMekanik, simpanLembur }) {
+function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahPersenMekanik, onSimpanPersenMekanik, simpanLembur }) {
   const { notify } = useUI()
-
-  const daftar = useMemo(() => {
-    return staffList
-      .filter((s) => s.aktif && s.jabatan !== 'Magang')
-      .map((s) => {
-        const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
-        const jasa = hitungJasaBulanIni(riwayat, bulanIni, s.nama)
-        const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
-        const gajiPerHari = (s.gajiPokok || 0) / 26
-        const bagiHasil = Math.round((jasa.nilai * persenMekanik) / 100)
-        const lemburNominal = Math.round((gajiPerHari / 8) * 1.5 * jamLembur)
-        const potongan = Math.round(gajiPerHari * rekap.tanpaKabar)
-        const total = (s.gajiPokok || 0) - potongan + bagiHasil + lemburNominal
-        return { ...s, rekap, jasa, jamLembur, bagiHasil, lemburNominal, potongan, total }
-      })
-  }, [staffList, daftarAbsensi, riwayat, lembur, bulanIni, persenMekanik])
 
   async function ubahLembur(kode, nilai) {
     try {
@@ -489,6 +547,19 @@ function TabelGajiStaf({ staffList, daftarAbsensi, riwayat, lembur, bulanIni, la
   return (
     <div style={{ margin: '15px 0', padding: 15, background: '#eef2ff', borderRadius: 6, border: '1px solid #c7d2fe' }}>
       <h3>🔧 Gaji Staf (Mekanik/Kasir/Lainnya) — {labelBulanIni}</h3>
+      <div className="row" style={{ alignItems: 'center', marginBottom: 8 }}>
+        <label>Persentase Bagi Hasil Jasa:</label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={persenMekanik}
+          onChange={(e) => onUbahPersenMekanik(parseInt(e.target.value, 10) || 0)}
+          onBlur={onSimpanPersenMekanik}
+          style={{ width: 70 }}
+        />
+        <span style={{ fontSize: 12, color: '#666' }}>% — bisa diubah kapan saja</span>
+      </div>
       <div className="table-wrap">
         <table style={{ fontSize: 12 }}>
           <thead>
@@ -547,22 +618,8 @@ function TabelGajiStaf({ staffList, daftarAbsensi, riwayat, lembur, bulanIni, la
   )
 }
 
-function TabelUangSakuMagang({ staffList, daftarAbsensi, lembur, bulanIni, labelBulanIni, simpanLembur }) {
+function TabelUangSakuMagang({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
   const { notify } = useUI()
-
-  const daftar = useMemo(() => {
-    return staffList
-      .filter((s) => s.aktif && s.jabatan === 'Magang')
-      .map((s) => {
-        const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
-        const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
-        const umPerHari = ((s.uangMakan || 0) + (s.uangBensin || 0)) / 26
-        const lemburNominal = Math.round((umPerHari / 8) * 1.5 * jamLembur)
-        const potongan = Math.round(umPerHari * rekap.tanpaKabar)
-        const total = (s.uangMakan || 0) + (s.uangBensin || 0) - potongan + lemburNominal
-        return { ...s, rekap, jamLembur, lemburNominal, potongan, total }
-      })
-  }, [staffList, daftarAbsensi, lembur, bulanIni])
 
   async function ubahLembur(kode, nilai) {
     try {
@@ -645,20 +702,235 @@ function TabelUangSakuMagang({ staffList, daftarAbsensi, lembur, bulanIni, label
   )
 }
 
+function InputInvestorNama({ nilaiAwal, onSimpan }) {
+  const [nilai, setNilai] = useState(nilaiAwal)
+  return (
+    <input
+      value={nilai}
+      onChange={(e) => setNilai(e.target.value)}
+      onBlur={() => { if (nilai.trim() && nilai !== nilaiAwal) onSimpan(nilai) }}
+      placeholder="Nama Investor"
+      style={{ minWidth: 120 }}
+    />
+  )
+}
+
+function InputInvestorPersen({ nilaiAwal, onSimpan }) {
+  const [nilai, setNilai] = useState(nilaiAwal)
+  return (
+    <input
+      type="number"
+      min="0"
+      max="100"
+      value={nilai}
+      onChange={(e) => setNilai(e.target.value)}
+      onBlur={() => {
+        const v = parseFloat(nilai) || 0
+        if (v !== nilaiAwal) onSimpan(v)
+      }}
+      style={{ width: 70 }}
+    />
+  )
+}
+
+function PembagianLabaBersih({
+  labaBersih,
+  labelBulanIni,
+  persenPemilik,
+  persenCadangan,
+  onUbahPersenPemilik,
+  onUbahPersenCadangan,
+  onSimpanSetting,
+  investorList,
+  tambahInvestor,
+  ubahInvestor,
+  hapusInvestor,
+}) {
+  const { notify, confirm } = useUI()
+  const [namaBaru, setNamaBaru] = useState('')
+  const [persenBaru, setPersenBaru] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const totalPersenInvestor = investorList.reduce((s, x) => s + (x.persen || 0), 0)
+  const totalNominalInvestor = investorList.reduce((s, x) => s + Math.round((labaBersih * (x.persen || 0)) / 100), 0)
+  const nominalPemilik = Math.round((labaBersih * persenPemilik) / 100)
+  const nominalCadangan = Math.round((labaBersih * persenCadangan) / 100)
+  const totalPersenSemua = persenPemilik + totalPersenInvestor + persenCadangan
+  const seimbang = totalPersenSemua === 100
+
+  async function submitTambah(e) {
+    e.preventDefault()
+    if (!namaBaru.trim()) {
+      notify('⚠️ Isi nama investor!', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      await tambahInvestor({ nama: namaBaru.trim(), persen: parseFloat(persenBaru) || 0 })
+      setNamaBaru('')
+      setPersenBaru('')
+    } catch (err) {
+      notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function ubahNama(inv, nama) {
+    try {
+      await ubahInvestor(inv.id, { nama, persen: inv.persen })
+    } catch (err) {
+      notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    }
+  }
+
+  async function ubahPersen(inv, persen) {
+    try {
+      await ubahInvestor(inv.id, { nama: inv.nama, persen })
+    } catch (err) {
+      notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    }
+  }
+
+  async function hapus(inv) {
+    const ok = await confirm(`⚠️ Hapus investor "${inv.nama}"?`)
+    if (!ok) return
+    try {
+      await hapusInvestor(inv.id)
+    } catch (err) {
+      notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
+    }
+  }
+
+  function cetak(inv) {
+    cetakSlipInvestor({
+      nama: inv.nama,
+      persen: inv.persen || 0,
+      labaBersih,
+      nominal: Math.round((labaBersih * (inv.persen || 0)) / 100),
+      labelPeriode: labelBulanIni,
+    })
+  }
+
+  return (
+    <div style={{ margin: '15px 0', padding: 15, background: '#fefce8', borderRadius: 6, border: '1px solid #fde68a' }}>
+      <h3>💰 Pembagian Laba Bersih — {labelBulanIni}</h3>
+      <p style={{ fontSize: 12, color: '#888', marginTop: -6, marginBottom: 10 }}>
+        ⓘ Dasar pembagian: Laba Bersih {formatRupiah(labaBersih)} (lihat "✅ Laba Bersih" di Ringkasan Bulan Ini).
+      </p>
+
+      <h4 style={{ margin: '8px 0' }}>👤 Bagian Pemilik</h4>
+      <div className="row" style={{ alignItems: 'center' }}>
+        <label>Persentase Pemilik:</label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={persenPemilik}
+          onChange={(e) => onUbahPersenPemilik(parseInt(e.target.value, 10) || 0)}
+          onBlur={onSimpanSetting}
+          style={{ width: 70 }}
+        />
+        <span>% — Nominal: <strong>{formatRupiah(nominalPemilik)}</strong></span>
+      </div>
+
+      <h4 style={{ margin: '15px 0 8px' }}>🤝 Daftar Investor</h4>
+      <div className="table-wrap">
+        <table style={{ fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th>Nama Investor</th>
+              <th className="tengah">% Bagian</th>
+              <th className="angka">Nominal</th>
+              <th className="tengah">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {investorList.length === 0 && (
+              <tr>
+                <td colSpan={4} className="tengah" style={{ padding: 10, color: '#888' }}>
+                  📭 Belum ada investor
+                </td>
+              </tr>
+            )}
+            {investorList.map((inv) => (
+              <tr key={inv.id}>
+                <td>
+                  <InputInvestorNama nilaiAwal={inv.nama} onSimpan={(v) => ubahNama(inv, v)} />
+                </td>
+                <td className="tengah">
+                  <InputInvestorPersen nilaiAwal={inv.persen || 0} onSimpan={(v) => ubahPersen(inv, v)} />
+                </td>
+                <td className="angka">{formatRupiah(Math.round((labaBersih * (inv.persen || 0)) / 100))}</td>
+                <td className="tengah">
+                  <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                    <button className="btn btn-blue btn-sm" onClick={() => cetak(inv)} title="Cetak Slip A4">🖨️</button>
+                    <button className="btn btn-red btn-sm" onClick={() => hapus(inv)}>🗑️</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot style={{ fontWeight: 700, background: '#f5f5f5' }}>
+            <tr>
+              <td>Total Investor</td>
+              <td className="tengah">{totalPersenInvestor}%</td>
+              <td className="angka">{formatRupiah(totalNominalInvestor)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <form onSubmit={submitTambah} className="row" style={{ alignItems: 'flex-end' }}>
+        <div className="field" style={{ flex: '2 1 160px' }}>
+          <label>Nama Investor Baru</label>
+          <input value={namaBaru} onChange={(e) => setNamaBaru(e.target.value)} placeholder="Nama Investor" />
+        </div>
+        <div className="field" style={{ flex: '1 1 100px' }}>
+          <label>% Bagian</label>
+          <input type="number" min="0" max="100" value={persenBaru} onChange={(e) => setPersenBaru(e.target.value)} placeholder="0" />
+        </div>
+        <button className="btn btn-sm" type="submit" disabled={saving} style={{ marginBottom: 12 }}>
+          {saving ? 'Menyimpan…' : '➕ Tambah Investor'}
+        </button>
+      </form>
+
+      <h4 style={{ margin: '15px 0 8px' }}>📦 Dana Cadangan / Lainnya</h4>
+      <div className="row" style={{ alignItems: 'center' }}>
+        <label>Persentase Dana Cadangan:</label>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={persenCadangan}
+          onChange={(e) => onUbahPersenCadangan(parseInt(e.target.value, 10) || 0)}
+          onBlur={onSimpanSetting}
+          style={{ width: 70 }}
+        />
+        <span>% — Nominal: <strong>{formatRupiah(nominalCadangan)}</strong></span>
+      </div>
+
+      <div
+        style={{
+          marginTop: 15,
+          padding: 10,
+          background: seimbang ? '#e8f5e9' : '#fff3cd',
+          borderRadius: 6,
+          fontWeight: 700,
+        }}
+      >
+        {seimbang ? '✅' : '⚠️'} Keseimbangan: Total {totalPersenSemua}% | Sisa {100 - totalPersenSemua}%
+      </div>
+    </div>
+  )
+}
+
 function RingkasCard({ label, value, bg, fg }) {
   return (
     <div style={{ padding: 12, background: bg, borderRadius: 6 }}>
       <p style={{ fontSize: 13, color: fg }}>{label}</p>
       <p style={{ fontSize: 18, fontWeight: 700, color: fg }}>{formatRupiah(value)}</p>
-    </div>
-  )
-}
-
-function SettingField({ label, value, onChange, onBlur }) {
-  return (
-    <div className="field" style={{ flex: '1 1 200px' }}>
-      <label>{label}</label>
-      <input type="number" value={value} onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)} onBlur={onBlur} />
     </div>
   )
 }

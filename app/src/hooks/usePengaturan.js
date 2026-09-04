@@ -4,7 +4,8 @@ import { db } from '../lib/supabaseClient'
 function kolomPengaturanKeInternal(row) {
   return {
     persenMekanik: row?.persen_mekanik ?? 8,
-    persenInvestor: row?.persen_investor ?? 15,
+    persenPemilik: row?.persen_pemilik ?? 60,
+    persenCadangan: row?.persen_cadangan ?? 15,
     kataSandiLaporan: row?.kata_sandi_laporan || '1234',
   }
 }
@@ -25,10 +26,10 @@ export function usePengaturanMutations() {
   const queryClient = useQueryClient()
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pengaturan'] })
 
-  async function simpanPengaturan({ persenMekanik, persenInvestor }) {
+  async function simpanPengaturan({ persenMekanik, persenPemilik, persenCadangan }) {
     const { error } = await db
       .from('pengaturan')
-      .update({ persen_mekanik: persenMekanik, persen_investor: persenInvestor })
+      .update({ persen_mekanik: persenMekanik, persen_pemilik: persenPemilik, persen_cadangan: persenCadangan })
       .eq('id', 1)
     if (error) throw error
     await invalidate()
