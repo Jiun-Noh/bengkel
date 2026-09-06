@@ -15,7 +15,7 @@ function kolomPengeluaranKeInternal(row) {
 export function usePengeluaranQuery(enabled) {
   return useQuery({
     queryKey: ['pengeluaran'],
-    queryFn: async () => (await ambilSemuaBaris('pengeluaran', 'tanggal')).map(kolomPengeluaranKeInternal),
+    queryFn: async () => (await ambilSemuaBaris('pengeluaran', ['tanggal', 'id'])).map(kolomPengeluaranKeInternal),
     enabled,
   })
 }

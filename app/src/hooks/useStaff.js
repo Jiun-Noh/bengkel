@@ -18,7 +18,7 @@ export function kolomStaffKeInternal(row) {
 export function useStaffQuery(enabled) {
   return useQuery({
     queryKey: ['staff'],
-    queryFn: async () => (await ambilSemuaBaris('staff', 'nama')).map(kolomStaffKeInternal),
+    queryFn: async () => (await ambilSemuaBaris('staff', ['nama', 'kode'])).map(kolomStaffKeInternal),
     enabled,
   })
 }

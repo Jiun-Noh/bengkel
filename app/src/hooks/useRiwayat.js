@@ -26,7 +26,7 @@ export function kolomRiwayatKeInternal(row) {
 export function useRiwayatQuery(enabled) {
   return useQuery({
     queryKey: ['riwayat'],
-    queryFn: async () => (await ambilSemuaBaris('riwayat', 'created_at', true)).map(kolomRiwayatKeInternal),
+    queryFn: async () => (await ambilSemuaBaris('riwayat', ['created_at', 'id'], true)).map(kolomRiwayatKeInternal),
     enabled,
   })
 }

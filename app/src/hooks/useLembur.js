@@ -8,7 +8,7 @@ function kolomLemburKeInternal(row) {
 export function useLemburQuery(enabled) {
   return useQuery({
     queryKey: ['lembur'],
-    queryFn: async () => (await ambilSemuaBaris('lembur', 'bulan')).map(kolomLemburKeInternal),
+    queryFn: async () => (await ambilSemuaBaris('lembur', ['bulan', 'id'])).map(kolomLemburKeInternal),
     enabled,
   })
 }

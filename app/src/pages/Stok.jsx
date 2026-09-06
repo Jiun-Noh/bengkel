@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useBarangQuery, useBarangMutations } from '../hooks/useBarang'
 import { useUI } from '../contexts/UIContext'
+import { useOwnerMode } from '../contexts/OwnerModeContext'
 import { formatRupiah, kapitalKode, kapitalNama, waktuSekarang } from '../lib/format'
 import Modal from '../components/common/Modal'
 import Fab from '../components/common/Fab'
@@ -13,16 +14,17 @@ export default function StokPage() {
   const { data: barang = [], isLoading } = useBarangQuery(true)
   const { simpanBarang, hapusBarang } = useBarangMutations()
   const { notify, confirm } = useUI()
+  const { unlocked } = useOwnerMode()
 
   const [mode, setMode] = useState('list') // 'list' | 'form'
   const [form, setForm] = useState(FORM_KOSONG)
   const [editingKode, setEditingKode] = useState(null)
+  const [restockMode, setRestockMode] = useState(false)
   const [cari, setCari] = useState('')
   const [riwayatKode, setRiwayatKode] = useState(null)
   const [saving, setSaving] = useState(false)
 
   const barangEditing = editingKode ? barang.find((b) => b.kode === editingKode) : null
-  const kodeCocok = !editingKode ? barang.find((b) => b.kode === form.kode.trim().toUpperCase()) : null
 
   const hasil = useMemo(() => {
     const kata = cari.trim().toUpperCase()
@@ -35,25 +37,12 @@ export default function StokPage() {
   function ubahKode(nilai) {
     const kode = kapitalKode(nilai)
     setForm((f) => ({ ...f, kode }))
-    if (editingKode) return
-    const cocok = barang.find((b) => b.kode === kode)
-    if (cocok) {
-      setForm((f) => ({
-        ...f,
-        kode,
-        nama: cocok.nama,
-        jenisMotor: cocok.jenisMotor || '',
-        satuan: cocok.satuan || 'PCS',
-        hargaPokok: cocok.hargaPokok,
-        hargaJual: cocok.hargaJual,
-        jumlahStok: cocok.stok,
-      }))
-    }
   }
 
   function resetForm() {
     setForm(FORM_KOSONG)
     setEditingKode(null)
+    setRestockMode(false)
   }
 
   function bukaTambah() {
@@ -63,6 +52,7 @@ export default function StokPage() {
 
   function mulaiEdit(b) {
     setEditingKode(b.kode)
+    setRestockMode(false)
     setForm({
       kode: b.kode,
       nama: b.nama,
@@ -71,6 +61,21 @@ export default function StokPage() {
       hargaPokok: b.hargaPokok,
       hargaJual: b.hargaJual,
       jumlahStok: b.stok,
+    })
+    setMode('form')
+  }
+
+  function mulaiRestock(b) {
+    setEditingKode(null)
+    setRestockMode(true)
+    setForm({
+      kode: b.kode,
+      nama: b.nama,
+      jenisMotor: b.jenisMotor || '',
+      satuan: b.satuan || 'PCS',
+      hargaPokok: b.hargaPokok,
+      hargaJual: b.hargaJual,
+      jumlahStok: '',
     })
     setMode('form')
   }
@@ -93,10 +98,15 @@ export default function StokPage() {
     const jual = parseInt(form.hargaJual, 10) || 0
     const jumlah = parseInt(form.jumlahStok, 10) || 0
     const waktu = waktuSekarang()
+    const adaSebelumnya = barang.find((b) => b.kode === kode)
+
+    if (!editingKode && !restockMode && adaSebelumnya) {
+      notify(`❌ Kode "${kode}" sudah dipakai oleh "${adaSebelumnya.nama}"!\nPakai tombol 🔄 Restock di daftar untuk menambah stok, atau pakai kode lain.`, 'error')
+      return
+    }
 
     let baris
     let pesan
-    const adaSebelumnya = barang.find((b) => b.kode === kode)
 
     if (editingKode) {
       const b = barangEditing
@@ -107,7 +117,7 @@ export default function StokPage() {
         satuan: form.satuan,
         harga_pokok: pokok,
         harga_jual: jual,
-        stok: jumlah,
+        stok: b.stok,
         stok_awal: b.stokAwal,
         restock: b.restock,
         terjual: b.terjual,
@@ -115,7 +125,11 @@ export default function StokPage() {
         riwayat_restock: b.riwayatRestock || [],
       }
       pesan = '✅ Data barang berhasil diubah!'
-    } else if (adaSebelumnya) {
+    } else if (restockMode) {
+      if (!adaSebelumnya) {
+        notify('❌ Barang tidak ditemukan, mungkin sudah dihapus.', 'error')
+        return
+      }
       const b = adaSebelumnya
       const riwayatRestockBaru = [...(b.riwayatRestock || []), { jumlah, tanggal: waktu }]
       baris = {
@@ -175,6 +189,32 @@ export default function StokPage() {
     }
   }
 
+  async function revertRestock(b, index) {
+    const entry = b.riwayatRestock[index]
+    const ok = await confirm(`⚠️ Batalkan restock +${entry.jumlah} ${b.satuan || 'PCS'} (${entry.tanggal})?\nStok akan dikurangi kembali.`)
+    if (!ok) return
+    const riwayatBaru = b.riwayatRestock.filter((_, i) => i !== index)
+    try {
+      await simpanBarang({
+        kode: b.kode,
+        nama: b.nama,
+        jenis_motor: b.jenisMotor,
+        satuan: b.satuan,
+        harga_pokok: b.hargaPokok,
+        harga_jual: b.hargaJual,
+        stok: (b.stok || 0) - entry.jumlah,
+        stok_awal: b.stokAwal,
+        restock: (b.restock || 0) - entry.jumlah,
+        terjual: b.terjual,
+        tanggal_stok_awal: b.tanggalStokAwal,
+        riwayat_restock: riwayatBaru,
+      })
+      notify('✅ Restock dibatalkan, stok sudah disesuaikan.')
+    } catch (err) {
+      notify('❌ Gagal membatalkan di cloud: ' + err.message, 'error')
+    }
+  }
+
   function backupExcel() {
     let isi = 'Kode\tNama Barang\tJenis Motor\tSatuan\tHarga Pokok\tHarga Jual\tStok Awal\tRestock\tTerjual\tSisa Stok\n'
     barang.forEach((b) => {
@@ -194,19 +234,19 @@ export default function StokPage() {
       <div>
         <div className="form-header">
           <button className="btn-back" onClick={kembaliKeDaftar} aria-label="Kembali">←</button>
-          <h1>{editingKode ? '✏️ Ubah Barang' : kodeCocok ? '📦 Restock Barang' : '➕ Tambah Barang'}</h1>
+          <h1>{editingKode ? '✏️ Ubah Barang' : restockMode ? '📦 Restock Barang' : '➕ Tambah Barang'}</h1>
         </div>
 
         <form className="card" onSubmit={submit}>
-          {!editingKode && kodeCocok && (
+          {restockMode && (
             <div className="edit-banner" style={{ background: '#e3f2fd', color: '#0d47a1' }}>
-              <span>📦 Kode sudah ada — mengisi ini akan MENAMBAH stok "{kodeCocok.nama}"</span>
+              <span>📦 Restock — kode/nama/harga terkunci, cuma jumlah yang ditambahkan ke stok "{form.nama}"</span>
             </div>
           )}
 
           <div className="field">
             <label>Kode Barang</label>
-            <input value={form.kode} onChange={(e) => ubahKode(e.target.value)} readOnly={!!editingKode} placeholder="Kode Barang" autoFocus />
+            <input value={form.kode} onChange={(e) => ubahKode(e.target.value)} readOnly={!!editingKode || restockMode} placeholder="Kode Barang" autoFocus={!restockMode} />
           </div>
           <div className="field">
             <label>Nama Barang</label>
@@ -214,6 +254,7 @@ export default function StokPage() {
               value={form.nama}
               onChange={(e) => setForm((f) => ({ ...f, nama: kapitalNama(e.target.value) }))}
               placeholder="Nama Barang"
+              disabled={restockMode}
             />
           </div>
           <div className="field">
@@ -222,11 +263,12 @@ export default function StokPage() {
               value={form.jenisMotor}
               onChange={(e) => setForm((f) => ({ ...f, jenisMotor: kapitalNama(e.target.value) }))}
               placeholder="Contoh: BEAT, SCOOPY"
+              disabled={restockMode}
             />
           </div>
           <div className="field">
             <label>Satuan</label>
-            <select value={form.satuan} onChange={(e) => setForm((f) => ({ ...f, satuan: e.target.value }))}>
+            <select value={form.satuan} onChange={(e) => setForm((f) => ({ ...f, satuan: e.target.value }))} disabled={restockMode}>
               <option value="PCS">PCS</option>
               <option value="BTL">BOTOL</option>
               <option value="SET">SET</option>
@@ -239,6 +281,7 @@ export default function StokPage() {
               value={form.hargaPokok}
               onChange={(e) => setForm((f) => ({ ...f, hargaPokok: e.target.value }))}
               placeholder="Harga Modal Beli"
+              disabled={restockMode}
             />
           </div>
           <div className="field">
@@ -248,20 +291,28 @@ export default function StokPage() {
               value={form.hargaJual}
               onChange={(e) => setForm((f) => ({ ...f, hargaJual: e.target.value }))}
               placeholder="Harga Jual ke Pelanggan"
+              disabled={restockMode}
             />
           </div>
           <div className="field">
-            <label>{editingKode ? 'Jumlah Stok' : 'Jumlah Stok / Restock'}</label>
+            <label>{editingKode ? 'Jumlah Stok (terkunci)' : restockMode ? 'Jumlah Restock' : 'Jumlah Stok'}</label>
             <input
               type="number"
               value={form.jumlahStok}
               onChange={(e) => setForm((f) => ({ ...f, jumlahStok: e.target.value }))}
-              placeholder="Jumlah Stok / Restock"
+              placeholder="Jumlah Stok"
+              autoFocus={restockMode}
+              disabled={!!editingKode}
             />
+            {editingKode && (
+              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                ⓘ Ubah jumlah stok cuma lewat 🔄 Restock atau ✕ batalkan di Riwayat Restock, biar histori selalu sesuai.
+              </p>
+            )}
           </div>
 
           <button className="btn btn-block" type="submit" disabled={saving}>
-            {saving ? 'Menyimpan…' : '✅ Simpan Barang'}
+            {saving ? 'Menyimpan…' : restockMode ? '✅ Simpan Restock' : '✅ Simpan Barang'}
           </button>
         </form>
       </div>
@@ -275,9 +326,11 @@ export default function StokPage() {
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0 }}>📋 Daftar Stok Barang</h2>
-          <button className="btn btn-blue btn-sm" onClick={backupExcel}>
-            📥 Backup Excel
-          </button>
+          <AksiPemilik>
+            <button className="btn btn-blue btn-sm" onClick={backupExcel}>
+              📥 Backup Excel
+            </button>
+          </AksiPemilik>
         </div>
         <input placeholder="🔍 Cari Kode / Nama Barang / Motor..." value={cari} onChange={(e) => setCari(e.target.value)} style={{ marginTop: 10 }} />
         <div className="table-wrap">
@@ -316,19 +369,24 @@ export default function StokPage() {
                 return (
                   <tr key={b.kode} className={rendah ? 'baris-merah' : ''}>
                     <td className="tengah">
-                      <AksiPemilik>
-                        <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
-                          <button className="btn btn-blue btn-sm" onClick={() => setRiwayatKode(b.kode)}>
-                            📋
-                          </button>
-                          <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(b)}>
-                            ✏️
-                          </button>
-                          <button className="btn btn-red btn-sm" onClick={() => hapus(b.kode)}>
-                            🗑️
-                          </button>
-                        </div>
-                      </AksiPemilik>
+                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                        <button className="btn btn-sm" onClick={() => mulaiRestock(b)} title="Restock">
+                          🔄
+                        </button>
+                        <AksiPemilik>
+                          <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                            <button className="btn btn-blue btn-sm" onClick={() => setRiwayatKode(b.kode)}>
+                              📋
+                            </button>
+                            <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(b)}>
+                              ✏️
+                            </button>
+                            <button className="btn btn-red btn-sm" onClick={() => hapus(b.kode)}>
+                              🗑️
+                            </button>
+                          </div>
+                        </AksiPemilik>
+                      </div>
                     </td>
                     <td className="tengah">{i + 1}</td>
                     <td>{b.kode}</td>
@@ -362,8 +420,15 @@ export default function StokPage() {
                 <strong>📅 Detail Restock:</strong>
               </p>
               {barangRiwayat.riwayatRestock.map((r, i) => (
-                <div key={i} style={{ padding: '4px 0', borderBottom: '1px dashed #eee' }}>
-                  {i + 1}. +{r.jumlah} {barangRiwayat.satuan || 'PCS'} — {r.tanggal}
+                <div
+                  key={i}
+                  className="row"
+                  style={{ padding: '4px 0', borderBottom: '1px dashed #eee', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <span>{i + 1}. +{r.jumlah} {barangRiwayat.satuan || 'PCS'} — {r.tanggal}</span>
+                  <button className="btn btn-red btn-sm" onClick={() => revertRestock(barangRiwayat, i)} title="Batalkan restock ini">
+                    ✕
+                  </button>
                 </div>
               ))}
             </>
@@ -371,7 +436,7 @@ export default function StokPage() {
         </Modal>
       )}
 
-      <Fab onClick={bukaTambah} title="Tambah Barang" />
+      {unlocked && <Fab onClick={bukaTambah} title="Tambah Barang" />}
     </div>
   )
 }

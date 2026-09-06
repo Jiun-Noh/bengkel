@@ -21,7 +21,7 @@ export function kolomBarangKeInternal(row) {
 export function useBarangQuery(enabled) {
   return useQuery({
     queryKey: ['barang'],
-    queryFn: async () => (await ambilSemuaBaris('barang', 'nama')).map(kolomBarangKeInternal),
+    queryFn: async () => (await ambilSemuaBaris('barang', ['nama', 'kode'])).map(kolomBarangKeInternal),
     enabled,
   })
 }

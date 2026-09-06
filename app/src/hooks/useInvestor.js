@@ -8,7 +8,7 @@ function kolomInvestorKeInternal(row) {
 export function useInvestorQuery(enabled) {
   return useQuery({
     queryKey: ['investor'],
-    queryFn: async () => (await ambilSemuaBaris('investor', 'dibuat_pada')).map(kolomInvestorKeInternal),
+    queryFn: async () => (await ambilSemuaBaris('investor', ['dibuat_pada', 'id'])).map(kolomInvestorKeInternal),
     enabled,
   })
 }

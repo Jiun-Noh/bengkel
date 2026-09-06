@@ -19,7 +19,7 @@ export function kolomAbsensiKeInternal(row) {
 export function useAbsensiQuery(enabled) {
   return useQuery({
     queryKey: ['absensi'],
-    queryFn: async () => (await ambilSemuaBaris('absensi', 'tanggal')).map(kolomAbsensiKeInternal),
+    queryFn: async () => (await ambilSemuaBaris('absensi', ['tanggal', 'id'])).map(kolomAbsensiKeInternal),
     enabled,
   })
 }

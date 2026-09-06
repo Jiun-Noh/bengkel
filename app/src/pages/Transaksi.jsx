@@ -27,6 +27,17 @@ function ambilTanggalDariTeks(tgl) {
   return new Date(p[2], p[1] - 1, p[0])
 }
 
+function tanggalISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function awalBulanIniISO() {
+  const d = new Date()
+  return tanggalISO(new Date(d.getFullYear(), d.getMonth(), 1))
+}
+function hariIniISO() {
+  return tanggalISO(new Date())
+}
+
 export default function TransaksiPage() {
   const { data: barang = [] } = useBarangQuery(true)
   const { data: riwayat = [], isLoading } = useRiwayatQuery(true)
@@ -40,11 +51,12 @@ export default function TransaksiPage() {
   const [kodeJual, setKodeJual] = useState('')
   const [jumlahJual, setJumlahJual] = useState('')
   const [saranAktif, setSaranAktif] = useState(null) // 'nama' | 'plat' | null
+  const [saranBarangAktif, setSaranBarangAktif] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [cari, setCari] = useState('')
-  const [filterDari, setFilterDari] = useState('')
-  const [filterSampai, setFilterSampai] = useState('')
+  const [filterDari, setFilterDari] = useState(awalBulanIniISO())
+  const [filterSampai, setFilterSampai] = useState(hariIniISO())
   const [detailIdx, setDetailIdx] = useState(null)
   const [editIdx, setEditIdx] = useState(null)
 
@@ -63,11 +75,19 @@ export default function TransaksiPage() {
     riwayat.forEach((r) => {
       if (r.namaPelanggan && r.namaPelanggan !== '-') {
         const ada = daftar.find((x) => x.nama === r.namaPelanggan && x.plat === r.platKendaraan)
-        if (!ada) daftar.push({ nama: r.namaPelanggan, plat: r.platKendaraan, motor: r.jenisMotor })
+        // riwayat sudah terurut dari yang terbaru, jadi kecocokan pertama = kunjungan terakhir pelanggan ini.
+        if (!ada) daftar.push({ nama: r.namaPelanggan, plat: r.platKendaraan, motor: r.jenisMotor, nomorHP: r.nomorHP, kunjunganTerakhir: r.tgl })
       }
     })
     return daftar
   }, [riwayat])
+
+  const riwayatPelangganAktif = useMemo(() => {
+    const nama = form.namaPelanggan.trim()
+    const plat = form.platKendaraan.trim().toUpperCase()
+    if (!nama || !plat) return []
+    return riwayat.filter((r) => r.namaPelanggan === nama && r.platKendaraan === plat).slice(0, 3)
+  }, [riwayat, form.namaPelanggan, form.platKendaraan])
 
   const saranList = useMemo(() => {
     if (!saranAktif) return []
@@ -76,8 +96,26 @@ export default function TransaksiPage() {
     return daftarPelanggan.filter((p) => (saranAktif === 'nama' ? p.nama : p.plat).toUpperCase().includes(kata))
   }, [saranAktif, form.namaPelanggan, form.platKendaraan, daftarPelanggan])
 
+  const saranBarang = useMemo(() => {
+    if (!saranBarangAktif) return []
+    const kata = kodeJual.trim().toUpperCase()
+    if (!kata) return []
+    return barang.filter((b) => b.kode.toUpperCase().includes(kata) || b.nama.toUpperCase().includes(kata)).slice(0, 8)
+  }, [saranBarangAktif, kodeJual, barang])
+
+  function pilihBarang(b) {
+    setKodeJual(b.kode)
+    setSaranBarangAktif(false)
+  }
+
   function pilihPelanggan(p) {
-    setForm((f) => ({ ...f, namaPelanggan: p.nama, platKendaraan: p.plat, jenisMotor: p.motor }))
+    setForm((f) => ({
+      ...f,
+      namaPelanggan: p.nama,
+      platKendaraan: p.plat,
+      jenisMotor: p.motor,
+      nomorHP: p.nomorHP && p.nomorHP !== '-' ? p.nomorHP : f.nomorHP,
+    }))
     setSaranAktif(null)
   }
 
@@ -294,6 +332,20 @@ export default function TransaksiPage() {
           <input value={form.jenisMotor} onChange={(e) => setForm((f) => ({ ...f, jenisMotor: e.target.value.toUpperCase() }))} placeholder="Contoh: HONDA BEAT" />
         </div>
 
+        {riwayatPelangganAktif.length > 0 && (
+          <div style={{ margin: '0 0 12px', padding: 10, background: '#fff8e1', borderRadius: 6, fontSize: 12 }}>
+            <strong>🕐 Riwayat Kunjungan Terakhir Pelanggan Ini:</strong>
+            {riwayatPelangganAktif.map((r) => {
+              const uraian = (r.items || []).map((x) => `${x.nama}×${x.jumlah}`).join(', ') || r.namaJasa || 'Jasa'
+              return (
+                <div key={r.id} style={{ marginTop: 4 }}>
+                  📅 {r.tgl} — {uraian} ({formatRupiah(r.totalBayar || 0)})
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <h3 style={{ fontSize: 15 }}>🔧 Jenis Jasa Service</h3>
         <div className="field">
           <label>Pilih Jasa</label>
@@ -321,8 +373,15 @@ export default function TransaksiPage() {
 
         <h3 style={{ fontSize: 15 }}>➕ Tambah Barang</h3>
         <div className="row">
-          <div style={{ flex: '2 1 160px' }}>
-            <input placeholder="Kode Barang" value={kodeJual} onChange={(e) => setKodeJual(e.target.value.toUpperCase())} />
+          <div style={{ flex: '2 1 160px', position: 'relative' }}>
+            <input
+              placeholder="🔍 Cari Kode / Nama Barang..."
+              value={kodeJual}
+              onChange={(e) => { setKodeJual(e.target.value.toUpperCase()); setSaranBarangAktif(true) }}
+              onFocus={() => setSaranBarangAktif(true)}
+              onBlur={() => setTimeout(() => setSaranBarangAktif(false), 150)}
+            />
+            {saranBarangAktif && saranBarang.length > 0 && <SaranBarangBox saranBarang={saranBarang} onPilih={pilihBarang} />}
           </div>
           <div style={{ flex: '1 1 100px', fontSize: 12, padding: '10px 4px', background: '#f0f8ff', borderRadius: 6 }}>
             {kodeJual.length >= 2 ? (barangUntukKode ? `✅ ${barangUntukKode.nama}` : '⚠️ Tidak ditemukan') : ''}
@@ -402,6 +461,9 @@ export default function TransaksiPage() {
             <input type="date" value={filterSampai} onChange={(e) => setFilterSampai(e.target.value)} style={{ width: 150 }} />
             <button className="btn btn-blue btn-sm" onClick={() => { setCari(''); setFilterDari(''); setFilterSampai('') }}>↩️ Tampilkan Semua</button>
           </div>
+          <p style={{ fontSize: 12, color: '#888', marginTop: 6, marginBottom: 0 }}>
+            ⓘ Bawaannya menampilkan transaksi bulan ini. Ubah tanggal atau pakai "Tampilkan Semua" untuk lihat bulan lain.
+          </p>
         </div>
 
         <div className="table-wrap">
@@ -534,6 +596,24 @@ function SaranBox({ saranList, onPilih }) {
           onMouseDown={() => onPilih(p)}
         >
           {p.nama} — {p.plat} — {p.motor}
+          {p.kunjunganTerakhir && <><br /><small style={{ color: '#888' }}>Kunjungan terakhir: {p.kunjunganTerakhir}</small></>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SaranBarangBox({ saranBarang, onPilih }) {
+  return (
+    <div style={{ position: 'absolute', zIndex: 5, background: 'white', border: '1px solid #ddd', borderRadius: 8, width: '100%', marginTop: 4, boxShadow: '0 4px 10px rgba(0,0,0,0.1)', maxHeight: 260, overflowY: 'auto' }}>
+      {saranBarang.map((b) => (
+        <div
+          key={b.kode}
+          style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', gap: 8 }}
+          onMouseDown={() => onPilih(b)}
+        >
+          <span>{b.nama} <small style={{ color: '#888' }}>({b.kode})</small></span>
+          <small style={{ color: (b.stok || 0) <= 0 ? '#c00' : '#888', whiteSpace: 'nowrap' }}>Stok: {b.stok || 0}</small>
         </div>
       ))}
     </div>
