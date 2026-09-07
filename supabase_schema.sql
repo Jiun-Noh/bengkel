@@ -101,6 +101,13 @@ create table investor (
   dibuat_pada timestamptz default now()
 );
 
+create table jasa (
+  id uuid primary key default gen_random_uuid(),
+  nama text not null unique,
+  harga integer default 0,
+  dibuat_pada timestamptz default now()
+);
+
 alter table barang enable row level security;
 alter table riwayat enable row level security;
 alter table absensi enable row level security;
@@ -109,6 +116,7 @@ alter table pengaturan enable row level security;
 alter table pengeluaran enable row level security;
 alter table lembur enable row level security;
 alter table investor enable row level security;
+alter table jasa enable row level security;
 
 create policy "auth full access" on barang for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -126,3 +134,36 @@ create policy "auth full access" on lembur for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "auth full access" on investor for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "auth full access" on jasa for all
+  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+insert into jasa (nama, harga) values
+  ('Service CVT 110-150cc', 80000),
+  ('Service CVT 250cc Up', 150000),
+  ('Service Mesin Matic 110-150cc', 150000),
+  ('Service Mesin Matic 250cc Up', 250000),
+  ('Service Mesin Bebek 110-125cc', 100000),
+  ('Service Mesin Bebek 150-200cc', 150000),
+  ('Service Mesin Sport 250-300cc', 200000),
+  ('Service Mesin Sport 400-500cc', 300000),
+  ('Service Mesin Sport 600-1000cc', 450000),
+  ('Service Mesin Sport 1000cc Up', 600000),
+  ('Service Karburator/TB Matic', 60000),
+  ('Service Karburator/TB Bebek', 50000),
+  ('Service Karburator/TB Sport/Moge', 100000),
+  ('Service Rantai & Gir Bebek', 40000),
+  ('Service Rantai & Gir Sport/Moge', 80000),
+  ('Service Rem Matic', 40000),
+  ('Service Rem Bebek', 35000),
+  ('Service Rem Sport/Moge', 60000),
+  ('Service Shock Dpn Matic', 35000),
+  ('Service Shock Blkg Matic', 35000),
+  ('Service Shock Dpn Bebek', 30000),
+  ('Service Shock Blkg Bebek', 30000),
+  ('Service Shock Dpn Sport/Moge', 50000),
+  ('Service Shock Blkg Sport/Moge', 50000),
+  ('Jasa Ganti Oli Matic', 35000),
+  ('Jasa Ganti Oli Bebek', 25000),
+  ('Jasa Ganti Oli Sport/Moge', 50000),
+  ('Jasa Pasang Part', 0),
+  ('Jasa Lainnya', 0);

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { db } from '../lib/supabaseClient'
 
-const TABEL_DIPANTAU = ['barang', 'riwayat', 'absensi', 'staff', 'pengaturan', 'pengeluaran', 'lembur', 'investor']
+const TABEL_DIPANTAU = ['barang', 'riwayat', 'absensi', 'staff', 'pengaturan', 'pengeluaran', 'lembur', 'investor', 'jasa']
 
 // Satu channel realtime yang memantau semua tabel; setiap perubahan cukup
 // meng-invalidate query TanStack yang sesuai, biar react-query yang refetch.

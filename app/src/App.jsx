@@ -16,7 +16,7 @@ const TABS = [
   { key: 'home', label: 'Beranda', icon: '🏠' },
   { key: 'staff', label: 'Staff', icon: '👤' },
   { key: 'absensi', label: 'Absensi', icon: '📅' },
-  { key: 'stok', label: 'Stok', icon: '📦' },
+  { key: 'stok', label: 'Katalog', icon: '🗂️' },
   { key: 'transaksi', label: 'Transaksi', icon: '🛒' },
   { key: 'laporan', label: 'Laporan', icon: '💰' },
 ]

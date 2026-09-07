@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useBarangQuery, useBarangMutations } from '../hooks/useBarang'
+import { useJasaQuery, useJasaMutations } from '../hooks/useJasa'
 import { useUI } from '../contexts/UIContext'
 import { useOwnerMode } from '../contexts/OwnerModeContext'
 import { formatRupiah, kapitalKode, kapitalNama, waktuSekarang } from '../lib/format'
@@ -9,8 +10,36 @@ import AksiPemilik from '../components/common/AksiPemilik'
 
 const STOK_MINIM = 3
 const FORM_KOSONG = { kode: '', nama: '', jenisMotor: '', satuan: 'PCS', hargaPokok: '', hargaJual: '', jumlahStok: '' }
+const FORM_JASA_KOSONG = { nama: '', harga: '' }
 
 export default function StokPage() {
+  const [kategori, setKategori] = useState('barang') // 'barang' | 'jasa'
+
+  return (
+    <div>
+      <h1>🗂️ Manajemen Katalog</h1>
+      <div className="row" style={{ marginBottom: 12 }}>
+        <button
+          className="btn btn-sm"
+          style={{ background: kategori === 'barang' ? '#2563eb' : '#ddd', color: kategori === 'barang' ? 'white' : '#333' }}
+          onClick={() => setKategori('barang')}
+        >
+          📦 Barang
+        </button>
+        <button
+          className="btn btn-sm"
+          style={{ background: kategori === 'jasa' ? '#2563eb' : '#ddd', color: kategori === 'jasa' ? 'white' : '#333' }}
+          onClick={() => setKategori('jasa')}
+        >
+          🔧 Jasa
+        </button>
+      </div>
+      {kategori === 'barang' ? <BarangSection /> : <JasaSection />}
+    </div>
+  )
+}
+
+function BarangSection() {
   const { data: barang = [], isLoading } = useBarangQuery(true)
   const { simpanBarang, hapusBarang } = useBarangMutations()
   const { notify, confirm } = useUI()
@@ -321,8 +350,6 @@ export default function StokPage() {
 
   return (
     <div>
-      <h1>📦 Manajemen Stok Barang</h1>
-
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0 }}>📋 Daftar Stok Barang</h2>
@@ -437,6 +464,184 @@ export default function StokPage() {
       )}
 
       {unlocked && <Fab onClick={bukaTambah} title="Tambah Barang" />}
+    </div>
+  )
+}
+
+function JasaSection() {
+  const { data: jasaList = [], isLoading } = useJasaQuery(true)
+  const { tambahJasa, ubahJasa, hapusJasa } = useJasaMutations()
+  const { notify, confirm } = useUI()
+  const { unlocked } = useOwnerMode()
+
+  const [mode, setMode] = useState('list') // 'list' | 'form'
+  const [form, setForm] = useState(FORM_JASA_KOSONG)
+  const [editingId, setEditingId] = useState(null)
+  const [cari, setCari] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const hasil = useMemo(() => {
+    const kata = cari.trim().toUpperCase()
+    if (!kata) return jasaList
+    return jasaList.filter((j) => j.nama.toUpperCase().includes(kata))
+  }, [jasaList, cari])
+
+  function resetForm() {
+    setForm(FORM_JASA_KOSONG)
+    setEditingId(null)
+  }
+
+  function bukaTambah() {
+    resetForm()
+    setMode('form')
+  }
+
+  function mulaiEdit(j) {
+    setEditingId(j.id)
+    setForm({ nama: j.nama, harga: j.harga })
+    setMode('form')
+  }
+
+  function kembaliKeDaftar() {
+    resetForm()
+    setMode('list')
+  }
+
+  async function submit(e) {
+    e.preventDefault()
+    const nama = form.nama.trim()
+    if (!nama) {
+      notify('⚠️ Isi Nama Jasa!', 'error')
+      return
+    }
+    const harga = parseInt(form.harga, 10) || 0
+    const sudahAda = jasaList.find((j) => j.nama.toUpperCase() === nama.toUpperCase() && j.id !== editingId)
+    if (sudahAda) {
+      notify(`❌ Nama jasa "${nama}" sudah dipakai!`, 'error')
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (editingId) {
+        await ubahJasa(editingId, { nama, harga })
+        notify('✅ Data jasa berhasil diubah!')
+      } else {
+        await tambahJasa({ nama, harga })
+        notify('✅ Jasa baru berhasil ditambahkan!')
+      }
+      resetForm()
+      setMode('list')
+    } catch (err) {
+      notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function hapus(j) {
+    const ok = await confirm(`⚠️ Hapus jasa "${j.nama}"?`)
+    if (!ok) return
+    try {
+      await hapusJasa(j.id)
+      if (editingId === j.id) kembaliKeDaftar()
+    } catch (err) {
+      notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
+    }
+  }
+
+  if (mode === 'form') {
+    return (
+      <div>
+        <div className="form-header">
+          <button className="btn-back" onClick={kembaliKeDaftar} aria-label="Kembali">←</button>
+          <h1>{editingId ? '✏️ Ubah Jasa' : '➕ Tambah Jasa'}</h1>
+        </div>
+
+        <form className="card" onSubmit={submit}>
+          <div className="field">
+            <label>Nama Jasa</label>
+            <input
+              value={form.nama}
+              onChange={(e) => setForm((f) => ({ ...f, nama: e.target.value }))}
+              placeholder="Contoh: Ganti Oli Matic"
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label>Harga (Rp)</label>
+            <input
+              type="number"
+              min="0"
+              value={form.harga}
+              onChange={(e) => setForm((f) => ({ ...f, harga: e.target.value }))}
+              placeholder="0"
+            />
+          </div>
+
+          <button className="btn btn-block" type="submit" disabled={saving}>
+            {saving ? 'Menyimpan…' : '✅ Simpan Jasa'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="card">
+        <h2>📋 Daftar Jasa</h2>
+        <input placeholder="🔍 Cari Nama Jasa..." value={cari} onChange={(e) => setCari(e.target.value)} style={{ marginTop: 10 }} />
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th className="tengah">Aksi</th>
+                <th className="tengah">No</th>
+                <th>Nama Jasa</th>
+                <th className="angka">Harga</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={4} className="tengah" style={{ padding: 12, color: '#888' }}>
+                    Memuat...
+                  </td>
+                </tr>
+              )}
+              {!isLoading && hasil.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="tengah" style={{ padding: 12, color: '#888' }}>
+                    📭 Belum ada jasa
+                  </td>
+                </tr>
+              )}
+              {hasil.map((j, i) => (
+                <tr key={j.id}>
+                  <td className="tengah">
+                    <AksiPemilik>
+                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                        <button className="btn btn-orange btn-sm" onClick={() => mulaiEdit(j)}>
+                          ✏️
+                        </button>
+                        <button className="btn btn-red btn-sm" onClick={() => hapus(j)}>
+                          🗑️
+                        </button>
+                      </div>
+                    </AksiPemilik>
+                  </td>
+                  <td className="tengah">{i + 1}</td>
+                  <td>🔧 {j.nama}</td>
+                  <td className="angka">{formatRupiah(j.harga || 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {unlocked && <Fab onClick={bukaTambah} title="Tambah Jasa" />}
     </div>
   )
 }

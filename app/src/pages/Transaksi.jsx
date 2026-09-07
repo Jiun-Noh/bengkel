@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useBarangQuery, useBarangMutations } from '../hooks/useBarang'
+import { useJasaQuery } from '../hooks/useJasa'
 import { useRiwayatQuery, useRiwayatMutations } from '../hooks/useRiwayat'
 import { useStaffQuery } from '../hooks/useStaff'
 import { useUI } from '../contexts/UIContext'
 import { formatRupiah, kapitalNama, kapitalKode, waktuSekarang } from '../lib/format'
-import { JASA_OPTIONS, hargaJasa } from '../lib/jasaOptions'
 import { cetakNota } from '../lib/cetakNota'
 import Modal from '../components/common/Modal'
 
@@ -40,6 +40,7 @@ function hariIniISO() {
 
 export default function TransaksiPage() {
   const { data: barang = [] } = useBarangQuery(true)
+  const { data: jasaList = [] } = useJasaQuery(true)
   const { data: riwayat = [], isLoading } = useRiwayatQuery(true)
   const { data: staffList = [] } = useStaffQuery(true)
   const { ubahStokTerjual } = useBarangMutations()
@@ -52,6 +53,7 @@ export default function TransaksiPage() {
   const [jumlahJual, setJumlahJual] = useState('')
   const [saranAktif, setSaranAktif] = useState(null) // 'nama' | 'plat' | null
   const [saranBarangAktif, setSaranBarangAktif] = useState(false)
+  const [saranJasaAktif, setSaranJasaAktif] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [cari, setCari] = useState('')
@@ -99,7 +101,7 @@ export default function TransaksiPage() {
   const saranBarang = useMemo(() => {
     if (!saranBarangAktif) return []
     const kata = kodeJual.trim().toUpperCase()
-    if (!kata) return []
+    if (!kata) return barang.slice(0, 8)
     return barang.filter((b) => b.kode.toUpperCase().includes(kata) || b.nama.toUpperCase().includes(kata)).slice(0, 8)
   }, [saranBarangAktif, kodeJual, barang])
 
@@ -107,6 +109,13 @@ export default function TransaksiPage() {
     setKodeJual(b.kode)
     setSaranBarangAktif(false)
   }
+
+  const saranJasa = useMemo(() => {
+    if (!saranJasaAktif) return []
+    const kata = form.jenisJasa.trim().toUpperCase()
+    if (!kata) return jasaList.slice(0, 8)
+    return jasaList.filter((j) => j.nama.toUpperCase().includes(kata)).slice(0, 8)
+  }, [saranJasaAktif, form.jenisJasa, jasaList])
 
   function pilihPelanggan(p) {
     setForm((f) => ({
@@ -135,8 +144,9 @@ export default function TransaksiPage() {
     }
   }
 
-  function pilihJasa(value) {
-    setForm((f) => ({ ...f, jenisJasa: value, biayaJasaTotal: hargaJasa(value) || '' }))
+  function pilihJasa(j) {
+    setForm((f) => ({ ...f, jenisJasa: j.nama, biayaJasaTotal: j.harga || '' }))
+    setSaranJasaAktif(false)
   }
 
   function tambahKeKeranjang() {
@@ -347,14 +357,16 @@ export default function TransaksiPage() {
         )}
 
         <h3 style={{ fontSize: 15 }}>🔧 Jenis Jasa Service</h3>
-        <div className="field">
+        <div className="field" style={{ position: 'relative' }}>
           <label>Pilih Jasa</label>
-          <select value={form.jenisJasa} onChange={(e) => pilihJasa(e.target.value)}>
-            <option value="">— Pilih Jenis Jasa —</option>
-            {JASA_OPTIONS.map((j) => (
-              <option key={j.value} value={j.value}>{j.label}</option>
-            ))}
-          </select>
+          <input
+            placeholder="🔍 Cari Jenis Jasa..."
+            value={form.jenisJasa}
+            onChange={(e) => { setForm((f) => ({ ...f, jenisJasa: e.target.value })); setSaranJasaAktif(true) }}
+            onFocus={() => setSaranJasaAktif(true)}
+            onBlur={() => setTimeout(() => setSaranJasaAktif(false), 150)}
+          />
+          {saranJasaAktif && saranJasa.length > 0 && <SaranJasaBox saranJasa={saranJasa} onPilih={pilihJasa} />}
         </div>
         <div className="field">
           <label>👨‍🔧 Mekanik</label>
@@ -614,6 +626,23 @@ function SaranBarangBox({ saranBarang, onPilih }) {
         >
           <span>{b.nama} <small style={{ color: '#888' }}>({b.kode})</small></span>
           <small style={{ color: (b.stok || 0) <= 0 ? '#c00' : '#888', whiteSpace: 'nowrap' }}>Stok: {b.stok || 0}</small>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SaranJasaBox({ saranJasa, onPilih }) {
+  return (
+    <div style={{ position: 'absolute', zIndex: 5, background: 'white', border: '1px solid #ddd', borderRadius: 8, width: '100%', marginTop: 4, boxShadow: '0 4px 10px rgba(0,0,0,0.1)', maxHeight: 260, overflowY: 'auto' }}>
+      {saranJasa.map((j) => (
+        <div
+          key={j.id}
+          style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', gap: 8 }}
+          onMouseDown={() => onPilih(j)}
+        >
+          <span>🔧 {j.nama}</span>
+          <small style={{ color: '#888', whiteSpace: 'nowrap' }}>{formatRupiah(j.harga || 0)}</small>
         </div>
       ))}
     </div>
