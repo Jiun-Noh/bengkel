@@ -12,6 +12,7 @@ export function kolomStaffKeInternal(row) {
     gajiPokok: row.gaji_pokok || 0,
     uangMakan: row.uang_makan || 0,
     uangBensin: row.uang_bensin || 0,
+    uangLemburPerJam: row.uang_lembur_per_jam || 10000,
   }
 }
 

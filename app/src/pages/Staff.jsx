@@ -16,6 +16,7 @@ const FORM_KOSONG = {
   gajiPokok: '',
   uangMakan: '',
   uangBensin: '',
+  uangLemburPerJam: '10000',
 }
 
 export default function StaffPage() {
@@ -64,8 +65,17 @@ export default function StaffPage() {
       gajiPokok: s.gajiPokok || '',
       uangMakan: s.uangMakan || '',
       uangBensin: s.uangBensin || '',
+      uangLemburPerJam: s.uangLemburPerJam || 10000,
     })
     setMode('form')
+  }
+
+  function ubahJabatan(jabatan) {
+    setForm((f) => ({
+      ...f,
+      jabatan,
+      gajiPokok: jabatan === 'Freelance' && !f.gajiPokok ? '100000' : f.gajiPokok,
+    }))
   }
 
   function kembaliKeDaftar() {
@@ -92,6 +102,7 @@ export default function StaffPage() {
         gaji_pokok: parseInt(form.gajiPokok, 10) || 0,
         uang_makan: parseInt(form.uangMakan, 10) || 0,
         uang_bensin: parseInt(form.uangBensin, 10) || 0,
+        uang_lembur_per_jam: parseInt(form.uangLemburPerJam, 10) || 10000,
       })
       notify(editingKode ? '✅ Data staff berhasil diubah!' : `✅ Staff baru berhasil ditambahkan!\nKode: ${kodeTampil}`)
       resetForm()
@@ -138,7 +149,7 @@ export default function StaffPage() {
           </div>
           <div className="field">
             <label>Jabatan</label>
-            <select value={form.jabatan} onChange={(e) => setForm((f) => ({ ...f, jabatan: e.target.value }))}>
+            <select value={form.jabatan} onChange={(e) => ubahJabatan(e.target.value)}>
               {JABATAN_OPTIONS.map((j) => (
                 <option key={j.value} value={j.value}>
                   {j.label}
@@ -157,25 +168,29 @@ export default function StaffPage() {
             </select>
           </div>
 
-          <div className="field">
-            <label>📅 Tanggal Mulai Kerja</label>
-            <input
-              type="date"
-              value={form.tanggalMulai}
-              onChange={(e) => setForm((f) => ({ ...f, tanggalMulai: e.target.value }))}
-            />
-          </div>
-          <div className="field">
-            <label>🚪 Tanggal Keluar</label>
-            <input
-              type="date"
-              value={form.tanggalKeluar}
-              onChange={(e) => setForm((f) => ({ ...f, tanggalKeluar: e.target.value }))}
-            />
-          </div>
-          <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
-            ⓘ Dipakai untuk mengisi tanggal di surat pengalaman kerja / keterangan magang. Kosongkan Tanggal Keluar jika masih aktif bekerja.
-          </p>
+          {form.jabatan !== 'Freelance' && (
+            <>
+              <div className="field">
+                <label>📅 Tanggal Mulai Kerja</label>
+                <input
+                  type="date"
+                  value={form.tanggalMulai}
+                  onChange={(e) => setForm((f) => ({ ...f, tanggalMulai: e.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label>🚪 Tanggal Keluar</label>
+                <input
+                  type="date"
+                  value={form.tanggalKeluar}
+                  onChange={(e) => setForm((f) => ({ ...f, tanggalKeluar: e.target.value }))}
+                />
+              </div>
+              <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
+                ⓘ Dipakai untuk mengisi tanggal di surat pengalaman kerja / keterangan magang. Kosongkan Tanggal Keluar jika masih aktif bekerja.
+              </p>
+            </>
+          )}
 
           {form.jabatan === 'Magang' ? (
             <>
@@ -200,6 +215,20 @@ export default function StaffPage() {
                 />
               </div>
             </>
+          ) : form.jabatan === 'Freelance' ? (
+            <div className="field">
+              <label>💰 Gaji Harian (Rp)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.gajiPokok}
+                onChange={(e) => setForm((f) => ({ ...f, gajiPokok: e.target.value }))}
+                placeholder="100000"
+              />
+              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                ⓘ Freelance dibayar per hari hadir (gaji harian × jumlah hari hadir), bukan gaji bulanan tetap.
+              </p>
+            </div>
           ) : (
             <div className="field">
               <label>💰 Gaji Pokok / Bulan (Rp)</label>
@@ -215,6 +244,20 @@ export default function StaffPage() {
           <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
             ⓘ Dipakai untuk hitung slip gaji bulanan di Laporan (Mode Pemilik). Boleh dikosongkan/0 dulu, isi kapan saja.
           </p>
+
+          <div className="field">
+            <label>⏱️ Uang Lembur / Jam (Rp)</label>
+            <input
+              type="number"
+              min="0"
+              value={form.uangLemburPerJam}
+              onChange={(e) => setForm((f) => ({ ...f, uangLemburPerJam: e.target.value }))}
+              placeholder="10000"
+            />
+            <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+              ⓘ Tarif per jam saat lembur. Bawaannya Rp 10.000, bisa diubah per staf.
+            </p>
+          </div>
 
           <button className="btn btn-block" type="submit" disabled={saving}>
             {saving ? 'Menyimpan…' : '✅ Simpan Staff'}

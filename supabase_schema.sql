@@ -58,9 +58,10 @@ create table staff (
   aktif boolean default true,
   tanggal_mulai date,   -- tanggal mulai kerja, dipakai di surat pengalaman kerja/keterangan magang
   tanggal_keluar date,  -- tanggal keluar/selesai; kosong (null) berarti masih aktif bekerja
-  gaji_pokok integer default 0,   -- gaji pokok bulanan (Mekanik/Kasir/Freelance/Lainnya), dipakai di slip gaji
+  gaji_pokok integer default 0,   -- Mekanik/Kasir/Lainnya: gaji pokok bulanan. Freelance: gaji harian (dibayar per hari hadir)
   uang_makan integer default 0,   -- uang makan bulanan (khusus Magang)
-  uang_bensin integer default 0   -- uang bensin bulanan (khusus Magang)
+  uang_bensin integer default 0,  -- uang bensin bulanan (khusus Magang)
+  uang_lembur_per_jam integer default 10000   -- tarif lembur per jam, bisa beda tiap staf
 );
 
 create table pengaturan (

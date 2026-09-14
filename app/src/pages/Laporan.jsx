@@ -477,13 +477,24 @@ function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIn
     .filter((s) => s.aktif && s.jabatan !== 'Magang')
     .map((s) => {
       const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
-      const jasa = hitungJasaBulanIni(riwayat, bulanIni, s.nama)
+      // Kasir tidak melayani jasa servis, jadi jasa/bagi hasil tidak berlaku buat jabatan ini.
+      const jasa = s.jabatan === 'Kasir' ? { jumlah: 0, nilai: 0 } : hitungJasaBulanIni(riwayat, bulanIni, s.nama)
       const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
-      const gajiPerHari = (s.gajiPokok || 0) / 26
-      const bagiHasil = Math.round((jasa.nilai * persenMekanik) / 100)
-      const lemburNominal = Math.round((gajiPerHari / 8) * 1.5 * jamLembur)
-      const potongan = Math.round(gajiPerHari * rekap.tanpaKabar)
-      const total = (s.gajiPokok || 0) - potongan + bagiHasil + lemburNominal
+      const bagiHasil = s.jabatan === 'Kasir' ? 0 : Math.round((jasa.nilai * persenMekanik) / 100)
+      const lemburNominal = Math.round((s.uangLemburPerJam || 10000) * jamLembur)
+
+      let potongan
+      let total
+      if (s.jabatan === 'Freelance') {
+        // Freelance dibayar per hari hadir (harian penuh + setengah hari), bukan gaji bulanan tetap.
+        const totalHarian = Math.round((s.gajiPokok || 0) * rekap.hadir + (s.gajiPokok || 0) * 0.5 * rekap.setengah)
+        potongan = 0
+        total = totalHarian + bagiHasil + lemburNominal
+      } else {
+        const gajiPerHari = (s.gajiPokok || 0) / 26
+        potongan = Math.round(gajiPerHari * rekap.tanpaKabar)
+        total = (s.gajiPokok || 0) - potongan + bagiHasil + lemburNominal
+      }
       return { ...s, rekap, jasa, jamLembur, bagiHasil, lemburNominal, potongan, total }
     })
 }
@@ -495,7 +506,7 @@ function hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni) 
       const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
       const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
       const umPerHari = ((s.uangMakan || 0) + (s.uangBensin || 0)) / 26
-      const lemburNominal = Math.round((umPerHari / 8) * 1.5 * jamLembur)
+      const lemburNominal = Math.round((s.uangLemburPerJam || 10000) * jamLembur)
       const potongan = Math.round(umPerHari * rekap.tanpaKabar)
       const total = (s.uangMakan || 0) + (s.uangBensin || 0) - potongan + lemburNominal
       return { ...s, rekap, jamLembur, lemburNominal, potongan, total }
@@ -504,6 +515,11 @@ function hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni) 
 
 function InputLembur({ nilaiAwal, onSimpan }) {
   const [nilai, setNilai] = useState(nilaiAwal)
+
+  useEffect(() => {
+    setNilai(nilaiAwal)
+  }, [nilaiAwal])
+
   return (
     <input
       type="number"
@@ -511,7 +527,7 @@ function InputLembur({ nilaiAwal, onSimpan }) {
       value={nilai}
       onChange={(e) => setNilai(e.target.value)}
       onBlur={() => onSimpan(parseFloat(nilai) || 0)}
-      style={{ width: 60, padding: 4, minHeight: 'auto' }}
+      style={{ width: 60, padding: 4, minHeight: 'auto', textAlign: 'right' }}
     />
   )
 }
@@ -528,18 +544,29 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahP
   }
 
   function cetak(s) {
+    const rincian =
+      s.jabatan === 'Freelance'
+        ? [
+            { label: `Gaji Harian × ${s.rekap.hadir} hari penuh`, nilai: Math.round((s.gajiPokok || 0) * s.rekap.hadir) },
+            ...(s.rekap.setengah > 0
+              ? [{ label: `Gaji Harian × ${s.rekap.setengah} setengah hari`, nilai: Math.round((s.gajiPokok || 0) * 0.5 * s.rekap.setengah) }]
+              : []),
+            { label: `Bagi Hasil Jasa (${persenMekanik}%)`, nilai: s.bagiHasil },
+            { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
+          ]
+        : [
+            { label: 'Gaji Pokok', nilai: s.gajiPokok || 0 },
+            { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
+            { label: `Bagi Hasil Jasa (${persenMekanik}%)`, nilai: s.bagiHasil },
+            { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
+          ]
     cetakSlipGaji({
       judul: 'SLIP GAJI & BAGI HASIL',
       nama: s.nama,
       jabatan: s.jabatan,
       labelPeriode: labelBulanIni,
       rekap: s.rekap,
-      rincian: [
-        { label: 'Gaji Pokok', nilai: s.gajiPokok || 0 },
-        { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
-        { label: `Bagi Hasil Jasa (${persenMekanik}%)`, nilai: s.bagiHasil },
-        { label: `Uang Lembur (${s.jamLembur} jam)`, nilai: s.lemburNominal },
-      ],
+      rincian,
       total: s.total,
     })
   }
@@ -595,7 +622,7 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahP
                 <td>{s.jabatan}</td>
                 <td className="angka">{formatRupiah(s.gajiPokok || 0)}</td>
                 <td className="tengah">
-                  {s.jasa.jumlah}× ({formatRupiah(s.jasa.nilai)})
+                  {s.jabatan === 'Kasir' ? '−' : `${s.jasa.jumlah}× (${formatRupiah(s.jasa.nilai)})`}
                 </td>
                 <td className="angka">{formatRupiah(s.bagiHasil)}</td>
                 <td className="tengah">
@@ -612,7 +639,9 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahP
         </table>
       </div>
       <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-        ⓘ "Jasa Dilayani" dihitung otomatis dari Transaksi bulan ini yang mekaniknya persis nama staf ini. Transaksi dengan mekanik "Semua Mekanik" belum ikut terhitung ke siapa pun.
+        ⓘ "Jasa Dilayani" dihitung otomatis dari Transaksi bulan ini yang mekaniknya persis nama staf ini (tidak berlaku untuk Kasir). Transaksi dengan mekanik "Semua Mekanik" belum ikut terhitung ke siapa pun.
+        <br />
+        ⓘ Freelance: kolom "Gaji Pokok" adalah gaji harian, Total dihitung dari jumlah hari hadir × gaji harian (bukan gaji bulanan tetap).
       </p>
     </div>
   )
@@ -640,7 +669,7 @@ function TabelUangSakuMagang({ daftar, bulanIni, labelBulanIni, simpanLembur }) 
         { label: 'Uang Makan', nilai: s.uangMakan || 0 },
         { label: 'Uang Bensin', nilai: s.uangBensin || 0 },
         { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
-        { label: `Uang Lembur (${s.jamLembur} jam)`, nilai: s.lemburNominal },
+        { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
       ],
       total: s.total,
     })
