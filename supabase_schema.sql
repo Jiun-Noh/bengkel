@@ -13,7 +13,9 @@ create table barang (
   restock integer default 0,
   terjual integer default 0,
   tanggal_stok_awal text,
-  riwayat_restock jsonb default '[]'
+  riwayat_restock jsonb default '[]',
+  diubah_oleh uuid references auth.users(id),  -- jejak ringan: siapa terakhir insert/update baris ini
+  diubah_pada timestamptz
 );
 
 create table riwayat (
@@ -61,7 +63,9 @@ create table staff (
   gaji_pokok integer default 0,   -- Mekanik/Kasir/Lainnya: gaji pokok bulanan. Freelance: gaji harian (dibayar per hari hadir)
   uang_makan integer default 0,   -- uang makan bulanan (khusus Magang)
   uang_bensin integer default 0,  -- uang bensin bulanan (khusus Magang)
-  uang_lembur_per_jam integer default 10000   -- tarif lembur per jam, bisa beda tiap staf
+  uang_lembur_per_jam integer default 10000,  -- tarif lembur per jam, bisa beda tiap staf
+  diubah_oleh uuid references auth.users(id),  -- jejak ringan: siapa terakhir insert/update baris ini
+  diubah_pada timestamptz
 );
 
 create table pengaturan (
@@ -191,6 +195,21 @@ end;
 $$;
 create trigger jaga_harga_barang before update on barang
 for each row execute function cegah_ubah_harga_barang();
+
+-- Jejak ringan: catat siapa & kapan terakhir insert/update baris (bukan histori nilai lama,
+-- cuma "siapa terakhir pegang ini" — buat barang & staff, yang paling sensitif).
+create or replace function catat_perubahan() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  new.diubah_oleh := auth.uid();
+  new.diubah_pada := now();
+  return new;
+end;
+$$;
+create trigger catat_perubahan_barang before insert or update on barang
+for each row execute function catat_perubahan();
+create trigger catat_perubahan_staff before insert or update on staff
+for each row execute function catat_perubahan();
 
 insert into jasa (nama, harga) values
   ('Service CVT 110-150cc', 80000),
