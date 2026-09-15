@@ -6,7 +6,6 @@ function kolomPengaturanKeInternal(row) {
     persenMekanik: row?.persen_mekanik ?? 8,
     persenPemilik: row?.persen_pemilik ?? 60,
     persenCadangan: row?.persen_cadangan ?? 15,
-    kataSandiLaporan: row?.kata_sandi_laporan || '1234',
   }
 }
 
@@ -35,11 +34,5 @@ export function usePengaturanMutations() {
     await invalidate()
   }
 
-  async function gantiSandiLaporan(baru) {
-    const { error } = await db.from('pengaturan').update({ kata_sandi_laporan: baru }).eq('id', 1)
-    if (error) throw error
-    await invalidate()
-  }
-
-  return { simpanPengaturan, gantiSandiLaporan }
+  return { simpanPengaturan }
 }

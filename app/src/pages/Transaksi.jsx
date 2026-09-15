@@ -7,6 +7,7 @@ import { useUI } from '../contexts/UIContext'
 import { formatRupiah, kapitalNama, kapitalKode, waktuSekarang } from '../lib/format'
 import { cetakNota } from '../lib/cetakNota'
 import Modal from '../components/common/Modal'
+import AksiPemilik from '../components/common/AksiPemilik'
 
 const FORM_KOSONG = {
   namaPelanggan: '',
@@ -520,7 +521,7 @@ export default function TransaksiPage() {
                     <td className="tengah"><button className="btn btn-blue btn-sm" onClick={() => setDetailIdx(i)}>📋</button></td>
                     <td className="tengah"><button className="btn btn-orange btn-sm" onClick={() => setEditIdx(i)}>✏️</button></td>
                     <td className="tengah"><button className="btn btn-blue btn-sm" onClick={() => cetakNota(r)}>🖨️</button></td>
-                    <td className="tengah"><button className="btn btn-red btn-sm" onClick={() => hapus(r)}>🗑️</button></td>
+                    <td className="tengah"><AksiPemilik><button className="btn btn-red btn-sm" onClick={() => hapus(r)}>🗑️</button></AksiPemilik></td>
                   </tr>
                 )
               })}

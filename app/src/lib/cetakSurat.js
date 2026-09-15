@@ -9,8 +9,28 @@ function formatTanggalIndo(iso) {
   return `${String(d).padStart(2, '0')} ${NAMA_BULAN[m - 1]} ${y}`
 }
 
+// Kehadiran seumur masa kerja (bukan cuma bulan berjalan). Izin (absen dengan keterangan resmi) dikeluarkan
+// dari perhitungan sama sekali — bukan mangkir, jadi tidak dinilai baik/buruk.
+function hitungEvaluasiKehadiran(staff, daftarAbsensi) {
+  const data = daftarAbsensi.filter((a) => a.nama === staff.nama)
+  const hadir = data.filter((a) => a.status === 'Hadir').length
+  const setengah = data.filter((a) => a.status === 'Setengah Hari').length
+  const tanpaKabar = data.filter((a) => a.status === 'Tanpa Keterangan').length
+  const totalDinilai = hadir + setengah + tanpaKabar
+  if (totalDinilai === 0) return null
+
+  const persen = ((hadir + setengah * 0.5) / totalDinilai) * 100
+  let label
+  if (persen >= 95) label = 'sangat baik'
+  else if (persen >= 85) label = 'baik'
+  else if (persen >= 70) label = 'cukup baik'
+  else label = 'cukup, dengan catatan kedisiplinan kehadiran yang masih perlu ditingkatkan'
+
+  return { persen: Math.round(persen), label }
+}
+
 // Magang → surat keterangan magang selesai. Jabatan lain (Mekanik/Kasir/Freelance/Lainnya) → surat pengalaman kerja.
-export function cetakSuratStaff(staff) {
+export function cetakSuratStaff(staff, daftarAbsensi = []) {
   if (!staff) return
 
   const mulai = formatTanggalIndo(staff.tanggalMulai) || '—'
@@ -33,6 +53,11 @@ export function cetakSuratStaff(staff) {
   const isiUtama = isMagang
     ? `Yang bersangkutan telah menyelesaikan program magang di <strong>${SHOP.nama}</strong> dengan baik.`
     : `Yang bersangkutan benar telah bekerja di <strong>${SHOP.nama}</strong> pada posisi tersebut di atas dengan baik dan penuh tanggung jawab.`
+
+  const evaluasi = hitungEvaluasiKehadiran(staff, daftarAbsensi)
+  const isiKehadiran = evaluasi
+    ? `Selama masa ${isMagang ? 'magang' : 'kerja'}, yang bersangkutan menunjukkan tingkat kehadiran yang <strong>${evaluasi.label}</strong> (${evaluasi.persen}%).`
+    : ''
 
   const baseInfo = SHOP.alamat || SHOP.telepon
     ? `<p style="margin:2px 0; font-size:12px;">${[SHOP.alamat, SHOP.telepon && `Telp: ${SHOP.telepon}`].filter(Boolean).join(' &nbsp;•&nbsp; ')}</p>`
@@ -63,6 +88,7 @@ export function cetakSuratStaff(staff) {
       ${baris.map(([label, nilai]) => `<tr><td class="label">${label}</td><td>: ${nilai}</td></tr>`).join('')}
     </table>
     <p class="isi">${isiUtama}</p>
+    ${isiKehadiran ? `<p class="isi">${isiKehadiran}</p>` : ''}
     <p>Demikian surat keterangan ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.</p>
     <div class="ttd">
       <div class="tanggal">${tanggalCetak}</div>

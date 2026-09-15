@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useAuth } from './contexts/AuthContext'
-import { OwnerModeProvider, useOwnerMode } from './contexts/OwnerModeContext'
 import { useUI } from './contexts/UIContext'
 import { useRealtimeSync } from './hooks/useRealtimeSync'
 import Login from './components/Login'
-import Modal from './components/common/Modal'
+import ResetPassword from './components/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import StaffPage from './pages/Staff'
 import AbsensiPage from './pages/Absensi'
@@ -22,12 +21,16 @@ const TABS = [
 ]
 
 export default function App() {
-  const { session } = useAuth()
+  const { session, profil, recoveryMode } = useAuth()
   const [tab, setTab] = useState('home')
 
   useRealtimeSync(!!session)
 
-  if (session === undefined) {
+  if (recoveryMode) {
+    return <ResetPassword />
+  }
+
+  if (session === undefined || (session && profil === undefined)) {
     return <div style={{ padding: 24, textAlign: 'center', color: '#888' }}>Memuat…</div>
   }
 
@@ -36,68 +39,51 @@ export default function App() {
   }
 
   return (
-    <OwnerModeProvider>
-      <div>
-        <AppHeader />
+    <div>
+      <AppHeader />
 
-        <main className="app-main">
-          {tab === 'home' && <Dashboard onNavigate={setTab} />}
-          {tab === 'staff' && <StaffPage />}
-          {tab === 'absensi' && <AbsensiPage />}
-          {tab === 'stok' && <StokPage />}
-          {tab === 'transaksi' && <TransaksiPage />}
-          {tab === 'laporan' && <LaporanPage />}
-        </main>
+      <main className="app-main">
+        {tab === 'home' && <Dashboard onNavigate={setTab} />}
+        {tab === 'staff' && <StaffPage />}
+        {tab === 'absensi' && <AbsensiPage />}
+        {tab === 'stok' && <StokPage />}
+        {tab === 'transaksi' && <TransaksiPage />}
+        {tab === 'laporan' && <LaporanPage />}
+      </main>
 
-        <nav className="bottom-nav">
-          {TABS.map((t) => (
-            <button key={t.key} className={tab === t.key ? 'active' : ''} onClick={() => setTab(t.key)}>
-              <span className="ic">{t.icon}</span>
-              <span>{t.label}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
-    </OwnerModeProvider>
+      <nav className="bottom-nav">
+        {TABS.map((t) => (
+          <button key={t.key} className={tab === t.key ? 'active' : ''} onClick={() => setTab(t.key)}>
+            <span className="ic">{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
   )
 }
 
 function AppHeader() {
-  const { unlocked, unlock, lock } = useOwnerMode()
+  const { profil, logout } = useAuth()
   const { notify } = useUI()
-  const [modalOpen, setModalOpen] = useState(false)
-  const [sandi, setSandi] = useState('')
 
-  function submit(e) {
-    e.preventDefault()
-    if (unlock(sandi)) {
-      notify('🔓 Mode Pemilik aktif')
-      setSandi('')
-      setModalOpen(false)
-    } else {
-      notify('❌ Kata sandi salah!', 'error')
-      setSandi('')
-    }
-  }
-
-  function toggle() {
-    if (unlocked) {
-      lock()
-      notify('🔒 Mode Pemilik dimatikan')
-    } else {
-      setModalOpen(true)
-    }
+  async function handleLogout() {
+    await logout()
+    notify('👋 Berhasil keluar')
   }
 
   return (
-    <>
-      <header className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>📦 BENGKEL MANAGER</span>
+    <header className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span>📦 BENGKEL MANAGER</span>
+      <div className="row" style={{ flexWrap: 'nowrap', gap: 8, alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: 'white', opacity: 0.9 }}>
+          {profil?.peran === 'pemilik' ? '🔓' : '🔒'} {profil?.nama || '—'}
+        </span>
         <button
-          onClick={toggle}
-          title={unlocked ? 'Mode Pemilik aktif — klik untuk kunci' : 'Klik untuk buka Mode Pemilik'}
+          onClick={handleLogout}
+          title="Keluar"
           style={{
-            background: unlocked ? 'rgba(39,174,96,0.25)' : 'rgba(255,255,255,0.15)',
+            background: 'rgba(255,255,255,0.15)',
             border: 'none',
             borderRadius: 8,
             color: 'white',
@@ -107,29 +93,9 @@ function AppHeader() {
             minHeight: 'auto',
           }}
         >
-          {unlocked ? '🔓 Pemilik' : '🔒 Karyawan'}
+          Keluar
         </button>
-      </header>
-
-      {modalOpen && (
-        <Modal title="🔓 Buka Mode Pemilik" onClose={() => setModalOpen(false)} maxWidth={340}>
-          <form onSubmit={submit}>
-            <div className="field">
-              <label>Kata Sandi Pemilik</label>
-              <input
-                type="password"
-                value={sandi}
-                onChange={(e) => setSandi(e.target.value)}
-                placeholder="Sama dengan kata sandi Laporan"
-                autoFocus
-              />
-            </div>
-            <button className="btn btn-block" type="submit">
-              Buka
-            </button>
-          </form>
-        </Modal>
-      )}
-    </>
+      </div>
+    </header>
   )
 }

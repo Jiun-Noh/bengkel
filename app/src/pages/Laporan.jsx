@@ -8,11 +8,10 @@ import { useAbsensiQuery } from '../hooks/useAbsensi'
 import { useLemburQuery, useLemburMutations } from '../hooks/useLembur'
 import { useInvestorQuery, useInvestorMutations } from '../hooks/useInvestor'
 import { useUI } from '../contexts/UIContext'
-import { useOwnerMode } from '../contexts/OwnerModeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatRupiah, waktuSekarang } from '../lib/format'
 import { cetakSlipGaji } from '../lib/cetakSlipGaji'
 import { cetakSlipInvestor } from '../lib/cetakSlipInvestor'
-import Modal from '../components/common/Modal'
 
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 
@@ -24,81 +23,24 @@ function ambilTanggalDariTeks(tgl) {
 }
 
 export default function LaporanPage() {
-  const { data: pengaturan, isLoading: loadingPengaturan } = usePengaturanQuery(true)
+  const { data: pengaturan } = usePengaturanQuery(true)
   const { data: riwayat = [] } = useRiwayatQuery(true)
-  const { simpanPengaturan, gantiSandiLaporan } = usePengaturanMutations()
-  const { notify } = useUI()
-  const { unlocked, unlock } = useOwnerMode()
+  const { simpanPengaturan } = usePengaturanMutations()
+  const { profil } = useAuth()
 
-  const [sandiInput, setSandiInput] = useState('')
-  const [gantiSandiOpen, setGantiSandiOpen] = useState(false)
-
-  function coba(e) {
-    e.preventDefault()
-    if (unlock(sandiInput)) {
-      setSandiInput('')
-    } else {
-      notify('❌ Kata sandi laporan salah!', 'error')
-      setSandiInput('')
-    }
-  }
-
-  if (!unlocked) {
+  if (profil?.peran !== 'pemilik') {
     return (
       <div>
         <h1>💰 Laporan &amp; Pembagian Hasil (Pemilik)</h1>
-        <form className="card" style={{ background: '#fff3cd', textAlign: 'center' }} onSubmit={coba}>
+        <div className="card" style={{ background: '#fff3cd', textAlign: 'center' }}>
           <h3>🔒 Bagian Khusus Pemilik</h3>
-          <p>Masukkan kata sandi untuk melihat laporan &amp; pengaturan pembagian</p>
-          <input
-            type="password"
-            placeholder="Kata Sandi"
-            value={sandiInput}
-            onChange={(e) => setSandiInput(e.target.value)}
-            style={{ maxWidth: 240, margin: '0 auto 10px' }}
-          />
-          <button className="btn" type="submit" disabled={loadingPengaturan}>🔓 Buka Akses</button>
-          <br />
-          <button className="btn btn-orange btn-sm" type="button" onClick={() => setGantiSandiOpen(true)} style={{ marginTop: 10 }}>
-            🔧 Ganti Kata Sandi Laporan
-          </button>
-        </form>
-        {gantiSandiOpen && (
-          <GantiSandiModal
-            sandiSekarang={pengaturan?.kataSandiLaporan || '1234'}
-            onClose={() => setGantiSandiOpen(false)}
-            onSimpan={async (baru) => {
-              try {
-                await gantiSandiLaporan(baru)
-                notify('✅ Kata sandi laporan berhasil diganti!')
-                setGantiSandiOpen(false)
-              } catch (err) {
-                notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
-              }
-            }}
-          />
-        )}
+          <p>Halaman ini cuma bisa diakses oleh akun pemilik.</p>
+        </div>
       </div>
     )
   }
 
-  return <LaporanIsi pengaturan={pengaturan} riwayat={riwayat} simpanPengaturan={simpanPengaturan} onGantiSandi={() => setGantiSandiOpen(true)} gantiSandiModal={
-    gantiSandiOpen && (
-      <GantiSandiModal
-        sandiSekarang={pengaturan?.kataSandiLaporan || '1234'}
-        onClose={() => setGantiSandiOpen(false)}
-        onSimpan={async (baru) => {
-          try {
-            await gantiSandiLaporan(baru)
-            notify('✅ Kata sandi laporan berhasil diganti!')
-            setGantiSandiOpen(false)
-          } catch (err) {
-            notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
-          }
-        }}
-      />
-    )
-  } />
+  return <LaporanIsi pengaturan={pengaturan} riwayat={riwayat} simpanPengaturan={simpanPengaturan} />
 }
 
 function bulanIniISO() {
@@ -108,7 +50,7 @@ function bulanIniISO() {
 
 const KATEGORI_PENGELUARAN = ['Operasional', 'Maintenance']
 
-function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, gantiSandiModal }) {
+function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const { notify, confirm } = useUI()
   const { data: pengeluaran = [] } = usePengeluaranQuery(true)
   const { tambahPengeluaran, hapusPengeluaran } = usePengeluaranMutations()
@@ -441,11 +383,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onGantiSandi, ganti
           ubahInvestor={ubahInvestor}
           hapusInvestor={hapusInvestor}
         />
-
-        <button className="btn btn-outline btn-sm" onClick={onGantiSandi}>🔧 Ganti Kata Sandi Laporan</button>
       </div>
-
-      {gantiSandiModal}
     </div>
   )
 }
@@ -964,31 +902,6 @@ function RingkasCard({ label, value, bg, fg }) {
   )
 }
 
-function GantiSandiModal({ sandiSekarang, onClose, onSimpan }) {
-  const [lama, setLama] = useState('')
-  const [baru, setBaru] = useState('')
-  const [ulang, setUlang] = useState('')
-  const { notify } = useUI()
-
-  function submit(e) {
-    e.preventDefault()
-    if (lama !== sandiSekarang) { notify('❌ Sandi lama salah!', 'error'); return }
-    if (!baru || baru.length < 4) { notify('⚠️ Sandi terlalu pendek! (minimal 4 karakter)', 'error'); return }
-    if (baru !== ulang) { notify('❌ Sandi baru tidak cocok!', 'error'); return }
-    onSimpan(baru)
-  }
-
-  return (
-    <Modal title="🔧 Ganti Kata Sandi Laporan" onClose={onClose} maxWidth={360}>
-      <form onSubmit={submit}>
-        <div className="field"><label>Kata Sandi Lama</label><input type="password" value={lama} onChange={(e) => setLama(e.target.value)} /></div>
-        <div className="field"><label>Kata Sandi Baru</label><input type="password" value={baru} onChange={(e) => setBaru(e.target.value)} /></div>
-        <div className="field"><label>Ulangi Kata Sandi Baru</label><input type="password" value={ulang} onChange={(e) => setUlang(e.target.value)} /></div>
-        <button className="btn btn-block" type="submit">💾 Simpan</button>
-      </form>
-    </Modal>
-  )
-}
 
 function ambilDataRingkasan(riwayat, jenis) {
   const data = {}

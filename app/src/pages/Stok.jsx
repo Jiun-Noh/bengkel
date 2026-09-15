@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useBarangQuery, useBarangMutations } from '../hooks/useBarang'
 import { useJasaQuery, useJasaMutations } from '../hooks/useJasa'
 import { useUI } from '../contexts/UIContext'
-import { useOwnerMode } from '../contexts/OwnerModeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatRupiah, kapitalKode, kapitalNama, waktuSekarang } from '../lib/format'
 import Modal from '../components/common/Modal'
 import Fab from '../components/common/Fab'
@@ -43,7 +43,8 @@ function BarangSection() {
   const { data: barang = [], isLoading } = useBarangQuery(true)
   const { simpanBarang, hapusBarang } = useBarangMutations()
   const { notify, confirm } = useUI()
-  const { unlocked } = useOwnerMode()
+  const { profil } = useAuth()
+  const unlocked = profil?.peran === 'pemilik'
 
   const [mode, setMode] = useState('list') // 'list' | 'form'
   const [form, setForm] = useState(FORM_KOSONG)
@@ -472,7 +473,8 @@ function JasaSection() {
   const { data: jasaList = [], isLoading } = useJasaQuery(true)
   const { tambahJasa, ubahJasa, hapusJasa } = useJasaMutations()
   const { notify, confirm } = useUI()
-  const { unlocked } = useOwnerMode()
+  const { profil } = useAuth()
+  const unlocked = profil?.peran === 'pemilik'
 
   const [mode, setMode] = useState('list') // 'list' | 'form'
   const [form, setForm] = useState(FORM_JASA_KOSONG)

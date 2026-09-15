@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStaffQuery, useStaffMutations, generateKodeStaffBaru } from '../hooks/useStaff'
+import { useAbsensiQuery } from '../hooks/useAbsensi'
 import { useUI } from '../contexts/UIContext'
+import { useAuth } from '../contexts/AuthContext'
 import { kapitalNama } from '../lib/format'
 import { JABATAN_OPTIONS } from '../lib/jabatanOptions'
 import { cetakSuratStaff } from '../lib/cetakSurat'
@@ -21,8 +23,10 @@ const FORM_KOSONG = {
 
 export default function StaffPage() {
   const { data: staffList = [], isLoading } = useStaffQuery(true)
+  const { data: daftarAbsensi = [] } = useAbsensiQuery(true)
   const { simpanStaff, hapusStaff } = useStaffMutations()
   const { notify, confirm } = useUI()
+  const { profil } = useAuth()
 
   const [mode, setMode] = useState('list') // 'list' | 'form'
   const [editingKode, setEditingKode] = useState(null)
@@ -308,7 +312,7 @@ export default function StaffPage() {
                       <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
                         <button
                           className="btn btn-blue btn-sm"
-                          onClick={() => cetakSuratStaff(s)}
+                          onClick={() => cetakSuratStaff(s, daftarAbsensi)}
                           title={s.jabatan === 'Magang' ? 'Cetak Surat Keterangan Magang' : 'Cetak Surat Pengalaman Kerja'}
                         >
                           🖨️
@@ -334,7 +338,7 @@ export default function StaffPage() {
         </div>
       </div>
 
-      <Fab onClick={bukaTambah} title="Tambah Staff" />
+      {profil?.peran === 'pemilik' && <Fab onClick={bukaTambah} title="Tambah Staff" />}
     </div>
   )
 }

@@ -72,7 +72,7 @@ create table pengaturan (
   persen_investor integer default 15,   -- legacy, tidak dipakai lagi sejak tabel `investor` per-investor punya % sendiri
   persen_pemilik integer default 60,    -- bagian pemilik dari Laba Bersih (kartu Pembagian Laba Bersih)
   persen_cadangan integer default 15,   -- dana cadangan/lainnya dari Laba Bersih
-  kata_sandi_laporan text default '1234',
+  kata_sandi_laporan text default '1234',  -- legacy, tidak dipakai lagi sejak akses Laporan ditentukan oleh profil.peran
   check (id = 1)
 );
 insert into pengaturan (id) values (1);
@@ -109,6 +109,16 @@ create table jasa (
   dibuat_pada timestamptz default now()
 );
 
+-- profil: akun login (auth.users) → nama tampil + peran (pemilik/karyawan).
+-- Terpisah dari `staff` (data HR) supaya login & kepegawaian gak saling ganggu.
+create table profil (
+  id uuid primary key references auth.users(id) on delete cascade,
+  nama text not null,
+  peran text not null default 'karyawan' check (peran in ('pemilik', 'karyawan')),
+  staff_kode text references staff(kode),
+  dibuat_pada timestamptz default now()
+);
+
 alter table barang enable row level security;
 alter table riwayat enable row level security;
 alter table absensi enable row level security;
@@ -118,25 +128,69 @@ alter table pengeluaran enable row level security;
 alter table lembur enable row level security;
 alter table investor enable row level security;
 alter table jasa enable row level security;
+alter table profil enable row level security;
 
-create policy "auth full access" on barang for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on riwayat for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on absensi for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on staff for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on pengaturan for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on pengeluaran for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on lembur for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on investor for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "auth full access" on jasa for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+-- Helper: cek apakah user yang login sekarang berperan 'pemilik'.
+-- security definer supaya select ke `profil` di sini gak kena RLS profil sendiri (hindari rekursi).
+create or replace function is_pemilik() returns boolean
+language sql security definer stable set search_path = public as $$
+  select exists (select 1 from profil where id = auth.uid() and peran = 'pemilik');
+$$;
+
+create policy "lihat profil sendiri" on profil for select using (auth.uid() = id);
+create policy "pemilik kelola profil" on profil for all
+  using (is_pemilik()) with check (is_pemilik());
+
+-- barang: semua login bisa lihat & restock (update), tapi cuma pemilik yang bisa
+-- bikin barang baru / hapus. Ubah harga_pokok/harga_jual dijaga terpisah lewat trigger di bawah.
+create policy "barang select" on barang for select using (auth.role() = 'authenticated');
+create policy "barang insert" on barang for insert with check (is_pemilik());
+create policy "barang update" on barang for update using (auth.role() = 'authenticated');
+create policy "barang delete" on barang for delete using (is_pemilik());
+
+-- jasa: semua login bisa lihat (buat dipilih di Transaksi), kelola katalog cuma pemilik.
+create policy "jasa select" on jasa for select using (auth.role() = 'authenticated');
+create policy "jasa insert" on jasa for insert with check (is_pemilik());
+create policy "jasa update" on jasa for update using (is_pemilik());
+create policy "jasa delete" on jasa for delete using (is_pemilik());
+
+-- staff: semua login bisa lihat daftar (buat dropdown dsb), kelola data staf cuma pemilik.
+create policy "staff select" on staff for select using (auth.role() = 'authenticated');
+create policy "staff insert" on staff for insert with check (is_pemilik());
+create policy "staff update" on staff for update using (is_pemilik());
+create policy "staff delete" on staff for delete using (is_pemilik());
+
+-- absensi: semua login bisa lihat/isi/ubah presensi, hapus permanen cuma pemilik.
+create policy "absensi select" on absensi for select using (auth.role() = 'authenticated');
+create policy "absensi insert" on absensi for insert with check (auth.role() = 'authenticated');
+create policy "absensi update" on absensi for update using (auth.role() = 'authenticated');
+create policy "absensi delete" on absensi for delete using (is_pemilik());
+
+-- riwayat: semua login bisa lihat/buat transaksi & ubah (mis. catat pelunasan), hapus cuma pemilik.
+create policy "riwayat select" on riwayat for select using (auth.role() = 'authenticated');
+create policy "riwayat insert" on riwayat for insert with check (auth.role() = 'authenticated');
+create policy "riwayat update" on riwayat for update using (auth.role() = 'authenticated');
+create policy "riwayat delete" on riwayat for delete using (is_pemilik());
+
+-- pengaturan/investor/lembur/pengeluaran: layar Laporan seluruhnya khusus pemilik.
+create policy "pengaturan pemilik" on pengaturan for all using (is_pemilik()) with check (is_pemilik());
+create policy "investor pemilik" on investor for all using (is_pemilik()) with check (is_pemilik());
+create policy "lembur pemilik" on lembur for all using (is_pemilik()) with check (is_pemilik());
+create policy "pengeluaran pemilik" on pengeluaran for all using (is_pemilik()) with check (is_pemilik());
+
+-- Trigger: cegah karyawan mengubah harga_pokok/harga_jual barang lewat jalur UPDATE mana pun
+-- (mis. langsung lewat API, bukan lewat form Restock di app). Restock sungguhan cuma ubah stok.
+create or replace function cegah_ubah_harga_barang() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if not is_pemilik() and (new.harga_pokok is distinct from old.harga_pokok or new.harga_jual is distinct from old.harga_jual) then
+    raise exception 'Hanya pemilik yang boleh mengubah harga barang';
+  end if;
+  return new;
+end;
+$$;
+create trigger jaga_harga_barang before update on barang
+for each row execute function cegah_ubah_harga_barang();
 
 insert into jasa (nama, harga) values
   ('Service CVT 110-150cc', 80000),
