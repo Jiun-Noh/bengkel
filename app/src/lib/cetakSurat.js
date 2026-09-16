@@ -68,6 +68,7 @@ export function cetakSuratStaff(staff, daftarAbsensi = []) {
     body { font-family: 'Times New Roman', Times, serif; font-size: 14px; line-height: 1.7; color: #111; }
     .kop { text-align: center; border-bottom: 3px double #111; padding-bottom: 10px; margin-bottom: 24px; }
     .kop h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+    .kop img { max-width: 220px; max-height: 90px; object-fit: contain; }
     .judul { text-align: center; margin-bottom: 4px; }
     .judul h2 { margin: 0 0 4px; font-size: 16px; text-decoration: underline; }
     table.data { margin: 20px 0; border-collapse: collapse; }
@@ -79,7 +80,7 @@ export function cetakSuratStaff(staff, daftarAbsensi = []) {
     .ttd .nama { text-decoration: underline; font-weight: bold; }
   </style></head><body>
     <div class="kop">
-      <h1>${SHOP.nama}</h1>
+      <img src="${SHOP.logo}" alt="${SHOP.nama}" />
       ${baseInfo}
     </div>
     <div class="judul"><h2>${judul}</h2></div>

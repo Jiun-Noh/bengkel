@@ -15,6 +15,7 @@ export function cetakSlipInvestor({ nama, persen, labaBersih, nominal, labelPeri
     body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #111; }
     .kop { text-align: center; border-bottom: 3px double #111; padding-bottom: 10px; margin-bottom: 20px; }
     .kop h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
+    .kop img { max-width: 220px; max-height: 90px; object-fit: contain; }
     .judul { text-align: center; margin-bottom: 16px; }
     .judul h2 { margin: 0; font-size: 16px; text-decoration: underline; }
     table.data { margin: 14px 0; border-collapse: collapse; }
@@ -30,7 +31,7 @@ export function cetakSlipInvestor({ nama, persen, labaBersih, nominal, labelPeri
     .ttd .nama-ttd { padding-top: 6px; font-size: 13px; }
   </style></head><body>
     <div class="kop">
-      <h1>${SHOP.nama}</h1>
+      <img src="${SHOP.logo}" alt="${SHOP.nama}" />
       ${baseInfo}
     </div>
     <div class="judul"><h2>📄 BUKTI PEMBAGIAN LABA BERSIH INVESTOR</h2></div>
