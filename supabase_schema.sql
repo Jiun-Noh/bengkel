@@ -64,6 +64,7 @@ create table staff (
   uang_makan integer default 0,   -- uang makan bulanan (khusus Magang)
   uang_bensin integer default 0,  -- uang bensin bulanan (khusus Magang)
   uang_lembur_per_jam integer default 10000,  -- tarif lembur per jam, bisa beda tiap staf
+  persen_bagi_hasil integer default 8,  -- % komisi dari jasa yang dilayani, bisa beda tiap staf (Mekanik/Freelance/Lainnya; tidak dipakai Kasir/Magang)
   diubah_oleh uuid references auth.users(id),  -- jejak ringan: siapa terakhir insert/update baris ini
   diubah_pada timestamptz
 );
@@ -72,7 +73,7 @@ create table pengaturan (
   id int primary key default 1,
   operasional integer default 0,   -- legacy, tidak dipakai lagi sejak tabel `pengeluaran` ada (lihat di bawah)
   maintenance integer default 0,   -- legacy, tidak dipakai lagi sejak tabel `pengeluaran` ada
-  persen_mekanik integer default 8,
+  persen_mekanik integer default 8,   -- legacy, tidak dipakai lagi sejak staff.persen_bagi_hasil per-staf ada
   persen_investor integer default 15,   -- legacy, tidak dipakai lagi sejak tabel `investor` per-investor punya % sendiri
   persen_pemilik integer default 60,    -- bagian pemilik dari Laba Bersih (kartu Pembagian Laba Bersih)
   persen_cadangan integer default 15,   -- dana cadangan/lainnya dari Laba Bersih

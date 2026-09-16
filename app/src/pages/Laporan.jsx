@@ -65,7 +65,6 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const [sampai, setSampai] = useState('')
   const [jenisGrafik, setJenisGrafik] = useState('bulanan')
   const [pengSetting, setPengSetting] = useState({
-    persenMekanik: pengaturan?.persenMekanik ?? 8,
     persenPemilik: pengaturan?.persenPemilik ?? 60,
     persenCadangan: pengaturan?.persenCadangan ?? 15,
   })
@@ -111,8 +110,8 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   )
 
   const daftarGajiStaf = useMemo(
-    () => hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.persenMekanik),
-    [staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.persenMekanik],
+    () => hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni),
+    [staffList, daftarAbsensi, riwayat, lembur, bulanIni],
   )
   const daftarUangSakuMagang = useMemo(
     () => hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni),
@@ -330,9 +329,6 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         <TabelGajiStaf
           daftar={daftarGajiStaf}
           labelBulanIni={labelBulanIni}
-          persenMekanik={pengSetting.persenMekanik}
-          onUbahPersenMekanik={(v) => setPengSetting((s) => ({ ...s, persenMekanik: v }))}
-          onSimpanPersenMekanik={simpanSetting}
           simpanLembur={simpanLembur}
           bulanIni={bulanIni}
         />
@@ -410,7 +406,7 @@ function hitungJasaBulanIni(riwayat, bulan, namaMekanik) {
   return { jumlah: data.length, nilai: data.reduce((s, r) => s + (r.biayaJasa || 0), 0) }
 }
 
-function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni, persenMekanik) {
+function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni) {
   return staffList
     .filter((s) => s.aktif && s.jabatan !== 'Magang')
     .map((s) => {
@@ -418,7 +414,7 @@ function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIn
       // Kasir tidak melayani jasa servis, jadi jasa/bagi hasil tidak berlaku buat jabatan ini.
       const jasa = s.jabatan === 'Kasir' ? { jumlah: 0, nilai: 0 } : hitungJasaBulanIni(riwayat, bulanIni, s.nama)
       const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
-      const bagiHasil = s.jabatan === 'Kasir' ? 0 : Math.round((jasa.nilai * persenMekanik) / 100)
+      const bagiHasil = s.jabatan === 'Kasir' ? 0 : Math.round((jasa.nilai * (s.persenBagiHasil ?? 8)) / 100)
       const lemburNominal = Math.round((s.uangLemburPerJam || 10000) * jamLembur)
 
       let potongan
@@ -470,7 +466,7 @@ function InputLembur({ nilaiAwal, onSimpan }) {
   )
 }
 
-function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahPersenMekanik, onSimpanPersenMekanik, simpanLembur }) {
+function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
   const { notify } = useUI()
 
   async function ubahLembur(kode, nilai) {
@@ -489,13 +485,13 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahP
             ...(s.rekap.setengah > 0
               ? [{ label: `Gaji Harian × ${s.rekap.setengah} setengah hari`, nilai: Math.round((s.gajiPokok || 0) * 0.5 * s.rekap.setengah) }]
               : []),
-            { label: `Bagi Hasil Jasa (${persenMekanik}%)`, nilai: s.bagiHasil },
+            { label: `Bagi Hasil Jasa (${s.persenBagiHasil ?? 8}%)`, nilai: s.bagiHasil },
             { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
           ]
         : [
             { label: 'Gaji Pokok', nilai: s.gajiPokok || 0 },
             { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
-            { label: `Bagi Hasil Jasa (${persenMekanik}%)`, nilai: s.bagiHasil },
+            { label: `Bagi Hasil Jasa (${s.persenBagiHasil ?? 8}%)`, nilai: s.bagiHasil },
             { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
           ]
     cetakSlipGaji({
@@ -512,19 +508,9 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahP
   return (
     <div style={{ margin: '15px 0', padding: 15, background: '#eef2ff', borderRadius: 6, border: '1px solid #c7d2fe' }}>
       <h3>🔧 Gaji Staf (Mekanik/Kasir/Lainnya) — {labelBulanIni}</h3>
-      <div className="row" style={{ alignItems: 'center', marginBottom: 8 }}>
-        <label>Persentase Bagi Hasil Jasa:</label>
-        <input
-          type="number"
-          min="0"
-          max="100"
-          value={persenMekanik}
-          onChange={(e) => onUbahPersenMekanik(parseInt(e.target.value, 10) || 0)}
-          onBlur={onSimpanPersenMekanik}
-          style={{ width: 70 }}
-        />
-        <span style={{ fontSize: 12, color: '#666' }}>% — bisa diubah kapan saja</span>
-      </div>
+      <p style={{ fontSize: 12, color: '#888', marginTop: -6, marginBottom: 8 }}>
+        ⓘ Persentase Bagi Hasil Jasa diatur per staf di halaman Staff (bisa beda tiap orang sesuai keahlian).
+      </p>
       <div className="table-wrap">
         <table style={{ fontSize: 12 }}>
           <thead>
@@ -562,7 +548,9 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, persenMekanik, onUbahP
                 <td className="tengah">
                   {s.jabatan === 'Kasir' ? '−' : `${s.jasa.jumlah}× (${formatRupiah(s.jasa.nilai)})`}
                 </td>
-                <td className="angka">{formatRupiah(s.bagiHasil)}</td>
+                <td className="angka">
+                  {s.jabatan === 'Kasir' ? '−' : `${formatRupiah(s.bagiHasil)} (${s.persenBagiHasil ?? 8}%)`}
+                </td>
                 <td className="tengah">
                   <InputLembur nilaiAwal={s.jamLembur} onSimpan={(v) => ubahLembur(s.kode, v)} />
                 </td>

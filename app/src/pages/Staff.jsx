@@ -19,6 +19,7 @@ const FORM_KOSONG = {
   uangMakan: '',
   uangBensin: '',
   uangLemburPerJam: '10000',
+  persenBagiHasil: '8',
 }
 
 export default function StaffPage() {
@@ -70,6 +71,7 @@ export default function StaffPage() {
       uangMakan: s.uangMakan || '',
       uangBensin: s.uangBensin || '',
       uangLemburPerJam: s.uangLemburPerJam || 10000,
+      persenBagiHasil: s.persenBagiHasil ?? 8,
     })
     setMode('form')
   }
@@ -107,6 +109,7 @@ export default function StaffPage() {
         uang_makan: parseInt(form.uangMakan, 10) || 0,
         uang_bensin: parseInt(form.uangBensin, 10) || 0,
         uang_lembur_per_jam: parseInt(form.uangLemburPerJam, 10) || 10000,
+        persen_bagi_hasil: parseInt(form.persenBagiHasil, 10) || 0,
       })
       notify(editingKode ? '✅ Data staff berhasil diubah!' : `✅ Staff baru berhasil ditambahkan!\nKode: ${kodeTampil}`)
       resetForm()
@@ -262,6 +265,23 @@ export default function StaffPage() {
               ⓘ Tarif per jam saat lembur. Bawaannya Rp 10.000, bisa diubah per staf.
             </p>
           </div>
+
+          {form.jabatan !== 'Magang' && form.jabatan !== 'Kasir' && (
+            <div className="field">
+              <label>💼 % Bagi Hasil Jasa</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={form.persenBagiHasil}
+                onChange={(e) => setForm((f) => ({ ...f, persenBagiHasil: e.target.value }))}
+                placeholder="8"
+              />
+              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                ⓘ Persentase komisi dari jasa yang dilayani staf ini. Bisa beda tiap staf sesuai keahlian.
+              </p>
+            </div>
+          )}
 
           <button className="btn btn-block" type="submit" disabled={saving}>
             {saving ? 'Menyimpan…' : '✅ Simpan Staff'}
