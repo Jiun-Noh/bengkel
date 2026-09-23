@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto'
 import { useRiwayatQuery } from '../hooks/useRiwayat'
 import { usePengaturanQuery, usePengaturanMutations } from '../hooks/usePengaturan'
 import { usePengeluaranQuery, usePengeluaranMutations } from '../hooks/usePengeluaran'
+import { useHutangSupplierQuery, useHutangSupplierMutations } from '../hooks/useHutangSupplier'
 import { useStaffQuery } from '../hooks/useStaff'
 import { useAbsensiQuery } from '../hooks/useAbsensi'
 import { useLemburQuery, useLemburMutations } from '../hooks/useLembur'
@@ -12,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatRupiah, waktuSekarang } from '../lib/format'
 import { cetakSlipGaji } from '../lib/cetakSlipGaji'
 import { cetakSlipInvestor } from '../lib/cetakSlipInvestor'
+import Modal from '../components/common/Modal'
 
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 
@@ -54,6 +56,8 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const { notify, confirm } = useUI()
   const { data: pengeluaran = [] } = usePengeluaranQuery(true)
   const { tambahPengeluaran, hapusPengeluaran } = usePengeluaranMutations()
+  const { data: hutangSupplier = [] } = useHutangSupplierQuery(true)
+  const { tambahHutangSupplier, ubahStatusHutangSupplier, hapusHutangSupplier } = useHutangSupplierMutations()
   const { data: staffList = [] } = useStaffQuery(true)
   const { data: daftarAbsensi = [] } = useAbsensiQuery(true)
   const { data: lembur = [] } = useLemburQuery(true)
@@ -67,7 +71,21 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const [pengSetting, setPengSetting] = useState({
     persenPemilik: pengaturan?.persenPemilik ?? 60,
     persenCadangan: pengaturan?.persenCadangan ?? 15,
+    jamMasukStandar: pengaturan?.jamMasukStandar || '09:00',
   })
+
+  // `pengaturan` datang dari fetch async (undefined saat render pertama), jadi useState di atas
+  // cuma sempat pakai nilai default. Begitu data asli dari server datang (atau berubah dari
+  // realtime sync), sinkronkan ke sini — kalau tidak, hasil simpan sebelumnya tidak akan pernah
+  // kelihatan lagi setelah reload.
+  useEffect(() => {
+    if (!pengaturan) return
+    setPengSetting({
+      persenPemilik: pengaturan.persenPemilik,
+      persenCadangan: pengaturan.persenCadangan,
+      jamMasukStandar: pengaturan.jamMasukStandar,
+    })
+  }, [pengaturan])
 
   const [formPengeluaran, setFormPengeluaran] = useState({
     tanggal: new Date().toISOString().split('T')[0],
@@ -77,6 +95,14 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   })
   const [savingPengeluaran, setSavingPengeluaran] = useState(false)
 
+  const [formHutangSupplier, setFormHutangSupplier] = useState({
+    namaSupplier: '',
+    tanggal: new Date().toISOString().split('T')[0],
+    deskripsi: '',
+    nominal: '',
+  })
+  const [savingHutangSupplier, setSavingHutangSupplier] = useState(false)
+
   const bulanIni = bulanIniISO()
   const [thnIni, blnIni] = bulanIni.split('-')
   const labelBulanIni = `${NAMA_BULAN[parseInt(blnIni, 10) - 1]} ${thnIni}`
@@ -84,6 +110,21 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const pengeluaranBulanIni = useMemo(
     () => pengeluaran.filter((p) => p.bulan === bulanIni).sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
     [pengeluaran, bulanIni],
+  )
+
+  // Beda dari Pengeluaran: hutang belum lunas TIDAK reset tiap bulan, tetap tampil sampai dilunasi.
+  // Belum Lunas ditaruh di atas (terbaru dulu), baru Lunas di bawahnya.
+  const hutangSupplierUrut = useMemo(
+    () =>
+      [...hutangSupplier].sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'Belum Lunas' ? -1 : 1
+        return (b.tanggal || '').localeCompare(a.tanggal || '')
+      }),
+    [hutangSupplier],
+  )
+  const totalHutangBelumLunas = useMemo(
+    () => hutangSupplier.filter((h) => h.status === 'Belum Lunas').reduce((s, h) => s + (h.nominal || 0), 0),
+    [hutangSupplier],
   )
 
   const dataFilter = useMemo(() => {
@@ -110,12 +151,12 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   )
 
   const daftarGajiStaf = useMemo(
-    () => hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni),
-    [staffList, daftarAbsensi, riwayat, lembur, bulanIni],
+    () => hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.jamMasukStandar),
+    [staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.jamMasukStandar],
   )
   const daftarUangSakuMagang = useMemo(
-    () => hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni),
-    [staffList, daftarAbsensi, lembur, bulanIni],
+    () => hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni, pengSetting.jamMasukStandar),
+    [staffList, daftarAbsensi, lembur, bulanIni, pengSetting.jamMasukStandar],
   )
   const totalGajiStaf = useMemo(() => daftarGajiStaf.reduce((s, x) => s + Math.max(0, x.total), 0), [daftarGajiStaf])
   const totalUangSakuMagang = useMemo(() => daftarUangSakuMagang.reduce((s, x) => s + Math.max(0, x.total), 0), [daftarUangSakuMagang])
@@ -144,6 +185,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   async function simpanSetting() {
     try {
       await simpanPengaturan(pengSetting)
+      notify('✅ Pengaturan disimpan!')
     } catch (err) {
       notify('❌ Gagal menyimpan pengaturan: ' + err.message, 'error')
     }
@@ -182,6 +224,57 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     if (!ok) return
     try {
       await hapusPengeluaran(p.id)
+    } catch (err) {
+      notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
+    }
+  }
+
+  async function submitHutangSupplier(e) {
+    e.preventDefault()
+    const nominal = parseInt(formHutangSupplier.nominal, 10) || 0
+    if (!formHutangSupplier.namaSupplier.trim()) {
+      notify('⚠️ Isi nama supplier!', 'error')
+      return
+    }
+    if (!formHutangSupplier.deskripsi.trim()) {
+      notify('⚠️ Isi deskripsi barang!', 'error')
+      return
+    }
+    if (nominal <= 0) {
+      notify('⚠️ Isi nominal yang benar!', 'error')
+      return
+    }
+    setSavingHutangSupplier(true)
+    try {
+      await tambahHutangSupplier({
+        namaSupplier: formHutangSupplier.namaSupplier.trim(),
+        tanggal: formHutangSupplier.tanggal,
+        deskripsi: formHutangSupplier.deskripsi.trim(),
+        nominal,
+      })
+      notify('✅ Hutang supplier dicatat!')
+      setFormHutangSupplier((f) => ({ ...f, namaSupplier: '', deskripsi: '', nominal: '' }))
+    } catch (err) {
+      notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    } finally {
+      setSavingHutangSupplier(false)
+    }
+  }
+
+  async function ubahStatusHutangSupplierBaris(h) {
+    const statusBaru = h.status === 'Belum Lunas' ? 'Lunas' : 'Belum Lunas'
+    try {
+      await ubahStatusHutangSupplier(h.id, statusBaru)
+    } catch (err) {
+      notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    }
+  }
+
+  async function hapusHutangSupplierBaris(h) {
+    const ok = await confirm(`⚠️ Hapus catatan hutang "${h.namaSupplier}" (${formatRupiah(h.nominal)})?`)
+    if (!ok) return
+    try {
+      await hapusHutangSupplier(h.id)
     } catch (err) {
       notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
     }
@@ -326,6 +419,113 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           </p>
         </div>
 
+        <div style={{ margin: '15px 0', padding: 15, background: '#fff7ed', borderRadius: 6, border: '1px solid #fed7aa' }}>
+          <h3>🚚 Hutang Supplier</h3>
+          <p style={{ fontSize: 12, color: '#888', marginTop: -6, marginBottom: 10 }}>
+            ⓘ Catat tagihan dari supplier/distributor barang. Beda dari Pengeluaran, catatan Belum Lunas di sini tidak reset tiap bulan — tetap tampil sampai ditandai Lunas.
+          </p>
+          <form onSubmit={submitHutangSupplier} className="row" style={{ alignItems: 'flex-end' }}>
+            <div className="field" style={{ flex: '1 1 160px' }}>
+              <label>Nama Supplier</label>
+              <input
+                value={formHutangSupplier.namaSupplier}
+                onChange={(e) => setFormHutangSupplier((f) => ({ ...f, namaSupplier: e.target.value }))}
+                placeholder="Contoh: CV Sumber Jaya"
+              />
+            </div>
+            <div className="field" style={{ flex: '2 1 200px' }}>
+              <label>Deskripsi Barang</label>
+              <input
+                value={formHutangSupplier.deskripsi}
+                onChange={(e) => setFormHutangSupplier((f) => ({ ...f, deskripsi: e.target.value }))}
+                placeholder="Contoh: Oli Castrol 20 botol, Ban 5 set"
+              />
+            </div>
+            <div className="field" style={{ flex: '1 1 140px' }}>
+              <label>Nominal (Rp)</label>
+              <input
+                type="number"
+                min="0"
+                value={formHutangSupplier.nominal}
+                onChange={(e) => setFormHutangSupplier((f) => ({ ...f, nominal: e.target.value }))}
+                placeholder="0"
+              />
+            </div>
+            <div className="field" style={{ flex: '1 1 140px' }}>
+              <label>Tanggal</label>
+              <input
+                type="date"
+                value={formHutangSupplier.tanggal}
+                onChange={(e) => setFormHutangSupplier((f) => ({ ...f, tanggal: e.target.value }))}
+              />
+            </div>
+            <button className="btn btn-sm" type="submit" disabled={savingHutangSupplier} style={{ marginBottom: 12 }}>
+              {savingHutangSupplier ? 'Menyimpan…' : '➕ Tambah'}
+            </button>
+          </form>
+
+          <div className="table-wrap">
+            <table style={{ fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Supplier</th>
+                  <th>Deskripsi</th>
+                  <th className="angka">Nominal</th>
+                  <th className="tengah">Status</th>
+                  <th className="tengah">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hutangSupplierUrut.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="tengah" style={{ padding: 10, color: '#888' }}>
+                      📭 Belum ada catatan hutang supplier
+                    </td>
+                  </tr>
+                )}
+                {hutangSupplierUrut.map((h) => (
+                  <tr key={h.id} className={h.status === 'Belum Lunas' ? 'baris-merah' : ''}>
+                    <td>{h.tanggal}</td>
+                    <td>{h.namaSupplier}</td>
+                    <td>{h.deskripsi}</td>
+                    <td className="angka">{formatRupiah(h.nominal)}</td>
+                    <td className="tengah">
+                      {h.status === 'Lunas' ? `✅ Lunas (${h.tanggalLunas || '-'})` : '🔴 Belum Lunas'}
+                    </td>
+                    <td className="tengah">
+                      <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                        <button className="btn btn-blue btn-sm" onClick={() => ubahStatusHutangSupplierBaris(h)}>
+                          {h.status === 'Belum Lunas' ? '✅ Lunas' : '↩️ Batal'}
+                        </button>
+                        <button className="btn btn-red btn-sm" onClick={() => hapusHutangSupplierBaris(h)}>
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p style={{ marginTop: 10, fontWeight: 700 }}>Total Belum Lunas: {formatRupiah(totalHutangBelumLunas)}</p>
+        </div>
+
+        <div style={{ margin: '15px 0 0', padding: 10, background: '#fff', borderRadius: 6, border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <label style={{ fontWeight: 700, fontSize: 13 }}>⏰ Jam Masuk Standar:</label>
+          <input
+            type="time"
+            value={pengSetting.jamMasukStandar}
+            onChange={(e) => setPengSetting((s) => ({ ...s, jamMasukStandar: e.target.value }))}
+            onBlur={simpanSetting}
+            style={{ width: 110 }}
+          />
+          <span style={{ fontSize: 12, color: '#888' }}>
+            ⓘ Dipakai untuk hitung potongan telat di tabel Gaji Staf &amp; Uang Saku Magang di bawah.
+          </span>
+        </div>
+
         <TabelGajiStaf
           daftar={daftarGajiStaf}
           labelBulanIni={labelBulanIni}
@@ -394,56 +594,142 @@ function hitungRekapAbsensi(daftarAbsensi, bulan, nama) {
   }
 }
 
-// Hanya transaksi yang mekaniknya persis nama ini yang dihitung — transaksi "Semua Mekanik" (dibagi rata/tim)
-// belum diatribusikan ke siapa pun secara otomatis.
-function hitungJasaBulanIni(riwayat, bulan, namaMekanik) {
-  const [thn, bln] = bulan.split('-').map(Number)
-  const data = riwayat.filter((r) => {
-    if (r.namaMekanik !== namaMekanik) return false
-    const t = ambilTanggalDariTeks(r.tgl)
-    return t && t.getFullYear() === thn && t.getMonth() + 1 === bln
-  })
-  return { jumlah: data.length, nilai: data.reduce((s, r) => s + (r.biayaJasa || 0), 0) }
+function hitungTanggalMangkir(daftarAbsensi, bulan, nama) {
+  return daftarAbsensi
+    .filter((a) => a.bulan === bulan && a.nama === nama && a.status === 'Tanpa Keterangan')
+    .map((a) => a.tanggal)
+    .sort()
 }
 
-function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni) {
+// Menit terlambat & potongannya bulan ini — cuma dihitung dari hari berstatus "Hadir" yang jam datangnya
+// lewat dari jam masuk standar. Setengah Hari/Izin/Tanpa Keterangan tidak dihitung di sini.
+// Potongan telat PER HARI dibatasi maksimal sebesar denda mangkir staf itu sendiri, supaya telat
+// ekstrem (mis. 50+ menit) tidak lebih mahal daripada mangkir seharian penuh.
+// rincian = daftar per-hari (tanggal, menit, potongan) supaya bisa ditampilkan detail saat diklik.
+function hitungPotonganTerlambat(daftarAbsensi, bulan, nama, jamMasukStandar, nominalTelatPerMenit, nominalMangkir) {
+  const [jamStd, menitStd] = (jamMasukStandar || '09:00').split(':').map(Number)
+  const standarMenit = jamStd * 60 + menitStd
+  const rincian = daftarAbsensi
+    .filter((a) => a.bulan === bulan && a.nama === nama && a.status === 'Hadir' && a.jamDatang)
+    .map((a) => {
+      const [j, m] = a.jamDatang.split(':').map(Number)
+      if (Number.isNaN(j) || Number.isNaN(m)) return null
+      const menit = Math.max(0, j * 60 + m - standarMenit)
+      if (menit === 0) return null
+      const potongan = Math.min(menit * nominalTelatPerMenit, nominalMangkir)
+      return { tanggal: a.tanggal, jamDatang: a.jamDatang, menit, potongan }
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.tanggal || '').localeCompare(b.tanggal || ''))
+  return {
+    menitTerlambat: rincian.reduce((s, r) => s + r.menit, 0),
+    potonganTerlambat: rincian.reduce((s, r) => s + r.potongan, 0),
+    rincianTerlambat: rincian,
+  }
+}
+
+// Bagi hasil jasa bulan ini buat satu mekanik, dihitung dari transaksi yang mengikutsertakan
+// dia di mekanikItems (transaksi baru, multi-mekanik) atau namaMekanik (transaksi lama, single
+// mekanik — sebelum fitur multi-mekanik ada). Untuk transaksi baru, % yang dipakai adalah %
+// yang DIKUNCI di transaksi itu sendiri (mekanikItems[].persen), bukan % staf saat ini — supaya
+// transaksi lama tidak berubah kalau % staf diubah belakangan. Transaksi lama (tanpa mekanikItems)
+// tetap pakai % staf saat ini seperti perilaku lama, karena memang tidak ada % yang dikunci dulu.
+// "Solo" = cuma 1 mekanik di transaksi itu, "Bersama" = 2 mekanik atau lebih.
+function hitungBagiHasilBulanIni(riwayat, bulan, namaMekanik, persenBagiHasilStaffSaatIni) {
+  const [thn, bln] = bulan.split('-').map(Number)
+  const hasil = { jumlahJasa: 0, nilaiJasa: 0, bagiHasilSolo: 0, bagiHasilBersama: 0, jumlahSolo: 0, jumlahBersama: 0 }
+
+  riwayat.forEach((r) => {
+    const t = ambilTanggalDariTeks(r.tgl)
+    if (!t || t.getFullYear() !== thn || t.getMonth() + 1 !== bln) return
+
+    const items = r.mekanikItems
+    if (items && items.length > 0) {
+      const entry = items.find((m) => m.nama === namaMekanik)
+      if (!entry) return
+      const kontribusi = Math.round(((r.biayaJasa || 0) * entry.persen) / 100)
+      hasil.jumlahJasa += 1
+      hasil.nilaiJasa += r.biayaJasa || 0
+      if (items.length > 1) {
+        hasil.bagiHasilBersama += kontribusi
+        hasil.jumlahBersama += 1
+      } else {
+        hasil.bagiHasilSolo += kontribusi
+        hasil.jumlahSolo += 1
+      }
+    } else if (r.namaMekanik === namaMekanik) {
+      const kontribusi = Math.round(((r.biayaJasa || 0) * (persenBagiHasilStaffSaatIni ?? 8)) / 100)
+      hasil.jumlahJasa += 1
+      hasil.nilaiJasa += r.biayaJasa || 0
+      hasil.bagiHasilSolo += kontribusi
+      hasil.jumlahSolo += 1
+    }
+  })
+
+  hasil.bagiHasilTotal = hasil.bagiHasilSolo + hasil.bagiHasilBersama
+  return hasil
+}
+
+function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni, jamMasukStandar) {
   return staffList
     .filter((s) => s.aktif && s.jabatan !== 'Magang')
     .map((s) => {
       const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
       // Kasir tidak melayani jasa servis, jadi jasa/bagi hasil tidak berlaku buat jabatan ini.
-      const jasa = s.jabatan === 'Kasir' ? { jumlah: 0, nilai: 0 } : hitungJasaBulanIni(riwayat, bulanIni, s.nama)
+      const bagiHasilInfo =
+        s.jabatan === 'Kasir'
+          ? { jumlahJasa: 0, nilaiJasa: 0, bagiHasilSolo: 0, bagiHasilBersama: 0, bagiHasilTotal: 0, jumlahSolo: 0, jumlahBersama: 0 }
+          : hitungBagiHasilBulanIni(riwayat, bulanIni, s.nama, s.persenBagiHasil ?? 8)
       const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
-      const bagiHasil = s.jabatan === 'Kasir' ? 0 : Math.round((jasa.nilai * (s.persenBagiHasil ?? 8)) / 100)
+      const bagiHasil = bagiHasilInfo.bagiHasilTotal
       const lemburNominal = Math.round((s.uangLemburPerJam || 10000) * jamLembur)
 
-      let potongan
+      // Freelance dikecualikan dari potongan telat/mangkir — dia sudah otomatis "kena" lewat
+      // gajiPokok x hari hadir di bawah (hari mangkir memang tidak dibayar sama sekali), jadi
+      // denda tambahan di sini cuma akan jadi penalti ganda.
+      const { menitTerlambat, potonganTerlambat, rincianTerlambat } =
+        s.jabatan === 'Freelance'
+          ? { menitTerlambat: 0, potonganTerlambat: 0, rincianTerlambat: [] }
+          : hitungPotonganTerlambat(daftarAbsensi, bulanIni, s.nama, jamMasukStandar, s.nominalTelatPerMenit ?? 1000, s.nominalMangkir ?? 50000)
+      const rincianMangkir = s.jabatan === 'Freelance' ? [] : hitungTanggalMangkir(daftarAbsensi, bulanIni, s.nama)
+      const potonganMangkir = s.jabatan === 'Freelance' ? 0 : (s.nominalMangkir ?? 50000) * rekap.tanpaKabar
+      const potongan = potonganTerlambat + potonganMangkir
+
       let total
       if (s.jabatan === 'Freelance') {
         // Freelance dibayar per hari hadir (harian penuh + setengah hari), bukan gaji bulanan tetap.
         const totalHarian = Math.round((s.gajiPokok || 0) * rekap.hadir + (s.gajiPokok || 0) * 0.5 * rekap.setengah)
-        potongan = 0
-        total = totalHarian + bagiHasil + lemburNominal
+        total = totalHarian - potongan + bagiHasil + lemburNominal
       } else {
-        const gajiPerHari = (s.gajiPokok || 0) / 26
-        potongan = Math.round(gajiPerHari * rekap.tanpaKabar)
         total = (s.gajiPokok || 0) - potongan + bagiHasil + lemburNominal
       }
-      return { ...s, rekap, jasa, jamLembur, bagiHasil, lemburNominal, potongan, total }
+      return {
+        ...s, rekap, bagiHasilInfo, jamLembur, bagiHasil, lemburNominal,
+        menitTerlambat, potonganTerlambat, rincianTerlambat, potonganMangkir, rincianMangkir, potongan, total,
+      }
     })
 }
 
-function hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni) {
+function hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni, jamMasukStandar) {
   return staffList
     .filter((s) => s.aktif && s.jabatan === 'Magang')
     .map((s) => {
       const rekap = hitungRekapAbsensi(daftarAbsensi, bulanIni, s.nama)
       const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
-      const umPerHari = ((s.uangMakan || 0) + (s.uangBensin || 0)) / 26
       const lemburNominal = Math.round((s.uangLemburPerJam || 10000) * jamLembur)
-      const potongan = Math.round(umPerHari * rekap.tanpaKabar)
+
+      const { menitTerlambat, potonganTerlambat, rincianTerlambat } = hitungPotonganTerlambat(
+        daftarAbsensi, bulanIni, s.nama, jamMasukStandar, s.nominalTelatPerMenit ?? 1000, s.nominalMangkir ?? 50000,
+      )
+      const rincianMangkir = hitungTanggalMangkir(daftarAbsensi, bulanIni, s.nama)
+      const potonganMangkir = (s.nominalMangkir ?? 50000) * rekap.tanpaKabar
+      const potongan = potonganTerlambat + potonganMangkir
+
       const total = (s.uangMakan || 0) + (s.uangBensin || 0) - potongan + lemburNominal
-      return { ...s, rekap, jamLembur, lemburNominal, potongan, total }
+      return {
+        ...s, rekap, jamLembur, lemburNominal,
+        menitTerlambat, potonganTerlambat, rincianTerlambat, potonganMangkir, rincianMangkir, potongan, total,
+      }
     })
 }
 
@@ -466,8 +752,67 @@ function InputLembur({ nilaiAwal, onSimpan }) {
   )
 }
 
+function ModalDetailPotongan({ s, onClose }) {
+  return (
+    <Modal title={`📋 Detail Potongan — ${s.nama}`} onClose={onClose}>
+      <h4 style={{ margin: '4px 0' }}>⏰ Telat ({s.rincianTerlambat.length} hari)</h4>
+      {s.rincianTerlambat.length === 0 ? (
+        <p style={{ color: '#888', fontSize: 13 }}>Tidak ada keterlambatan bulan ini.</p>
+      ) : (
+        <div className="table-wrap">
+          <table style={{ fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th className="tengah">Jam Datang</th>
+                <th className="tengah">Telat</th>
+                <th className="angka">Potongan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.rincianTerlambat.map((r) => (
+                <tr key={r.tanggal}>
+                  <td>{r.tanggal}</td>
+                  <td className="tengah">{r.jamDatang}</td>
+                  <td className="tengah">{r.menit} menit</td>
+                  <td className="angka merah">−{formatRupiah(r.potongan)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <h4 style={{ margin: '15px 0 4px' }}>🚫 Mangkir ({s.rincianMangkir.length} hari)</h4>
+      {s.rincianMangkir.length === 0 ? (
+        <p style={{ color: '#888', fontSize: 13 }}>Tidak ada Tanpa Keterangan bulan ini.</p>
+      ) : (
+        <div className="table-wrap">
+          <table style={{ fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th className="angka">Potongan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.rincianMangkir.map((tgl) => (
+                <tr key={tgl}>
+                  <td>{tgl}</td>
+                  <td className="angka merah">−{formatRupiah(s.nominalMangkir ?? 50000)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p style={{ marginTop: 12, fontWeight: 700, textAlign: 'right' }}>Total Potongan: {formatRupiah(s.potongan)}</p>
+    </Modal>
+  )
+}
+
 function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
   const { notify } = useUI()
+  const [detailPotongan, setDetailPotongan] = useState(null)
 
   async function ubahLembur(kode, nilai) {
     try {
@@ -478,6 +823,14 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
   }
 
   function cetak(s) {
+    const potonganRincian = [
+      ...(s.potonganTerlambat > 0 ? [{ label: `Potongan Telat (${s.menitTerlambat} menit)`, nilai: -s.potonganTerlambat }] : []),
+      ...(s.potonganMangkir > 0 ? [{ label: `Potongan Mangkir (${s.rekap.tanpaKabar} hari)`, nilai: -s.potonganMangkir }] : []),
+    ]
+    const bagiHasilRincian = [
+      ...(s.bagiHasilInfo.bagiHasilSolo > 0 ? [{ label: `Bagi Hasil Solo (${s.bagiHasilInfo.jumlahSolo}× jasa)`, nilai: s.bagiHasilInfo.bagiHasilSolo }] : []),
+      ...(s.bagiHasilInfo.bagiHasilBersama > 0 ? [{ label: `Bagi Hasil Bersama (${s.bagiHasilInfo.jumlahBersama}× jasa)`, nilai: s.bagiHasilInfo.bagiHasilBersama }] : []),
+    ]
     const rincian =
       s.jabatan === 'Freelance'
         ? [
@@ -485,13 +838,14 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
             ...(s.rekap.setengah > 0
               ? [{ label: `Gaji Harian × ${s.rekap.setengah} setengah hari`, nilai: Math.round((s.gajiPokok || 0) * 0.5 * s.rekap.setengah) }]
               : []),
-            { label: `Bagi Hasil Jasa (${s.persenBagiHasil ?? 8}%)`, nilai: s.bagiHasil },
+            ...potonganRincian,
+            ...bagiHasilRincian,
             { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
           ]
         : [
             { label: 'Gaji Pokok', nilai: s.gajiPokok || 0 },
-            { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
-            { label: `Bagi Hasil Jasa (${s.persenBagiHasil ?? 8}%)`, nilai: s.bagiHasil },
+            ...potonganRincian,
+            ...bagiHasilRincian,
             { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
           ]
     cetakSlipGaji({
@@ -509,7 +863,7 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
     <div style={{ margin: '15px 0', padding: 15, background: '#eef2ff', borderRadius: 6, border: '1px solid #c7d2fe' }}>
       <h3>🔧 Gaji Staf (Mekanik/Kasir/Lainnya) — {labelBulanIni}</h3>
       <p style={{ fontSize: 12, color: '#888', marginTop: -6, marginBottom: 8 }}>
-        ⓘ Persentase Bagi Hasil Jasa diatur per staf di halaman Staff (bisa beda tiap orang sesuai keahlian).
+        ⓘ % Bagi Hasil Jasa di Staff cuma dipakai sebagai default saat mekanik kerja solo (maks. 40%). Kalau lebih dari satu mekanik mengerjakan satu transaksi, % masing-masing ditentukan langsung di Transaksi saat itu (total maks. 40% dari nilai jasa transaksi itu).
       </p>
       <div className="table-wrap">
         <table style={{ fontSize: 12 }}>
@@ -546,16 +900,41 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
                 <td>{s.jabatan}</td>
                 <td className="angka">{formatRupiah(s.gajiPokok || 0)}</td>
                 <td className="tengah">
-                  {s.jabatan === 'Kasir' ? '−' : `${s.jasa.jumlah}× (${formatRupiah(s.jasa.nilai)})`}
+                  {s.jabatan === 'Kasir' ? '−' : `${s.bagiHasilInfo.jumlahJasa}× (${formatRupiah(s.bagiHasilInfo.nilaiJasa)})`}
                 </td>
                 <td className="angka">
-                  {s.jabatan === 'Kasir' ? '−' : `${formatRupiah(s.bagiHasil)} (${s.persenBagiHasil ?? 8}%)`}
+                  {s.jabatan === 'Kasir' ? (
+                    '−'
+                  ) : (
+                    <>
+                      {formatRupiah(s.bagiHasil)}
+                      {(s.bagiHasilInfo.bagiHasilSolo > 0 || s.bagiHasilInfo.bagiHasilBersama > 0) && (
+                        <div style={{ fontSize: 10, fontWeight: 400, color: '#888' }}>
+                          {s.bagiHasilInfo.bagiHasilSolo > 0 && <div>Solo {s.bagiHasilInfo.jumlahSolo}×: {formatRupiah(s.bagiHasilInfo.bagiHasilSolo)}</div>}
+                          {s.bagiHasilInfo.bagiHasilBersama > 0 && <div>Bersama {s.bagiHasilInfo.jumlahBersama}×: {formatRupiah(s.bagiHasilInfo.bagiHasilBersama)}</div>}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </td>
                 <td className="tengah">
                   <InputLembur nilaiAwal={s.jamLembur} onSimpan={(v) => ubahLembur(s.kode, v)} />
                 </td>
                 <td className="angka">{formatRupiah(s.lemburNominal)}</td>
-                <td className="angka merah">{formatRupiah(s.potongan)}</td>
+                <td
+                  className="angka merah"
+                  style={(s.potonganTerlambat > 0 || s.potonganMangkir > 0) ? { cursor: 'pointer', textDecoration: 'underline dotted' } : undefined}
+                  title={(s.potonganTerlambat > 0 || s.potonganMangkir > 0) ? 'Klik untuk lihat rincian' : undefined}
+                  onClick={() => (s.potonganTerlambat > 0 || s.potonganMangkir > 0) && setDetailPotongan(s)}
+                >
+                  {formatRupiah(s.potongan)}
+                  {(s.potonganTerlambat > 0 || s.potonganMangkir > 0) && (
+                    <div style={{ fontSize: 10, fontWeight: 400, color: '#888' }}>
+                      {s.potonganTerlambat > 0 && <div>Telat {s.menitTerlambat}mnt: −{formatRupiah(s.potonganTerlambat)}</div>}
+                      {s.potonganMangkir > 0 && <div>Mangkir {s.rekap.tanpaKabar}× : −{formatRupiah(s.potonganMangkir)}</div>}
+                    </div>
+                  )}
+                </td>
                 <td className="angka" style={{ fontWeight: 700 }}>
                   {formatRupiah(Math.max(0, s.total))}
                 </td>
@@ -565,16 +944,20 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
         </table>
       </div>
       <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-        ⓘ "Jasa Dilayani" dihitung otomatis dari Transaksi bulan ini yang mekaniknya persis nama staf ini (tidak berlaku untuk Kasir). Transaksi dengan mekanik "Semua Mekanik" belum ikut terhitung ke siapa pun.
+        ⓘ "Jasa Dilayani" dihitung otomatis dari Transaksi bulan ini yang mengikutsertakan staf ini sebagai mekanik (tidak berlaku untuk Kasir). Transaksi tanpa mekanik dipilih belum ikut terhitung ke siapa pun.
         <br />
         ⓘ Freelance: kolom "Gaji Pokok" adalah gaji harian, Total dihitung dari jumlah hari hadir × gaji harian (bukan gaji bulanan tetap).
+        <br />
+        ⓘ Denda Telat/Mangkir diatur per staf di halaman Staff, dihitung dari "Jam Masuk Standar" di atas. Klik nominal Potongan untuk lihat rincian per hari. Freelance dikecualikan dari denda ini (lihat poin di atas).
       </p>
+      {detailPotongan && <ModalDetailPotongan s={detailPotongan} onClose={() => setDetailPotongan(null)} />}
     </div>
   )
 }
 
 function TabelUangSakuMagang({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
   const { notify } = useUI()
+  const [detailPotongan, setDetailPotongan] = useState(null)
 
   async function ubahLembur(kode, nilai) {
     try {
@@ -594,7 +977,8 @@ function TabelUangSakuMagang({ daftar, bulanIni, labelBulanIni, simpanLembur }) 
       rincian: [
         { label: 'Uang Makan', nilai: s.uangMakan || 0 },
         { label: 'Uang Bensin', nilai: s.uangBensin || 0 },
-        { label: 'Potongan Tanpa Kabar', nilai: -s.potongan },
+        ...(s.potonganTerlambat > 0 ? [{ label: `Potongan Telat (${s.menitTerlambat} menit)`, nilai: -s.potonganTerlambat }] : []),
+        ...(s.potonganMangkir > 0 ? [{ label: `Potongan Mangkir (${s.rekap.tanpaKabar} hari)`, nilai: -s.potonganMangkir }] : []),
         { label: `Uang Lembur (${s.jamLembur} jam × ${formatRupiah(s.uangLemburPerJam || 10000)})`, nilai: s.lemburNominal },
       ],
       total: s.total,
@@ -644,7 +1028,20 @@ function TabelUangSakuMagang({ daftar, bulanIni, labelBulanIni, simpanLembur }) 
                   <InputLembur nilaiAwal={s.jamLembur} onSimpan={(v) => ubahLembur(s.kode, v)} />
                 </td>
                 <td className="angka">{formatRupiah(s.lemburNominal)}</td>
-                <td className="angka merah">{formatRupiah(s.potongan)}</td>
+                <td
+                  className="angka merah"
+                  style={(s.potonganTerlambat > 0 || s.potonganMangkir > 0) ? { cursor: 'pointer', textDecoration: 'underline dotted' } : undefined}
+                  title={(s.potonganTerlambat > 0 || s.potonganMangkir > 0) ? 'Klik untuk lihat rincian' : undefined}
+                  onClick={() => (s.potonganTerlambat > 0 || s.potonganMangkir > 0) && setDetailPotongan(s)}
+                >
+                  {formatRupiah(s.potongan)}
+                  {(s.potonganTerlambat > 0 || s.potonganMangkir > 0) && (
+                    <div style={{ fontSize: 10, fontWeight: 400, color: '#888' }}>
+                      {s.potonganTerlambat > 0 && <div>Telat {s.menitTerlambat}mnt: −{formatRupiah(s.potonganTerlambat)}</div>}
+                      {s.potonganMangkir > 0 && <div>Mangkir {s.rekap.tanpaKabar}× : −{formatRupiah(s.potonganMangkir)}</div>}
+                    </div>
+                  )}
+                </td>
                 <td className="angka" style={{ fontWeight: 700 }}>
                   {formatRupiah(Math.max(0, s.total))}
                 </td>
@@ -653,6 +1050,7 @@ function TabelUangSakuMagang({ daftar, bulanIni, labelBulanIni, simpanLembur }) 
           </tbody>
         </table>
       </div>
+      {detailPotongan && <ModalDetailPotongan s={detailPotongan} onClose={() => setDetailPotongan(null)} />}
     </div>
   )
 }

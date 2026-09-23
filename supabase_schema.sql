@@ -20,14 +20,17 @@ create table barang (
 
 create table riwayat (
   id uuid primary key default gen_random_uuid(),
+  no_transaksi text unique,        -- format INV-{tahun}-{6 digit urut}, diisi otomatis lewat trigger di bawah
   tgl text not null,               -- format "DD/MM/YYYY HH:MM", disamakan dengan aplikasi
   nama_pelanggan text,
   nomor_hp text,
   plat_kendaraan text,
   jenis_motor text,
-  nama_jasa text,
-  nama_mekanik text,
-  biaya_jasa integer default 0,
+  nama_jasa text,             -- gabungan nama semua jasa (dipisah koma), buat pencarian/tampilan ringkas
+  nama_mekanik text,          -- gabungan nama semua mekanik (dipisah koma), buat pencarian/tampilan ringkas
+  mekanik_items jsonb default '[]', -- rincian per mekanik: [{nama, persen}], persen dikunci saat transaksi dibuat (total maks 40%)
+  biaya_jasa integer default 0,  -- total semua jasa
+  jasa_items jsonb default '[]', -- rincian per jasa: [{id, nama, harga}]
   items jsonb default '[]',
   total_barang integer default 0,
   modal_keluar integer default 0,
@@ -36,6 +39,9 @@ create table riwayat (
   cara_bayar text default 'Tunai',
   uangdibayarkan integer default 0,
   sisa_bayar integer default 0,
+  poin_didapat integer default 0,    -- poin member yang didapat dari transaksi ini
+  poin_digunakan integer default 0,  -- poin member yang dipakai (dipotong dari total_bayar) di transaksi ini
+  diskon_poin integer default 0,     -- nilai rupiah dari poin_digunakan (poin_digunakan x 1.000)
   created_at timestamptz default now()
 );
 
@@ -64,7 +70,9 @@ create table staff (
   uang_makan integer default 0,   -- uang makan bulanan (khusus Magang)
   uang_bensin integer default 0,  -- uang bensin bulanan (khusus Magang)
   uang_lembur_per_jam integer default 10000,  -- tarif lembur per jam, bisa beda tiap staf
-  persen_bagi_hasil integer default 8,  -- % komisi dari jasa yang dilayani, bisa beda tiap staf (Mekanik/Freelance/Lainnya; tidak dipakai Kasir/Magang)
+  persen_bagi_hasil integer default 8,  -- % komisi default saat kerja SOLO (maks 40, disepakati dgn pemilik); saat transaksi dikerjakan >1 mekanik, % masing2 diisi langsung di Transaksi & dikunci ke riwayat.mekanik_items
+  nominal_telat_per_menit integer default 1000,  -- denda keterlambatan per menit, bisa beda tiap staf
+  nominal_mangkir integer default 50000,  -- denda per hari Tanpa Keterangan (mangkir), bisa beda tiap staf
   diubah_oleh uuid references auth.users(id),  -- jejak ringan: siapa terakhir insert/update baris ini
   diubah_pada timestamptz
 );
@@ -77,6 +85,7 @@ create table pengaturan (
   persen_investor integer default 15,   -- legacy, tidak dipakai lagi sejak tabel `investor` per-investor punya % sendiri
   persen_pemilik integer default 60,    -- bagian pemilik dari Laba Bersih (kartu Pembagian Laba Bersih)
   persen_cadangan integer default 15,   -- dana cadangan/lainnya dari Laba Bersih
+  jam_masuk_standar text default '09:00',  -- jam masuk standar (shop-wide), dasar hitung potongan telat di Laporan
   kata_sandi_laporan text default '1234',  -- legacy, tidak dipakai lagi sejak akses Laporan ditentukan oleh profil.peran
   check (id = 1)
 );
@@ -114,6 +123,38 @@ create table jasa (
   dibuat_pada timestamptz default now()
 );
 
+-- poin_ledger: poin member pelanggan (kunci = nomor_hp, tidak ada proses "daftar member" terpisah).
+-- Disimpan per-batch (bukan satu angka saldo) supaya kadaluarsa 1 tahun per-batch bisa akurat —
+-- lihat komentar lengkap di migrasi_poin_pelanggan.sql.
+create table poin_ledger (
+  id uuid primary key default gen_random_uuid(),
+  nomor_hp text not null,
+  nama text,
+  tanggal date not null,
+  jenis text not null check (jenis in ('earn', 'redeem')),
+  jumlah integer not null,
+  sisa integer not null default 0,
+  kadaluarsa date,
+  riwayat_id uuid references riwayat(id) on delete set null,
+  dibuat_pada timestamptz default now()
+);
+create index idx_poin_ledger_hp on poin_ledger (nomor_hp);
+
+-- hutang_supplier: tagihan dari supplier/distributor barang, belum/sudah lunas.
+-- Sengaja tidak diikat ke baris `barang` tertentu — satu pengiriman biasanya berisi
+-- banyak SKU dengan satu status pembayaran gabungan, jadi disimpan sebagai catatan bebas.
+create table hutang_supplier (
+  id uuid primary key default gen_random_uuid(),
+  nama_supplier text not null,
+  tanggal date not null,
+  deskripsi text not null,
+  nominal integer default 0,
+  status text not null default 'Belum Lunas' check (status in ('Belum Lunas', 'Lunas')),
+  tanggal_lunas date,
+  bulan text,
+  dibuat_pada timestamptz default now()
+);
+
 -- profil: akun login (auth.users) → nama tampil + peran (pemilik/karyawan).
 -- Terpisah dari `staff` (data HR) supaya login & kepegawaian gak saling ganggu.
 create table profil (
@@ -134,6 +175,8 @@ alter table lembur enable row level security;
 alter table investor enable row level security;
 alter table jasa enable row level security;
 alter table profil enable row level security;
+alter table hutang_supplier enable row level security;
+alter table poin_ledger enable row level security;
 
 -- Helper: cek apakah user yang login sekarang berperan 'pemilik'.
 -- security definer supaya select ke `profil` di sini gak kena RLS profil sendiri (hindari rekursi).
@@ -177,11 +220,19 @@ create policy "riwayat insert" on riwayat for insert with check (auth.role() = '
 create policy "riwayat update" on riwayat for update using (auth.role() = 'authenticated');
 create policy "riwayat delete" on riwayat for delete using (is_pemilik());
 
--- pengaturan/investor/lembur/pengeluaran: layar Laporan seluruhnya khusus pemilik.
+-- poin_ledger: sama seperti riwayat — semua login bisa lihat/isi/ubah (dipakai/didapat pas transaksi
+-- jalan di halaman Transaksi yang dipakai semua staf), hapus permanen cuma pemilik.
+create policy "poin_ledger select" on poin_ledger for select using (auth.role() = 'authenticated');
+create policy "poin_ledger insert" on poin_ledger for insert with check (auth.role() = 'authenticated');
+create policy "poin_ledger update" on poin_ledger for update using (auth.role() = 'authenticated');
+create policy "poin_ledger delete" on poin_ledger for delete using (is_pemilik());
+
+-- pengaturan/investor/lembur/pengeluaran/hutang_supplier: layar Laporan seluruhnya khusus pemilik.
 create policy "pengaturan pemilik" on pengaturan for all using (is_pemilik()) with check (is_pemilik());
 create policy "investor pemilik" on investor for all using (is_pemilik()) with check (is_pemilik());
 create policy "lembur pemilik" on lembur for all using (is_pemilik()) with check (is_pemilik());
 create policy "pengeluaran pemilik" on pengeluaran for all using (is_pemilik()) with check (is_pemilik());
+create policy "hutang_supplier pemilik" on hutang_supplier for all using (is_pemilik()) with check (is_pemilik());
 
 -- Trigger: cegah karyawan mengubah harga_pokok/harga_jual barang lewat jalur UPDATE mana pun
 -- (mis. langsung lewat API, bukan lewat form Restock di app). Restock sungguhan cuma ubah stok.
@@ -211,6 +262,35 @@ create trigger catat_perubahan_barang before insert or update on barang
 for each row execute function catat_perubahan();
 create trigger catat_perubahan_staff before insert or update on staff
 for each row execute function catat_perubahan();
+
+-- Nomor transaksi otomatis (INV-{tahun}-{6 digit urut}) buat riwayat, lewat tabel counter
+-- per-tahun + trigger. insert...on conflict...returning atomik di Postgres, jadi aman dari
+-- race condition kalau dua staf selesai transaksi nyaris bersamaan.
+create table if not exists no_transaksi_counter (
+  tahun integer primary key,
+  terakhir integer not null default 0
+);
+alter table no_transaksi_counter enable row level security;
+-- Sengaja tidak dikasih policy — tabel ini cuma disentuh lewat trigger security definer di bawah.
+
+create or replace function set_no_transaksi() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  thn integer := extract(year from now());
+  urut integer;
+begin
+  if new.no_transaksi is not null then
+    return new;
+  end if;
+  insert into no_transaksi_counter (tahun, terakhir) values (thn, 1)
+    on conflict (tahun) do update set terakhir = no_transaksi_counter.terakhir + 1
+    returning terakhir into urut;
+  new.no_transaksi := 'INV-' || thn || '-' || lpad(urut::text, 6, '0');
+  return new;
+end;
+$$;
+create trigger isi_no_transaksi before insert on riwayat
+for each row execute function set_no_transaksi();
 
 insert into jasa (nama, harga) values
   ('Service CVT 110-150cc', 80000),

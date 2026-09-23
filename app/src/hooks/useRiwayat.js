@@ -4,6 +4,7 @@ import { ambilSemuaBaris, db } from '../lib/supabaseClient'
 export function kolomRiwayatKeInternal(row) {
   return {
     id: row.id,
+    noTransaksi: row.no_transaksi,
     tgl: row.tgl,
     namaPelanggan: row.nama_pelanggan,
     nomorHP: row.nomor_hp,
@@ -11,7 +12,9 @@ export function kolomRiwayatKeInternal(row) {
     jenisMotor: row.jenis_motor,
     namaJasa: row.nama_jasa,
     namaMekanik: row.nama_mekanik,
+    mekanikItems: row.mekanik_items || [],
     biayaJasa: row.biaya_jasa,
+    jasaItems: row.jasa_items || [],
     items: row.items || [],
     totalBarang: row.total_barang,
     modalKeluar: row.modal_keluar,
@@ -20,6 +23,9 @@ export function kolomRiwayatKeInternal(row) {
     caraBayar: row.cara_bayar,
     uangdibayarkan: row.uangdibayarkan,
     sisaBayar: row.sisa_bayar,
+    poinDidapat: row.poin_didapat || 0,
+    poinDigunakan: row.poin_digunakan || 0,
+    diskonPoin: row.diskon_poin || 0,
   }
 }
 

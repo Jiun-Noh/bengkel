@@ -5,6 +5,7 @@ function kolomPengaturanKeInternal(row) {
   return {
     persenPemilik: row?.persen_pemilik ?? 60,
     persenCadangan: row?.persen_cadangan ?? 15,
+    jamMasukStandar: row?.jam_masuk_standar || '09:00',
   }
 }
 
@@ -24,10 +25,10 @@ export function usePengaturanMutations() {
   const queryClient = useQueryClient()
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['pengaturan'] })
 
-  async function simpanPengaturan({ persenPemilik, persenCadangan }) {
+  async function simpanPengaturan({ persenPemilik, persenCadangan, jamMasukStandar }) {
     const { error } = await db
       .from('pengaturan')
-      .update({ persen_pemilik: persenPemilik, persen_cadangan: persenCadangan })
+      .update({ persen_pemilik: persenPemilik, persen_cadangan: persenCadangan, jam_masuk_standar: jamMasukStandar })
       .eq('id', 1)
     if (error) throw error
     await invalidate()

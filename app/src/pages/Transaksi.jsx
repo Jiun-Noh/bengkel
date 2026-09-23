@@ -3,7 +3,9 @@ import { useBarangQuery, useBarangMutations } from '../hooks/useBarang'
 import { useJasaQuery } from '../hooks/useJasa'
 import { useRiwayatQuery, useRiwayatMutations } from '../hooks/useRiwayat'
 import { useStaffQuery } from '../hooks/useStaff'
+import { usePoinLedgerQuery, usePoinMutations, hitungSaldoPoin, hitungPoinDidapat, NILAI_RUPIAH_PER_POIN, MIN_POIN_PAKAI } from '../hooks/usePoin'
 import { useUI } from '../contexts/UIContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatRupiah, kapitalNama, kapitalKode, waktuSekarang } from '../lib/format'
 import { cetakNota } from '../lib/cetakNota'
 import Modal from '../components/common/Modal'
@@ -14,12 +16,11 @@ const FORM_KOSONG = {
   nomorHP: '',
   platKendaraan: '',
   jenisMotor: '',
-  jenisJasa: '',
-  biayaJasaTotal: '',
-  mekanik: '',
   caraBayar: 'Tunai',
   uangdibayarkan: '0',
 }
+
+const MAX_PERSEN_MEKANIK = 40 // total % bagi hasil semua mekanik di satu transaksi, disepakati dengan pemilik
 
 function ambilTanggalDariTeks(tgl) {
   if (!tgl) return null
@@ -44,17 +45,27 @@ export default function TransaksiPage() {
   const { data: jasaList = [] } = useJasaQuery(true)
   const { data: riwayat = [], isLoading } = useRiwayatQuery(true)
   const { data: staffList = [] } = useStaffQuery(true)
+  const { data: poinLedger = [] } = usePoinLedgerQuery(true)
   const { ubahStokTerjual } = useBarangMutations()
   const { tambahRiwayat, hapusRiwayat, ubahRiwayat } = useRiwayatMutations()
+  const { prosesPoin } = usePoinMutations()
   const { notify, confirm } = useUI()
+  const { profil } = useAuth()
 
   const [form, setForm] = useState(FORM_KOSONG)
   const [keranjang, setKeranjang] = useState([])
   const [kodeJual, setKodeJual] = useState('')
   const [jumlahJual, setJumlahJual] = useState('')
+  const [keranjangJasa, setKeranjangJasa] = useState([])
+  const [jasaCari, setJasaCari] = useState('')
+  const [jasaHargaInput, setJasaHargaInput] = useState('')
+  const [keranjangMekanik, setKeranjangMekanik] = useState([])
+  const [mekanikCari, setMekanikCari] = useState('')
+  const [poinDigunakan, setPoinDigunakan] = useState('')
   const [saranAktif, setSaranAktif] = useState(null) // 'nama' | 'plat' | null
   const [saranBarangAktif, setSaranBarangAktif] = useState(false)
   const [saranJasaAktif, setSaranJasaAktif] = useState(false)
+  const [saranMekanikAktif, setSaranMekanikAktif] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [cari, setCari] = useState('')
@@ -65,13 +76,32 @@ export default function TransaksiPage() {
 
   const mekanikAktif = staffList.filter((s) => s.aktif && s.jabatan === 'Mekanik')
 
+  const saranMekanik = useMemo(() => {
+    if (!saranMekanikAktif) return []
+    const belumDipilih = mekanikAktif.filter((s) => !keranjangMekanik.some((m) => m.nama === s.nama))
+    const kata = mekanikCari.trim().toUpperCase()
+    if (!kata) return belumDipilih.slice(0, 8)
+    return belumDipilih.filter((s) => s.nama.toUpperCase().includes(kata)).slice(0, 8)
+  }, [saranMekanikAktif, mekanikCari, mekanikAktif, keranjangMekanik])
+
+  const totalPersenMekanik = keranjangMekanik.reduce((s, m) => s + (parseFloat(m.persen) || 0), 0)
+
   const barangUntukKode = barang.find((b) => b.kode === kodeJual.toUpperCase())
 
   const totalBrgCart = keranjang.reduce((s, i) => s + i.subtotal, 0)
-  const jasaNum = parseInt(form.biayaJasaTotal, 10) || 0
-  const totalBayarCart = totalBrgCart + jasaNum
+  const totalJasaCart = keranjangJasa.reduce((s, j) => s + (j.harga || 0), 0)
+  const totalBayarCart = totalBrgCart + totalJasaCart
+
+  const saldoPoin = hitungSaldoPoin(poinLedger, form.nomorHP.trim(), hariIniISO())
+  const poinDigunakanNum = parseInt(poinDigunakan, 10) || 0
+  const maksPoinBisaDipakai = Math.min(saldoPoin, Math.floor(totalBayarCart / NILAI_RUPIAH_PER_POIN))
+  const poinDigunakanEfektif = Math.min(poinDigunakanNum, maksPoinBisaDipakai)
+  const diskonPoin = poinDigunakanEfektif * NILAI_RUPIAH_PER_POIN
+  const totalBayarBersih = Math.max(0, totalBayarCart - diskonPoin)
+  const poinAkanDidapat = hitungPoinDidapat(totalBayarBersih)
+
   const dpNum = parseInt(form.uangdibayarkan, 10) || 0
-  const sisaCart = Math.max(0, totalBayarCart - dpNum)
+  const sisaCart = Math.max(0, totalBayarBersih - dpNum)
 
   const daftarPelanggan = useMemo(() => {
     const daftar = []
@@ -113,10 +143,10 @@ export default function TransaksiPage() {
 
   const saranJasa = useMemo(() => {
     if (!saranJasaAktif) return []
-    const kata = form.jenisJasa.trim().toUpperCase()
+    const kata = jasaCari.trim().toUpperCase()
     if (!kata) return jasaList.slice(0, 8)
     return jasaList.filter((j) => j.nama.toUpperCase().includes(kata)).slice(0, 8)
-  }, [saranJasaAktif, form.jenisJasa, jasaList])
+  }, [saranJasaAktif, jasaCari, jasaList])
 
   function pilihPelanggan(p) {
     setForm((f) => ({
@@ -146,8 +176,51 @@ export default function TransaksiPage() {
   }
 
   function pilihJasa(j) {
-    setForm((f) => ({ ...f, jenisJasa: j.nama, biayaJasaTotal: j.harga || '' }))
+    setJasaCari(j.nama)
+    setJasaHargaInput(j.harga || '')
     setSaranJasaAktif(false)
+  }
+
+  function tambahJasaKeKeranjang() {
+    const nama = jasaCari.trim()
+    const harga = parseInt(jasaHargaInput, 10) || 0
+    const jasaCocok = jasaList.find((j) => j.nama.toUpperCase() === nama.toUpperCase())
+    if (!nama) { notify('⚠️ Pilih Jenis Jasa!', 'error'); return }
+    if (!jasaCocok) { notify('⚠️ Jasa tidak ditemukan di katalog! Pilih dari daftar, atau pakai "Jasa Lainnya" untuk servis di luar daftar.', 'error'); return }
+    setKeranjangJasa((prev) => [...prev, { id: Date.now() + Math.random(), nama: jasaCocok.nama, harga }])
+    setJasaCari('')
+    setJasaHargaInput('')
+    setSaranJasaAktif(false)
+  }
+
+  function hapusJasaDariKeranjang(id) {
+    setKeranjangJasa((prev) => prev.filter((j) => j.id !== id))
+  }
+
+  // Solo (1 mekanik) → pakai % default staf itu sendiri (dari halaman Staff).
+  // Bersama (2+ mekanik) → MAX_PERSEN_MEKANIK dibagi rata di antara mereka.
+  // Dipanggil ulang tiap kali roster berubah (tambah/hapus); staf tetap bisa ubah manual sesudahnya.
+  function hitungUlangPersenMekanik(list) {
+    if (list.length === 0) return list
+    if (list.length === 1) {
+      return [{ ...list[0], persen: list[0].persenDefault }]
+    }
+    const tiap = Math.round((MAX_PERSEN_MEKANIK / list.length) * 10) / 10
+    return list.map((m) => ({ ...m, persen: tiap }))
+  }
+
+  function pilihMekanik(s) {
+    setKeranjangMekanik((prev) => hitungUlangPersenMekanik([...prev, { nama: s.nama, persenDefault: s.persenBagiHasil ?? 8, persen: 0 }]))
+    setMekanikCari('')
+    setSaranMekanikAktif(false)
+  }
+
+  function hapusMekanikDariKeranjang(nama) {
+    setKeranjangMekanik((prev) => hitungUlangPersenMekanik(prev.filter((m) => m.nama !== nama)))
+  }
+
+  function ubahPersenMekanik(nama, persen) {
+    setKeranjangMekanik((prev) => prev.map((m) => (m.nama === nama ? { ...m, persen } : m)))
   }
 
   function tambahKeKeranjang() {
@@ -193,13 +266,33 @@ export default function TransaksiPage() {
     setKeranjang([])
     setKodeJual('')
     setJumlahJual('')
+    setKeranjangJasa([])
+    setJasaCari('')
+    setJasaHargaInput('')
+    setKeranjangMekanik([])
+    setMekanikCari('')
+    setPoinDigunakan('')
   }
 
   async function selesaikanTransaksi() {
     const adaBarang = keranjang.length > 0
-    const adaJasa = jasaNum > 0
+    const adaJasa = keranjangJasa.length > 0
     if (!adaBarang && !adaJasa) {
       notify('⚠️ Masukkan barang ATAU pilih jasa!', 'error')
+      return
+    }
+    if (poinDigunakanNum > 0) {
+      if (poinDigunakanNum < MIN_POIN_PAKAI) {
+        notify(`⚠️ Pemakaian poin minimal ${MIN_POIN_PAKAI} poin!`, 'error')
+        return
+      }
+      if (poinDigunakanNum > maksPoinBisaDipakai) {
+        notify(`⚠️ Poin tidak cukup atau melebihi total tagihan! Maksimal bisa dipakai sekarang: ${maksPoinBisaDipakai} poin.`, 'error')
+        return
+      }
+    }
+    if (totalPersenMekanik > MAX_PERSEN_MEKANIK) {
+      notify(`⚠️ Total % Bagi Hasil Mekanik (${totalPersenMekanik}%) melebihi batas maksimal ${MAX_PERSEN_MEKANIK}%!`, 'error')
       return
     }
 
@@ -213,27 +306,46 @@ export default function TransaksiPage() {
 
       const totalModal = keranjang.reduce((s, i) => s + i.hargaPokok * i.jumlah, 0)
       const totalLabaBrg = keranjang.reduce((s, i) => s + i.laba, 0)
+      const nomorHPBersih = form.nomorHP.trim() || '-'
 
-      await tambahRiwayat({
+      const hasilRiwayat = await tambahRiwayat({
         tgl: waktuSekarang(),
         nama_pelanggan: form.namaPelanggan.trim() || '-',
-        nomor_hp: form.nomorHP.trim() || '-',
+        nomor_hp: nomorHPBersih,
         plat_kendaraan: form.platKendaraan.trim() || '-',
         jenis_motor: form.jenisMotor.trim().toUpperCase() || '-',
-        nama_jasa: form.jenisJasa,
-        nama_mekanik: form.mekanik || '-',
-        biaya_jasa: jasaNum,
+        nama_jasa: keranjangJasa.map((j) => j.nama).join(', '),
+        nama_mekanik: keranjangMekanik.map((m) => m.nama).join(', ') || '-',
+        mekanik_items: keranjangMekanik.map((m) => ({ nama: m.nama, persen: parseFloat(m.persen) || 0 })),
+        biaya_jasa: totalJasaCart,
+        jasa_items: JSON.parse(JSON.stringify(keranjangJasa)),
         items: JSON.parse(JSON.stringify(keranjang)),
         total_barang: totalBrgCart,
         modal_keluar: totalModal,
         laba_barang: totalLabaBrg,
-        total_bayar: totalBayarCart,
+        total_bayar: totalBayarBersih,
         cara_bayar: form.caraBayar,
         uangdibayarkan: dpNum,
         sisa_bayar: sisaCart,
+        poin_didapat: poinAkanDidapat,
+        poin_digunakan: poinDigunakanNum,
+        diskon_poin: diskonPoin,
       })
 
-      notify(`✅ SELESAI!\nTotal Bayar: ${formatRupiah(totalBayarCart)}\nDibayar: ${formatRupiah(dpNum)}\nSisa: ${formatRupiah(sisaCart)}`)
+      await prosesPoin({
+        nomorHP: nomorHPBersih,
+        nama: form.namaPelanggan.trim() || '-',
+        tanggalISO: hariIniISO(),
+        riwayatId: hasilRiwayat.id,
+        poinDigunakan: poinDigunakanNum,
+        totalBayarSetelahDiskon: totalBayarBersih,
+      })
+
+      const infoPoin =
+        nomorHPBersih === '-'
+          ? ''
+          : `\n\n🎁 Poin digunakan: ${poinDigunakanNum}\n🎁 Poin didapat: ${poinAkanDidapat}`
+      notify(`✅ SELESAI!\nTotal Bayar: ${formatRupiah(totalBayarBersih)}\nDibayar: ${formatRupiah(dpNum)}\nSisa: ${formatRupiah(sisaCart)}${infoPoin}`)
       resetSemua()
     } catch (err) {
       notify('❌ Gagal menyimpan transaksi ke cloud: ' + err.message, 'error')
@@ -346,8 +458,11 @@ export default function TransaksiPage() {
         {riwayatPelangganAktif.length > 0 && (
           <div style={{ margin: '0 0 12px', padding: 10, background: '#fff8e1', borderRadius: 6, fontSize: 12 }}>
             <strong>🕐 Riwayat Kunjungan Terakhir Pelanggan Ini:</strong>
+            {form.nomorHP.trim() && (
+              <div style={{ marginTop: 4, fontWeight: 700 }}>🎁 Saldo Poin: {saldoPoin}</div>
+            )}
             {riwayatPelangganAktif.map((r) => {
-              const uraian = (r.items || []).map((x) => `${x.nama}×${x.jumlah}`).join(', ') || r.namaJasa || 'Jasa'
+              const uraian = [...(r.items || []).map((x) => `${x.nama}×${x.jumlah}`), ...(r.jasaItems || []).map((x) => x.nama)].join(', ') || r.namaJasa || 'Jasa'
               return (
                 <div key={r.id} style={{ marginTop: 4 }}>
                   📅 {r.tgl} — {uraian} ({formatRupiah(r.totalBayar || 0)})
@@ -358,33 +473,111 @@ export default function TransaksiPage() {
         )}
 
         <h3 style={{ fontSize: 15 }}>🔧 Jenis Jasa Service</h3>
-        <div className="field" style={{ position: 'relative' }}>
-          <label>Pilih Jasa</label>
+        <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
+          ⓘ Bisa tambah lebih dari satu jasa kalau motor dikerjakan beberapa servis sekaligus.
+        </p>
+        <div className="row">
+          <div style={{ flex: '2 1 160px', position: 'relative' }}>
+            <input
+              placeholder="🔍 Cari/Ketik Jenis Jasa..."
+              value={jasaCari}
+              onChange={(e) => { setJasaCari(e.target.value); setSaranJasaAktif(true) }}
+              onFocus={() => setSaranJasaAktif(true)}
+              onBlur={() => setTimeout(() => setSaranJasaAktif(false), 150)}
+            />
+            {saranJasaAktif && saranJasa.length > 0 && <SaranJasaBox saranJasa={saranJasa} onPilih={pilihJasa} />}
+          </div>
+          <div style={{ flex: '1 1 120px' }}>
+            <input
+              type="number"
+              min="0"
+              placeholder="Harga (Rp)"
+              value={jasaHargaInput}
+              onChange={(e) => setJasaHargaInput(e.target.value)}
+            />
+          </div>
+        </div>
+        <button className="btn" type="button" onClick={tambahJasaKeKeranjang}>➕ Tambah Jasa</button>
+
+        {keranjangJasa.length > 0 && (
+          <div className="table-wrap" style={{ marginTop: 10 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama Jasa</th>
+                  <th className="angka">Harga</th>
+                  <th className="tengah">Hapus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {keranjangJasa.map((j) => (
+                  <tr key={j.id}>
+                    <td>{j.nama}</td>
+                    <td className="angka">{formatRupiah(j.harga)}</td>
+                    <td className="tengah">
+                      <button className="btn btn-red btn-sm" onClick={() => hapusJasaDariKeranjang(j.id)}>X</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <h3 style={{ fontSize: 15, marginTop: 15 }}>👨‍🔧 Mekanik</h3>
+        <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
+          ⓘ Bisa pilih lebih dari satu kalau dikerjakan bersama. Solo pakai % default dari Staff, kerja bersama otomatis dibagi rata dari maksimal {MAX_PERSEN_MEKANIK}% (bisa diubah manual).
+        </p>
+        <div style={{ position: 'relative' }}>
           <input
-            placeholder="🔍 Cari Jenis Jasa..."
-            value={form.jenisJasa}
-            onChange={(e) => { setForm((f) => ({ ...f, jenisJasa: e.target.value })); setSaranJasaAktif(true) }}
-            onFocus={() => setSaranJasaAktif(true)}
-            onBlur={() => setTimeout(() => setSaranJasaAktif(false), 150)}
+            placeholder="🔍 Cari/Pilih Mekanik..."
+            value={mekanikCari}
+            onChange={(e) => { setMekanikCari(e.target.value); setSaranMekanikAktif(true) }}
+            onFocus={() => setSaranMekanikAktif(true)}
+            onBlur={() => setTimeout(() => setSaranMekanikAktif(false), 150)}
           />
-          {saranJasaAktif && saranJasa.length > 0 && <SaranJasaBox saranJasa={saranJasa} onPilih={pilihJasa} />}
-        </div>
-        <div className="field">
-          <label>👨‍🔧 Mekanik</label>
-          <select value={form.mekanik} onChange={(e) => setForm((f) => ({ ...f, mekanik: e.target.value }))}>
-            <option value="">— Pilih Mekanik —</option>
-            {mekanikAktif.map((s) => (
-              <option key={s.kode} value={s.nama}>👨‍🔧 {s.nama}</option>
-            ))}
-            <option value="Semua Mekanik">👨‍🔧 Semua Mekanik</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Biaya Jasa (Rp)</label>
-          <input type="number" min="0" value={form.biayaJasaTotal} onChange={(e) => setForm((f) => ({ ...f, biayaJasaTotal: e.target.value }))} />
+          {saranMekanikAktif && saranMekanik.length > 0 && <SaranMekanikBox saranMekanik={saranMekanik} onPilih={pilihMekanik} />}
         </div>
 
-        <h3 style={{ fontSize: 15 }}>➕ Tambah Barang</h3>
+        {keranjangMekanik.length > 0 && (
+          <div className="table-wrap" style={{ marginTop: 10 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama Mekanik</th>
+                  <th className="tengah">% Bagi Hasil</th>
+                  <th className="tengah">Hapus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {keranjangMekanik.map((m) => (
+                  <tr key={m.nama}>
+                    <td>👨‍🔧 {m.nama}</td>
+                    <td className="tengah">
+                      <input
+                        type="number"
+                        min="0"
+                        max={MAX_PERSEN_MEKANIK}
+                        step="0.1"
+                        value={m.persen}
+                        onChange={(e) => ubahPersenMekanik(m.nama, e.target.value)}
+                        style={{ width: 70, textAlign: 'right' }}
+                      />%
+                    </td>
+                    <td className="tengah">
+                      <button className="btn btn-red btn-sm" onClick={() => hapusMekanikDariKeranjang(m.nama)}>X</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: totalPersenMekanik > MAX_PERSEN_MEKANIK ? '#c00' : '#888' }}>
+              Total: {totalPersenMekanik}% {totalPersenMekanik > MAX_PERSEN_MEKANIK && '⚠️ melebihi batas!'}
+            </p>
+          </div>
+        )}
+
+        <h3 style={{ fontSize: 15, marginTop: 15 }}>📦 Barang</h3>
         <div className="row">
           <div style={{ flex: '2 1 160px', position: 'relative' }}>
             <input
@@ -435,9 +628,15 @@ export default function TransaksiPage() {
 
         <div style={{ marginTop: 12, padding: 10, background: '#f9f9f9', borderRadius: 6 }}>
           <p><strong>Total Barang:</strong> {formatRupiah(totalBrgCart)}</p>
-          <p><strong>Biaya Jasa:</strong> {formatRupiah(jasaNum)}</p>
+          <p><strong>Biaya Jasa:</strong> {formatRupiah(totalJasaCart)}</p>
+          {diskonPoin > 0 && (
+            <p className="merah"><strong>Diskon Poin ({poinDigunakanEfektif} poin):</strong> −{formatRupiah(diskonPoin)}</p>
+          )}
           <hr />
-          <p style={{ fontWeight: 700, fontSize: 16 }}>TOTAL BAYAR: {formatRupiah(totalBayarCart)}</p>
+          <p style={{ fontWeight: 700, fontSize: 16 }}>TOTAL BAYAR: {formatRupiah(totalBayarBersih)}</p>
+          {poinAkanDidapat > 0 && (
+            <p style={{ fontSize: 12, color: '#888' }}>🎁 Poin yang akan didapat dari transaksi ini: {poinAkanDidapat}</p>
+          )}
         </div>
 
         <div style={{ marginTop: 12, padding: 10, background: '#f0f8ff', borderRadius: 6 }}>
@@ -455,9 +654,24 @@ export default function TransaksiPage() {
             <input type="number" min="0" value={form.uangdibayarkan} onChange={(e) => setForm((f) => ({ ...f, uangdibayarkan: e.target.value }))} />
             <p style={{ marginTop: 6 }}>Sisa Bayar: <strong>{formatRupiah(sisaCart)}</strong></p>
           </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>🎁 Gunakan Poin</label>
+            <input
+              type="number"
+              min="0"
+              value={poinDigunakan}
+              onChange={(e) => setPoinDigunakan(e.target.value)}
+              placeholder={`Min. ${MIN_POIN_PAKAI} poin`}
+              disabled={saldoPoin < MIN_POIN_PAKAI}
+            />
+            <p style={{ marginTop: 6, fontSize: 12, color: '#888' }}>
+              {form.nomorHP.trim()
+                ? `Saldo poin pelanggan ini: ${saldoPoin} (min. ${MIN_POIN_PAKAI} buat dipakai, 1 poin = ${formatRupiah(NILAI_RUPIAH_PER_POIN)})`
+                : 'Isi Nomor HP dulu buat cek saldo poin pelanggan.'}
+            </p>
+          </div>
           <div className="row">
             <button className="btn" onClick={selesaikanTransaksi} disabled={saving}>{saving ? 'Menyimpan…' : '✅ Selesai & Simpan'}</button>
-            <button className="btn btn-blue" onClick={() => (riwayat[0] ? cetakNota(riwayat[0]) : notify('⚠️ Belum ada data penjualan!', 'error'))}>🖨️ Cetak Nota Terakhir</button>
             <button className="btn btn-orange" onClick={resetSemua}>🗑️ Kosongkan</button>
           </div>
         </div>
@@ -504,13 +718,27 @@ export default function TransaksiPage() {
                 <tr><td colSpan={11} className="tengah" style={{ padding: 12, color: '#888' }}>📭 Belum ada transaksi</td></tr>
               )}
               {dataTampil.map((r, i) => {
-                const uraian = (r.items || []).map((x) => `${x.nama}×${x.jumlah}`).join(', ') || r.namaJasa || 'Jasa'
-                const lunas = !((r.uangdibayarkan || 0) > 0 && (r.sisaBayar || 0) > 0)
+                const uraian = [...(r.items || []).map((x) => `${x.nama}×${x.jumlah}`), ...(r.jasaItems || []).map((x) => x.nama)].join(', ') || r.namaJasa || 'Jasa'
+                const lunas = (r.sisaBayar || 0) <= 0
                 return (
                   <tr key={r.id}>
                     <td>{r.tgl}</td>
                     <td>{r.namaPelanggan}<br /><small>{r.platKendaraan}{r.nomorHP && r.nomorHP !== '-' ? <><br />📱 {r.nomorHP}</> : null}</small></td>
-                    <td>{uraian}</td>
+                    <td
+                      title={uraian}
+                      onClick={() => setDetailIdx(i)}
+                      style={{
+                        maxWidth: 220,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        textDecoration: 'underline dotted',
+                        textUnderlineOffset: 3,
+                      }}
+                    >
+                      {uraian}
+                    </td>
                     <td>{r.namaMekanik || '-'}</td>
                     <td className="angka">{formatRupiah(r.totalBayar || 0)}</td>
                     <td>{r.caraBayar || 'Tunai'}{(r.uangdibayarkan || 0) > 0 && <><br /><small>{formatRupiah(r.uangdibayarkan)}</small></>}</td>
@@ -520,7 +748,20 @@ export default function TransaksiPage() {
                     </td>
                     <td className="tengah"><button className="btn btn-blue btn-sm" onClick={() => setDetailIdx(i)}>📋</button></td>
                     <td className="tengah"><button className="btn btn-orange btn-sm" onClick={() => setEditIdx(i)}>✏️</button></td>
-                    <td className="tengah"><button className="btn btn-blue btn-sm" onClick={() => cetakNota(r)}>🖨️</button></td>
+                    <td className="tengah">
+                      <button
+                        className="btn btn-blue btn-sm"
+                        onClick={() =>
+                          cetakNota(
+                            r,
+                            r.id === riwayat[0]?.id ? hitungSaldoPoin(poinLedger, r.nomorHP, hariIniISO()) : undefined,
+                            profil?.nama,
+                          )
+                        }
+                      >
+                        🖨️
+                      </button>
+                    </td>
                     <td className="tengah"><AksiPemilik><button className="btn btn-red btn-sm" onClick={() => hapus(r)}>🗑️</button></AksiPemilik></td>
                   </tr>
                 )
@@ -542,6 +783,7 @@ export default function TransaksiPage() {
 
       {detailRiwayat && (
         <Modal title="📋 Detail Transaksi" onClose={() => setDetailIdx(null)}>
+          {detailRiwayat.noTransaksi && <p>🧾 No. Transaksi: <strong>{detailRiwayat.noTransaksi}</strong></p>}
           <p>📅 Tanggal: {detailRiwayat.tgl}</p>
           <p>👤 Pelanggan: {detailRiwayat.namaPelanggan}</p>
           <p>🚗 Plat/Motor: {detailRiwayat.platKendaraan} / {detailRiwayat.jenisMotor}</p>
@@ -555,8 +797,23 @@ export default function TransaksiPage() {
               <p>📉 Sisa Bayar: {formatRupiah(detailRiwayat.sisaBayar || 0)}</p>
             </>
           )}
+          {((detailRiwayat.poinDidapat || 0) > 0 || (detailRiwayat.poinDigunakan || 0) > 0) && (
+            <p>
+              🎁 Poin: {(detailRiwayat.poinDigunakan || 0) > 0 && <>dipakai {detailRiwayat.poinDigunakan}, </>}
+              didapat +{detailRiwayat.poinDidapat || 0}
+            </p>
+          )}
           {detailRiwayat.biayaJasa > 0 && (
-            <p>🔧 Jasa: {detailRiwayat.namaJasa || '-'} — {formatRupiah(detailRiwayat.biayaJasa)}</p>
+            <>
+              <p style={{ marginTop: 8 }}><strong>🔧 Jasa:</strong></p>
+              {(detailRiwayat.jasaItems || []).length > 0 ? (
+                detailRiwayat.jasaItems.map((j, i) => (
+                  <div key={i}>- {j.nama} = {formatRupiah(j.harga)}</div>
+                ))
+              ) : (
+                <div>- {detailRiwayat.namaJasa || '-'} = {formatRupiah(detailRiwayat.biayaJasa)}</div>
+              )}
+            </>
           )}
           {(detailRiwayat.items || []).length > 0 && (
             <>
@@ -644,6 +901,22 @@ function SaranJasaBox({ saranJasa, onPilih }) {
         >
           <span>🔧 {j.nama}</span>
           <small style={{ color: '#888', whiteSpace: 'nowrap' }}>{formatRupiah(j.harga || 0)}</small>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SaranMekanikBox({ saranMekanik, onPilih }) {
+  return (
+    <div style={{ position: 'absolute', zIndex: 5, background: 'white', border: '1px solid #ddd', borderRadius: 8, width: '100%', marginTop: 4, boxShadow: '0 4px 10px rgba(0,0,0,0.1)', maxHeight: 260, overflowY: 'auto' }}>
+      {saranMekanik.map((s) => (
+        <div
+          key={s.kode}
+          style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+          onMouseDown={() => onPilih(s)}
+        >
+          👨‍🔧 {s.nama}
         </div>
       ))}
     </div>
