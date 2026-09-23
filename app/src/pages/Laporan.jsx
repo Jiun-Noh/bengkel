@@ -637,7 +637,7 @@ function hitungPotonganTerlambat(daftarAbsensi, bulan, nama, jamMasukStandar, no
 // "Solo" = cuma 1 mekanik di transaksi itu, "Bersama" = 2 mekanik atau lebih.
 function hitungBagiHasilBulanIni(riwayat, bulan, namaMekanik, persenBagiHasilStaffSaatIni) {
   const [thn, bln] = bulan.split('-').map(Number)
-  const hasil = { jumlahJasa: 0, nilaiJasa: 0, bagiHasilSolo: 0, bagiHasilBersama: 0, jumlahSolo: 0, jumlahBersama: 0 }
+  const hasil = { jumlahJasa: 0, nilaiJasa: 0, bagiHasilSolo: 0, bagiHasilBersama: 0, jumlahSolo: 0, jumlahBersama: 0, rincian: [] }
 
   riwayat.forEach((r) => {
     const t = ambilTanggalDariTeks(r.tgl)
@@ -650,6 +650,13 @@ function hitungBagiHasilBulanIni(riwayat, bulan, namaMekanik, persenBagiHasilSta
       const kontribusi = Math.round(((r.biayaJasa || 0) * entry.persen) / 100)
       hasil.jumlahJasa += 1
       hasil.nilaiJasa += r.biayaJasa || 0
+      hasil.rincian.push({
+        tgl: r.tgl,
+        biayaJasa: r.biayaJasa || 0,
+        persen: entry.persen,
+        kontribusi,
+        rekanKerja: items.filter((m) => m.nama !== namaMekanik).map((m) => m.nama),
+      })
       if (items.length > 1) {
         hasil.bagiHasilBersama += kontribusi
         hasil.jumlahBersama += 1
@@ -658,14 +665,17 @@ function hitungBagiHasilBulanIni(riwayat, bulan, namaMekanik, persenBagiHasilSta
         hasil.jumlahSolo += 1
       }
     } else if (r.namaMekanik === namaMekanik) {
-      const kontribusi = Math.round(((r.biayaJasa || 0) * (persenBagiHasilStaffSaatIni ?? 8)) / 100)
+      const persen = persenBagiHasilStaffSaatIni ?? 8
+      const kontribusi = Math.round(((r.biayaJasa || 0) * persen) / 100)
       hasil.jumlahJasa += 1
       hasil.nilaiJasa += r.biayaJasa || 0
+      hasil.rincian.push({ tgl: r.tgl, biayaJasa: r.biayaJasa || 0, persen, kontribusi, rekanKerja: [] })
       hasil.bagiHasilSolo += kontribusi
       hasil.jumlahSolo += 1
     }
   })
 
+  hasil.rincian.sort((a, b) => (a.tgl || '').localeCompare(b.tgl || ''))
   hasil.bagiHasilTotal = hasil.bagiHasilSolo + hasil.bagiHasilBersama
   return hasil
 }
@@ -678,7 +688,7 @@ function hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIn
       // Kasir tidak melayani jasa servis, jadi jasa/bagi hasil tidak berlaku buat jabatan ini.
       const bagiHasilInfo =
         s.jabatan === 'Kasir'
-          ? { jumlahJasa: 0, nilaiJasa: 0, bagiHasilSolo: 0, bagiHasilBersama: 0, bagiHasilTotal: 0, jumlahSolo: 0, jumlahBersama: 0 }
+          ? { jumlahJasa: 0, nilaiJasa: 0, bagiHasilSolo: 0, bagiHasilBersama: 0, bagiHasilTotal: 0, jumlahSolo: 0, jumlahBersama: 0, rincian: [] }
           : hitungBagiHasilBulanIni(riwayat, bulanIni, s.nama, s.persenBagiHasil ?? 8)
       const jamLembur = lembur.find((l) => l.staffKode === s.kode && l.bulan === bulanIni)?.jam || 0
       const bagiHasil = bagiHasilInfo.bagiHasilTotal
@@ -810,9 +820,46 @@ function ModalDetailPotongan({ s, onClose }) {
   )
 }
 
+function ModalDetailBagiHasil({ s, onClose }) {
+  return (
+    <Modal title={`💼 Detail Bagi Hasil — ${s.nama}`} onClose={onClose}>
+      {s.bagiHasilInfo.rincian.length === 0 ? (
+        <p style={{ color: '#888', fontSize: 13 }}>Belum ada jasa yang dilayani bulan ini.</p>
+      ) : (
+        <div className="table-wrap">
+          <table style={{ fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th className="angka">Nilai Jasa</th>
+                <th className="tengah">%</th>
+                <th className="angka">Kontribusi</th>
+                <th>Rekan Kerja</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.bagiHasilInfo.rincian.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.tgl}</td>
+                  <td className="angka">{formatRupiah(r.biayaJasa)}</td>
+                  <td className="tengah">{r.persen}%</td>
+                  <td className="angka hijau">{formatRupiah(r.kontribusi)}</td>
+                  <td>{r.rekanKerja.length > 0 ? r.rekanKerja.join(', ') : <span style={{ color: '#888' }}>Solo</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p style={{ marginTop: 12, fontWeight: 700, textAlign: 'right' }}>Total Bagi Hasil: {formatRupiah(s.bagiHasil)}</p>
+    </Modal>
+  )
+}
+
 function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
   const { notify } = useUI()
   const [detailPotongan, setDetailPotongan] = useState(null)
+  const [detailBagiHasil, setDetailBagiHasil] = useState(null)
 
   async function ubahLembur(kode, nilai) {
     try {
@@ -902,7 +949,12 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
                 <td className="tengah">
                   {s.jabatan === 'Kasir' ? '−' : `${s.bagiHasilInfo.jumlahJasa}× (${formatRupiah(s.bagiHasilInfo.nilaiJasa)})`}
                 </td>
-                <td className="angka">
+                <td
+                  className="angka"
+                  style={(s.jabatan !== 'Kasir' && s.bagiHasilInfo.rincian.length > 0) ? { cursor: 'pointer', textDecoration: 'underline dotted' } : undefined}
+                  title={(s.jabatan !== 'Kasir' && s.bagiHasilInfo.rincian.length > 0) ? 'Klik untuk lihat rincian' : undefined}
+                  onClick={() => s.jabatan !== 'Kasir' && s.bagiHasilInfo.rincian.length > 0 && setDetailBagiHasil(s)}
+                >
                   {s.jabatan === 'Kasir' ? (
                     '−'
                   ) : (
@@ -949,8 +1001,11 @@ function TabelGajiStaf({ daftar, bulanIni, labelBulanIni, simpanLembur }) {
         ⓘ Freelance: kolom "Gaji Pokok" adalah gaji harian, Total dihitung dari jumlah hari hadir × gaji harian (bukan gaji bulanan tetap).
         <br />
         ⓘ Denda Telat/Mangkir diatur per staf di halaman Staff, dihitung dari "Jam Masuk Standar" di atas. Klik nominal Potongan untuk lihat rincian per hari. Freelance dikecualikan dari denda ini (lihat poin di atas).
+        <br />
+        ⓘ Klik nominal Bagi Hasil untuk lihat rincian jasa & pembagian per transaksi.
       </p>
       {detailPotongan && <ModalDetailPotongan s={detailPotongan} onClose={() => setDetailPotongan(null)} />}
+      {detailBagiHasil && <ModalDetailBagiHasil s={detailBagiHasil} onClose={() => setDetailBagiHasil(null)} />}
     </div>
   )
 }
