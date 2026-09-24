@@ -48,7 +48,7 @@ export default function TransaksiPage() {
   const { data: poinLedger = [] } = usePoinLedgerQuery(true)
   const { ubahStokTerjual } = useBarangMutations()
   const { tambahRiwayat, hapusRiwayat, ubahRiwayat } = useRiwayatMutations()
-  const { prosesPoin } = usePoinMutations()
+  const { prosesPoin, earnPoinSaatLunas, batalkanPoinUntukRiwayat } = usePoinMutations()
   const { notify, confirm } = useUI()
   const { profil } = useAuth()
 
@@ -339,12 +339,13 @@ export default function TransaksiPage() {
         riwayatId: hasilRiwayat.id,
         poinDigunakan: poinDigunakanNum,
         totalBayarSetelahDiskon: totalBayarBersih,
+        sudahLunas: sisaCart <= 0,
       })
 
       const infoPoin =
         nomorHPBersih === '-'
           ? ''
-          : `\n\n🎁 Poin digunakan: ${poinDigunakanNum}\n🎁 Poin didapat: ${poinAkanDidapat}`
+          : `\n\n🎁 Poin digunakan: ${poinDigunakanNum}\n🎁 Poin didapat: ${poinAkanDidapat}${sisaCart > 0 ? ' (setelah lunas)' : ''}`
       notify(`✅ SELESAI!\nTotal Bayar: ${formatRupiah(totalBayarBersih)}\nDibayar: ${formatRupiah(dpNum)}\nSisa: ${formatRupiah(sisaCart)}${infoPoin}`)
       resetSemua()
     } catch (err) {
@@ -405,6 +406,7 @@ export default function TransaksiPage() {
     const ok = await confirm('⚠️ Hapus riwayat ini?')
     if (!ok) return
     try {
+      await batalkanPoinUntukRiwayat(r.id)
       await hapusRiwayat(r.id)
     } catch (err) {
       notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
@@ -635,7 +637,10 @@ export default function TransaksiPage() {
           <hr />
           <p style={{ fontWeight: 700, fontSize: 16 }}>TOTAL BAYAR: {formatRupiah(totalBayarBersih)}</p>
           {poinAkanDidapat > 0 && (
-            <p style={{ fontSize: 12, color: '#888' }}>🎁 Poin yang akan didapat dari transaksi ini: {poinAkanDidapat}</p>
+            <p style={{ fontSize: 12, color: '#888' }}>
+              🎁 Poin yang akan didapat dari transaksi ini: {poinAkanDidapat}
+              {sisaCart > 0 && ' (baru dikreditkan setelah lunas)'}
+            </p>
           )}
         </div>
 
@@ -841,9 +846,20 @@ export default function TransaksiPage() {
           }}
           onCatatPelunasan={async (nominal) => {
             const uangBaru = (editRiwayat.uangdibayarkan || 0) + nominal
-            const sisaBaru = Math.max(0, (editRiwayat.sisaBayar || 0) - nominal)
+            const sisaSebelum = editRiwayat.sisaBayar || 0
+            const sisaBaru = Math.max(0, sisaSebelum - nominal)
             try {
               await ubahRiwayat(editRiwayat.id, { uangdibayarkan: uangBaru, sisa_bayar: sisaBaru })
+              // Poin baru dikreditkan pas transaksi ini LUNAS buat pertama kalinya (belum lunas → lunas).
+              if (sisaSebelum > 0 && sisaBaru <= 0) {
+                await earnPoinSaatLunas({
+                  nomorHP: editRiwayat.nomorHP,
+                  nama: editRiwayat.namaPelanggan,
+                  tanggalISO: hariIniISO(),
+                  riwayatId: editRiwayat.id,
+                  totalBayarSetelahDiskon: editRiwayat.totalBayar,
+                })
+              }
               notify(`✅ Pembayaran dicatat!\nDibayar: ${formatRupiah(nominal)}\nSisa sekarang: ${formatRupiah(sisaBaru)}`)
               setEditIdx(null)
             } catch (err) {
