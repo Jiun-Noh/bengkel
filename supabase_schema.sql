@@ -71,6 +71,7 @@ create table staff (
   uang_bensin integer default 0,  -- uang bensin bulanan (khusus Magang)
   uang_lembur_per_jam integer default 10000,  -- tarif lembur per jam, bisa beda tiap staf
   persen_bagi_hasil integer default 8,  -- % komisi default saat kerja SOLO (maks 40, disepakati dgn pemilik); saat transaksi dikerjakan >1 mekanik, % masing2 diisi langsung di Transaksi & dikunci ke riwayat.mekanik_items
+  persen_bagi_hasil_bersama numeric default 20,  -- % komisi saat kerja BERSAMA mekanik lain (diisi pemilik; total tiap transaksi diskalakan ke maks 40)
   nominal_telat_per_menit integer default 1000,  -- denda keterlambatan per menit, bisa beda tiap staf
   nominal_mangkir integer default 50000,  -- denda per hari Tanpa Keterangan (mangkir), bisa beda tiap staf
   diubah_oleh uuid references auth.users(id),  -- jejak ringan: siapa terakhir insert/update baris ini

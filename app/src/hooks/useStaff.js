@@ -14,6 +14,7 @@ export function kolomStaffKeInternal(row) {
     uangBensin: row.uang_bensin || 0,
     uangLemburPerJam: row.uang_lembur_per_jam || 10000,
     persenBagiHasil: row.persen_bagi_hasil ?? 8,
+    persenBagiHasilBersama: row.persen_bagi_hasil_bersama ?? 20,
     nominalTelatPerMenit: row.nominal_telat_per_menit ?? 1000,
     nominalMangkir: row.nominal_mangkir ?? 50000,
   }

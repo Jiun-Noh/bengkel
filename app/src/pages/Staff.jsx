@@ -20,6 +20,7 @@ const FORM_KOSONG = {
   uangBensin: '',
   uangLemburPerJam: '10000',
   persenBagiHasil: '8',
+  persenBagiHasilBersama: '20',
   nominalTelatPerMenit: '1000',
   nominalMangkir: '50000',
 }
@@ -74,6 +75,7 @@ export default function StaffPage() {
       uangBensin: s.uangBensin || '',
       uangLemburPerJam: s.uangLemburPerJam || 10000,
       persenBagiHasil: s.persenBagiHasil ?? 8,
+      persenBagiHasilBersama: s.persenBagiHasilBersama ?? 20,
       nominalTelatPerMenit: s.nominalTelatPerMenit ?? 1000,
       nominalMangkir: s.nominalMangkir ?? 50000,
     })
@@ -114,6 +116,7 @@ export default function StaffPage() {
         uang_bensin: parseInt(form.uangBensin, 10) || 0,
         uang_lembur_per_jam: parseInt(form.uangLemburPerJam, 10) || 10000,
         persen_bagi_hasil: parseInt(form.persenBagiHasil, 10) || 0,
+        persen_bagi_hasil_bersama: parseFloat(form.persenBagiHasilBersama) || 0,
         nominal_telat_per_menit: parseInt(form.nominalTelatPerMenit, 10) || 0,
         nominal_mangkir: parseInt(form.nominalMangkir, 10) || 0,
       })
@@ -321,7 +324,25 @@ export default function StaffPage() {
                 placeholder="8"
               />
               <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                ⓘ Persentase komisi dari jasa yang dilayani staf ini SENDIRIAN. Maksimal 40% (sesuai kesepakatan dengan pemilik). Kalau transaksi dikerjakan bersama mekanik lain, % masing-masing ditentukan langsung di Transaksi (total tetap maks. 40%).
+                ⓘ Persentase komisi dari jasa yang dilayani staf ini SENDIRIAN. Maksimal 40% (sesuai kesepakatan dengan pemilik).
+              </p>
+            </div>
+          )}
+
+          {form.jabatan !== 'Magang' && form.jabatan !== 'Kasir' && (
+            <div className="field">
+              <label>🤝 % Bagi Hasil Jasa (Bersama)</label>
+              <input
+                type="number"
+                min="0"
+                max="40"
+                step="0.1"
+                value={form.persenBagiHasilBersama}
+                onChange={(e) => setForm((f) => ({ ...f, persenBagiHasilBersama: e.target.value }))}
+                placeholder="20"
+              />
+              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                ⓘ Persentase komisi saat staf ini mengerjakan transaksi BERSAMA mekanik lain. Angka ini otomatis muncul di Transaksi dan tidak bisa diubah kasir. Kalau total semua mekanik di satu transaksi lebih dari 40%, otomatis diskalakan proporsional ke 40%.
               </p>
             </div>
           )}

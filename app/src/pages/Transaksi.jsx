@@ -84,7 +84,9 @@ export default function TransaksiPage() {
     return belumDipilih.filter((s) => s.nama.toUpperCase().includes(kata)).slice(0, 8)
   }, [saranMekanikAktif, mekanikCari, mekanikAktif, keranjangMekanik])
 
-  const totalPersenMekanik = keranjangMekanik.reduce((s, m) => s + (parseFloat(m.persen) || 0), 0)
+  const totalPersenMekanik = Math.round(keranjangMekanik.reduce((s, m) => s + (parseFloat(m.persen) || 0), 0) * 100) / 100
+  const melebihiBatasMekanik = totalPersenMekanik > MAX_PERSEN_MEKANIK + 0.01
+  const bolehUbahPersenMekanik = profil?.peran === 'pemilik'
 
   const barangUntukKode = barang.find((b) => b.kode === kodeJual.toUpperCase())
 
@@ -197,20 +199,28 @@ export default function TransaksiPage() {
     setKeranjangJasa((prev) => prev.filter((j) => j.id !== id))
   }
 
-  // Solo (1 mekanik) → pakai % default staf itu sendiri (dari halaman Staff).
-  // Bersama (2+ mekanik) → MAX_PERSEN_MEKANIK dibagi rata di antara mereka.
-  // Dipanggil ulang tiap kali roster berubah (tambah/hapus); staf tetap bisa ubah manual sesudahnya.
+  // Solo (1 mekanik) → % Solo staf itu dari halaman Staff.
+  // Bersama (2+ mekanik) → % Bersama masing-masing dari halaman Staff; kalau totalnya melebihi
+  // MAX_PERSEN_MEKANIK, semuanya diskalakan proporsional supaya total pas di batas.
+  // Dipanggil ulang tiap kali roster berubah (tambah/hapus). Angka ini cuma bisa diubah manual
+  // oleh pemilik (kasir melihatnya sebagai teks saja).
   function hitungUlangPersenMekanik(list) {
     if (list.length === 0) return list
     if (list.length === 1) {
-      return [{ ...list[0], persen: list[0].persenDefault }]
+      return [{ ...list[0], persen: list[0].persenSolo }]
     }
-    const tiap = Math.round((MAX_PERSEN_MEKANIK / list.length) * 10) / 10
-    return list.map((m) => ({ ...m, persen: tiap }))
+    const total = list.reduce((s, m) => s + m.persenBersama, 0)
+    const skala = total > MAX_PERSEN_MEKANIK ? MAX_PERSEN_MEKANIK / total : 1
+    return list.map((m) => ({ ...m, persen: Math.round(m.persenBersama * skala * 100) / 100 }))
   }
 
   function pilihMekanik(s) {
-    setKeranjangMekanik((prev) => hitungUlangPersenMekanik([...prev, { nama: s.nama, persenDefault: s.persenBagiHasil ?? 8, persen: 0 }]))
+    setKeranjangMekanik((prev) =>
+      hitungUlangPersenMekanik([
+        ...prev,
+        { nama: s.nama, persenSolo: s.persenBagiHasil ?? 8, persenBersama: s.persenBagiHasilBersama ?? 20, persen: 0 },
+      ]),
+    )
     setMekanikCari('')
     setSaranMekanikAktif(false)
   }
@@ -291,7 +301,7 @@ export default function TransaksiPage() {
         return
       }
     }
-    if (totalPersenMekanik > MAX_PERSEN_MEKANIK) {
+    if (melebihiBatasMekanik) {
       notify(`⚠️ Total % Bagi Hasil Mekanik (${totalPersenMekanik}%) melebihi batas maksimal ${MAX_PERSEN_MEKANIK}%!`, 'error')
       return
     }
@@ -528,7 +538,7 @@ export default function TransaksiPage() {
 
         <h3 style={{ fontSize: 15, marginTop: 15 }}>👨‍🔧 Mekanik</h3>
         <p style={{ fontSize: 12, color: '#888', marginTop: -8 }}>
-          ⓘ Bisa pilih lebih dari satu kalau dikerjakan bersama. Solo pakai % default dari Staff, kerja bersama otomatis dibagi rata dari maksimal {MAX_PERSEN_MEKANIK}% (bisa diubah manual).
+          ⓘ Bisa pilih lebih dari satu kalau dikerjakan bersama. % Bagi Hasil terisi otomatis dari pengaturan Staff (Solo / Bersama), total maksimal {MAX_PERSEN_MEKANIK}%.{!bolehUbahPersenMekanik && ' Angka tidak bisa diubah kasir.'}
         </p>
         <div style={{ position: 'relative' }}>
           <input
@@ -556,15 +566,21 @@ export default function TransaksiPage() {
                   <tr key={m.nama}>
                     <td>👨‍🔧 {m.nama}</td>
                     <td className="tengah">
-                      <input
-                        type="number"
-                        min="0"
-                        max={MAX_PERSEN_MEKANIK}
-                        step="0.1"
-                        value={m.persen}
-                        onChange={(e) => ubahPersenMekanik(m.nama, e.target.value)}
-                        style={{ width: 70, textAlign: 'right' }}
-                      />%
+                      {bolehUbahPersenMekanik ? (
+                        <>
+                          <input
+                            type="number"
+                            min="0"
+                            max={MAX_PERSEN_MEKANIK}
+                            step="0.1"
+                            value={m.persen}
+                            onChange={(e) => ubahPersenMekanik(m.nama, e.target.value)}
+                            style={{ width: 70, textAlign: 'right' }}
+                          />%
+                        </>
+                      ) : (
+                        <strong>{m.persen}%</strong>
+                      )}
                     </td>
                     <td className="tengah">
                       <button className="btn btn-red btn-sm" onClick={() => hapusMekanikDariKeranjang(m.nama)}>X</button>
@@ -573,8 +589,8 @@ export default function TransaksiPage() {
                 ))}
               </tbody>
             </table>
-            <p style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: totalPersenMekanik > MAX_PERSEN_MEKANIK ? '#c00' : '#888' }}>
-              Total: {totalPersenMekanik}% {totalPersenMekanik > MAX_PERSEN_MEKANIK && '⚠️ melebihi batas!'}
+            <p style={{ marginTop: 6, fontSize: 12, fontWeight: 700, color: melebihiBatasMekanik ? '#c00' : '#888' }}>
+              Total: {totalPersenMekanik}% {melebihiBatasMekanik && '⚠️ melebihi batas!'}
             </p>
           </div>
         )}

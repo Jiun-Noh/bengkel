@@ -1,6 +1,30 @@
 import { formatRupiah, waktuSekarang } from './format'
 import { SHOP } from './shopInfo'
 
+// Tata letak sengaja tidak memakai lebar tetap: lebar mengikuti kertas yang dipilih di driver
+// printer (58 mm maupun 80 mm), dan semua teks boleh turun baris. Tiap baris tabel cuma 2 kolom
+// (label kiri, nominal kanan) supaya muat di 58 mm; nama barang ditaruh di baris sendiri, lalu
+// baris berikutnya berisi "jumlah x harga satuan" dan subtotal.
+const CSS = `
+@page{margin:0}
+body{font-family:'Courier New',monospace; font-size:12px; margin:0; padding:2mm;}
+p{margin:3px 0;}
+.tengah{text-align:center;}
+.kanan{text-align:right; white-space:nowrap; padding-left:6px;}
+.garis{border-bottom:1px dashed #000; margin:6px 0;}
+table{width:100%; border-collapse:collapse; font-size:12px;}
+td{vertical-align:top;}
+.logo{max-width:min(200px,100%); max-height:100px; object-fit:contain;}
+.nw{white-space:nowrap;}
+@media (max-width:230px){ body,table{font-size:11px;} }
+`
+
+function baris(label, nilai, tebal = false) {
+  const l = tebal ? `<strong>${label}</strong>` : label
+  const n = tebal ? `<strong>${nilai}</strong>` : nilai
+  return `<tr><td>${l}</td><td class="kanan">${n}</td></tr>`
+}
+
 // saldoPoinSekarang = saldo poin pelanggan SETELAH transaksi ini (opsional — cuma diisi
 // pas cetak nota langsung setelah transaksi selesai, biar "Poin sebelumnya/sekarang" akurat).
 // Kalau tidak diisi (mis. cetak ulang nota lama dari daftar riwayat), cuma tampilkan
@@ -10,33 +34,51 @@ import { SHOP } from './shopInfo'
 export function cetakNota(data, saldoPoinSekarang, namaPencetak) {
   if (!data) return
 
-  let nota = `<html><head><style>body{font-family:Courier New; font-size:13px; width:280px; padding:10px; margin:0 auto;}.tengah{text-align:center; white-space:nowrap;}.kanan{text-align:right; white-space:nowrap;}.garis{border-bottom:1px dashed #000; margin:6px 0;}table{width:100%; border-collapse:collapse; font-size:12px;}.logo{max-width:200px; max-height:100px; object-fit:contain;}</style></head><body><div class="tengah"><img class="logo" src="${SHOP.logo}" alt="${SHOP.nama}" />${SHOP.alamat ? `<p style="margin:4px 0; font-size:12px;">${SHOP.alamat}</p>` : ''}${SHOP.telepon ? `<p style="margin:4px 0; font-size:12px;">Telp: ${SHOP.telepon}</p>` : ''}</div><div class="garis"></div>${data.noTransaksi ? `<p>No. Transaksi: <strong>${data.noTransaksi}</strong></p>` : ''}<p>Tanggal: ${data.tgl}</p><p>Pelanggan: ${data.namaPelanggan}</p><p>📱 HP: ${data.nomorHP || '-'}</p><p>Plat/Motor: ${data.platKendaraan} / ${data.jenisMotor}</p><div class="garis"></div><table><tr><td><strong>URAIAN</strong></td><td class="tengah"><strong>JUMLAH</strong></td><td class="kanan"><strong>SUBTOTAL</strong></td></tr><tr><td colspan="3"><div class="garis"></div></td></tr>`
+  let nota = `<html><head><style>${CSS}</style></head><body>`
+
+  nota += `<div class="tengah"><img class="logo" src="${SHOP.logo}" alt="${SHOP.nama}" />`
+  if (SHOP.alamat) nota += `<p>${SHOP.alamat}</p>`
+  if (SHOP.telepon) nota += `<p>Telp: ${SHOP.telepon}</p>`
+  nota += `</div><div class="garis"></div>`
+
+  if (data.noTransaksi) nota += `<p>No. Transaksi: <strong>${data.noTransaksi}</strong></p>`
+  nota += `<p>Tanggal: ${data.tgl}</p>`
+  nota += `<p>Pelanggan: ${data.namaPelanggan}</p>`
+  nota += `<p>📱 HP: ${data.nomorHP || '-'}</p>`
+  nota += `<p>Plat/Motor: ${data.platKendaraan} / ${data.jenisMotor}</p>`
+  nota += `<div class="garis"></div>`
+
+  nota += `<table>${baris('URAIAN', 'SUBTOTAL', true)}<tr><td colspan="2"><div class="garis"></div></td></tr>`
 
   ;(data.items || []).forEach((i) => {
-    nota += `<tr><td>${i.nama}</td><td class="tengah">${i.jumlah} ${i.satuan}</td><td class="kanan">${formatRupiah(i.subtotal)}</td></tr>`
+    const hargaSatuan = i.hargaJual ?? (i.jumlah ? i.subtotal / i.jumlah : i.subtotal)
+    nota += `<tr><td colspan="2">${i.nama}</td></tr>`
+    nota += baris(`${i.jumlah} ${i.satuan} x <span class="nw">${formatRupiah(hargaSatuan)}</span>`, formatRupiah(i.subtotal))
   })
 
   if ((data.jasaItems || []).length > 0) {
     data.jasaItems.forEach((j) => {
-      nota += `<tr><td>🔧 ${j.nama}</td><td class="tengah">—</td><td class="kanan">${formatRupiah(j.harga)}</td></tr>`
+      nota += baris(`🔧 ${j.nama}`, formatRupiah(j.harga))
     })
   } else if (data.biayaJasa > 0) {
-    nota += `<tr><td>🔧 ${data.namaJasa || 'Jasa'}</td><td class="tengah">—</td><td class="kanan">${formatRupiah(data.biayaJasa)}</td></tr>`
+    nota += baris(`🔧 ${data.namaJasa || 'Jasa'}`, formatRupiah(data.biayaJasa))
   }
 
-  nota += `<tr><td colspan="3"><div class="garis"></div></td></tr>`
+  nota += `<tr><td colspan="2"><div class="garis"></div></td></tr>`
 
   if (data.diskonPoin > 0) {
-    nota += `<tr><td colspan="2">🎁 Diskon Poin (${data.poinDigunakan} poin)</td><td class="kanan">−${formatRupiah(data.diskonPoin)}</td></tr>`
+    nota += baris(`🎁 Diskon Poin (${data.poinDigunakan} poin)`, `−${formatRupiah(data.diskonPoin)}`)
   }
 
-  nota += `<tr><td colspan="2"><strong>TOTAL</strong></td><td class="kanan"><strong>${formatRupiah(data.totalBayar)}</strong></td></tr>`
+  nota += baris('TOTAL', formatRupiah(data.totalBayar), true)
 
   if (data.uangdibayarkan > 0) {
-    nota += `<tr><td colspan="2">💰 Total Bayar </td><td class="kanan">${formatRupiah(data.uangdibayarkan)}</td></tr><tr><td colspan="2">📉 Sisa Bayar</td><td class="kanan">${formatRupiah(data.sisaBayar)}</td></tr>`
+    nota += baris('💰 Total Bayar', formatRupiah(data.uangdibayarkan))
+    nota += baris('📉 Sisa Bayar', formatRupiah(data.sisaBayar))
   }
 
-  nota += `<tr><td colspan="2">💳 Cara Bayar</td><td class="kanan">${data.caraBayar}</td></tr></table>`
+  nota += baris('💳 Cara Bayar', data.caraBayar)
+  nota += `</table>`
 
   const adaHP = data.nomorHP && data.nomorHP !== '-'
   const poinDidapat = data.poinDidapat || 0
@@ -44,14 +86,14 @@ export function cetakNota(data, saldoPoinSekarang, namaPencetak) {
   if (adaHP && (poinDidapat > 0 || poinDigunakan > 0 || saldoPoinSekarang != null)) {
     const poinSebelumnya = saldoPoinSekarang != null ? saldoPoinSekarang - poinDidapat + poinDigunakan : null
     nota += `<div class="garis"></div><p class="tengah"><strong>🎁 POIN MEMBER</strong></p><table>`
-    if (poinSebelumnya != null) nota += `<tr><td>Poin sebelumnya</td><td class="kanan">${poinSebelumnya}</td></tr>`
-    if (poinDidapat > 0) nota += `<tr><td>Poin transaksi</td><td class="kanan">+${poinDidapat}</td></tr>`
-    if (poinDigunakan > 0) nota += `<tr><td>Poin digunakan</td><td class="kanan">−${poinDigunakan}</td></tr>`
-    if (saldoPoinSekarang != null) nota += `<tr><td><strong>Poin sekarang</strong></td><td class="kanan"><strong>${saldoPoinSekarang}</strong></td></tr>`
+    if (poinSebelumnya != null) nota += baris('Poin sebelumnya', poinSebelumnya)
+    if (poinDidapat > 0) nota += baris('Poin transaksi', `+${poinDidapat}`)
+    if (poinDigunakan > 0) nota += baris('Poin digunakan', `−${poinDigunakan}`)
+    if (saldoPoinSekarang != null) nota += baris('Poin sekarang', saldoPoinSekarang, true)
     nota += `</table>`
   }
 
-  nota += `<div class="garis"></div><p class="tengah">Terima Kasih 🙏</p>`
+  nota += `<div class="garis"></div><p class="tengah">Terima kasih telah mempercayakan perawatan motor Anda kepada kami.</p>`
 
   if (namaPencetak) {
     nota += `<div class="garis"></div><p style="font-size:11px; color:#555;">Dicetak: ${waktuSekarang()}<br />Kasir: ${namaPencetak}</p>`

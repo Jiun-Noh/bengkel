@@ -2,7 +2,7 @@
 export const SHOP = {
   nama: 'Koko Suka Motor',
   logo: '/ksm_logo.jpeg',
-  alamat: 'Jl. Raya Abianbase No. 76, Mengwi, Badung',
-  telepon: '+62 878 5553 9079',
+  alamat: 'Jl. Raya Abianbase No. 76A, Mengwi, Badung',
+  telepon: '+62 878 5553 6079',
   pemilik: 'Widi Adi Budi Wibowo',
 }
