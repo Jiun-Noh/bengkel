@@ -5,8 +5,10 @@ import { SHOP } from './shopInfo'
 // printer (58 mm maupun 80 mm), dan semua teks boleh turun baris. Tiap baris tabel cuma 2 kolom
 // (label kiri, nominal kanan) supaya muat di 58 mm; nama barang ditaruh di baris sendiri, lalu
 // baris berikutnya berisi "jumlah x harga satuan" dan subtotal.
+// @page size dikunci ke 58mm karena printer thermal yang dibeli 58mm — kalau nanti ganti
+// ke printer 80mm, angka ini yang perlu diubah jadi 80mm.
 const CSS = `
-@page{margin:0}
+@page{size:58mm auto; margin:0}
 body{font-family:'Courier New',monospace; font-size:12px; margin:0; padding:2mm;}
 p{margin:3px 0;}
 .tengah{text-align:center;}

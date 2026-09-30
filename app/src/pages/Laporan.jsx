@@ -3,7 +3,7 @@ import Chart from 'chart.js/auto'
 import { useRiwayatQuery } from '../hooks/useRiwayat'
 import { usePengaturanQuery, usePengaturanMutations } from '../hooks/usePengaturan'
 import { usePengeluaranQuery, usePengeluaranMutations } from '../hooks/usePengeluaran'
-import { useHutangSupplierQuery, useHutangSupplierMutations } from '../hooks/useHutangSupplier'
+import { useHutangSupplierQuery, useHutangSupplierPembayaranQuery, useHutangSupplierMutations } from '../hooks/useHutangSupplier'
 import { useStaffQuery } from '../hooks/useStaff'
 import { useAbsensiQuery } from '../hooks/useAbsensi'
 import { useLemburQuery, useLemburMutations } from '../hooks/useLembur'
@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatRupiah, waktuSekarang } from '../lib/format'
 import { cetakSlipGaji } from '../lib/cetakSlipGaji'
 import { cetakSlipInvestor } from '../lib/cetakSlipInvestor'
+import { cetakKwitansiSupplier } from '../lib/cetakKwitansiSupplier'
 import Modal from '../components/common/Modal'
 
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
@@ -57,7 +58,8 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const { data: pengeluaran = [] } = usePengeluaranQuery(true)
   const { tambahPengeluaran, hapusPengeluaran } = usePengeluaranMutations()
   const { data: hutangSupplier = [] } = useHutangSupplierQuery(true)
-  const { tambahHutangSupplier, ubahStatusHutangSupplier, hapusHutangSupplier } = useHutangSupplierMutations()
+  const { data: pembayaranSupplier = [] } = useHutangSupplierPembayaranQuery(true)
+  const { tambahHutangSupplier, hapusHutangSupplier, tambahPembayaranSupplier, hapusPembayaranSupplier } = useHutangSupplierMutations()
   const { data: staffList = [] } = useStaffQuery(true)
   const { data: daftarAbsensi = [] } = useAbsensiQuery(true)
   const { data: lembur = [] } = useLemburQuery(true)
@@ -102,6 +104,9 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     nominal: '',
   })
   const [savingHutangSupplier, setSavingHutangSupplier] = useState(false)
+  const [detailHutangId, setDetailHutangId] = useState(null)
+  const [formPembayaran, setFormPembayaran] = useState({ tanggal: new Date().toISOString().split('T')[0], nominal: '' })
+  const [savingPembayaran, setSavingPembayaran] = useState(false)
 
   const bulanIni = bulanIniISO()
   const [thnIni, blnIni] = bulanIni.split('-')
@@ -113,19 +118,29 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   )
 
   // Beda dari Pengeluaran: hutang belum lunas TIDAK reset tiap bulan, tetap tampil sampai dilunasi.
-  // Belum Lunas ditaruh di atas (terbaru dulu), baru Lunas di bawahnya.
-  const hutangSupplierUrut = useMemo(
-    () =>
-      [...hutangSupplier].sort((a, b) => {
-        if (a.status !== b.status) return a.status === 'Belum Lunas' ? -1 : 1
-        return (b.tanggal || '').localeCompare(a.tanggal || '')
-      }),
-    [hutangSupplier],
-  )
+  // Belum Lunas ditaruh di atas (terbaru dulu), baru Lunas di bawahnya. Status/sisa DIHITUNG dari
+  // total pembayaran di ledger hutang_supplier_pembayaran (bisa dicicil beberapa kali), bukan dari
+  // toggle manual — supaya konsisten dengan kwitansi yang dicetak per pembayaran.
+  const hutangSupplierUrut = useMemo(() => {
+    const dengan = hutangSupplier.map((h) => {
+      const pembayaran = pembayaranSupplier
+        .filter((p) => p.hutangSupplierId === h.id)
+        .sort((a, b) => (a.tanggal || '').localeCompare(b.tanggal || ''))
+      const totalDibayar = pembayaran.reduce((s, p) => s + (p.nominal || 0), 0)
+      const sisa = Math.max(0, (h.nominal || 0) - totalDibayar)
+      return { ...h, pembayaran, totalDibayar, sisa, lunas: sisa <= 0 }
+    })
+    return dengan.sort((a, b) => {
+      if (a.lunas !== b.lunas) return a.lunas ? 1 : -1
+      return (b.tanggal || '').localeCompare(a.tanggal || '')
+    })
+  }, [hutangSupplier, pembayaranSupplier])
+
   const totalHutangBelumLunas = useMemo(
-    () => hutangSupplier.filter((h) => h.status === 'Belum Lunas').reduce((s, h) => s + (h.nominal || 0), 0),
-    [hutangSupplier],
+    () => hutangSupplierUrut.filter((h) => !h.lunas).reduce((s, h) => s + h.sisa, 0),
+    [hutangSupplierUrut],
   )
+  const detailHutang = detailHutangId ? hutangSupplierUrut.find((h) => h.id === detailHutangId) : null
 
   const dataFilter = useMemo(() => {
     if (!dari && !sampai) return riwayat
@@ -261,13 +276,49 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     }
   }
 
-  async function ubahStatusHutangSupplierBaris(h) {
-    const statusBaru = h.status === 'Belum Lunas' ? 'Lunas' : 'Belum Lunas'
+  async function submitPembayaran(e) {
+    e.preventDefault()
+    if (!detailHutang) return
+    const nominal = parseInt(formPembayaran.nominal, 10) || 0
+    if (nominal <= 0) {
+      notify('⚠️ Isi nominal yang benar!', 'error')
+      return
+    }
+    if (nominal > detailHutang.sisa) {
+      notify(`⚠️ Nominal melebihi sisa tagihan! Sisa: ${formatRupiah(detailHutang.sisa)}`, 'error')
+      return
+    }
+    setSavingPembayaran(true)
     try {
-      await ubahStatusHutangSupplier(h.id, statusBaru)
+      await tambahPembayaranSupplier({ hutangSupplierId: detailHutang.id, tanggal: formPembayaran.tanggal, nominal })
+      notify('✅ Pembayaran dicatat!')
+      setFormPembayaran((f) => ({ ...f, nominal: '' }))
     } catch (err) {
       notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+    } finally {
+      setSavingPembayaran(false)
     }
+  }
+
+  async function hapusPembayaranBaris(p) {
+    const ok = await confirm(`⚠️ Hapus pembayaran ${formatRupiah(p.nominal)} (${p.tanggal})?`)
+    if (!ok) return
+    try {
+      await hapusPembayaranSupplier(p.id)
+    } catch (err) {
+      notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
+    }
+  }
+
+  function cetakKwitansiBaris(h, p, sisaSetelah) {
+    cetakKwitansiSupplier({
+      namaSupplier: h.namaSupplier,
+      deskripsi: h.deskripsi,
+      tanggal: p.tanggal,
+      nominal: p.nominal,
+      totalTagihan: h.nominal,
+      sisaTagihan: sisaSetelah,
+    })
   }
 
   async function hapusHutangSupplierBaris(h) {
@@ -422,7 +473,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         <div style={{ margin: '15px 0', padding: 15, background: '#fff7ed', borderRadius: 6, border: '1px solid #fed7aa' }}>
           <h3>🚚 Hutang Supplier</h3>
           <p style={{ fontSize: 12, color: '#888', marginTop: -6, marginBottom: 10 }}>
-            ⓘ Catat tagihan dari supplier/distributor barang. Beda dari Pengeluaran, catatan Belum Lunas di sini tidak reset tiap bulan — tetap tampil sampai ditandai Lunas.
+            ⓘ Catat tagihan dari supplier/distributor barang. Beda dari Pengeluaran, catatan Belum Lunas di sini tidak reset tiap bulan — tetap tampil sampai lunas. Bisa dibayar bertahap (dicicil); klik "💰 Bayar" buat catat tiap pembayaran & cetak kwitansi untuk supplier.
           </p>
           <form onSubmit={submitHutangSupplier} className="row" style={{ alignItems: 'flex-end' }}>
             <div className="field" style={{ flex: '1 1 160px' }}>
@@ -485,18 +536,25 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
                   </tr>
                 )}
                 {hutangSupplierUrut.map((h) => (
-                  <tr key={h.id} className={h.status === 'Belum Lunas' ? 'baris-merah' : ''}>
+                  <tr key={h.id} className={!h.lunas ? 'baris-merah' : ''}>
                     <td>{h.tanggal}</td>
                     <td>{h.namaSupplier}</td>
                     <td>{h.deskripsi}</td>
                     <td className="angka">{formatRupiah(h.nominal)}</td>
                     <td className="tengah">
-                      {h.status === 'Lunas' ? `✅ Lunas (${h.tanggalLunas || '-'})` : '🔴 Belum Lunas'}
+                      {h.lunas ? (
+                        '✅ Lunas'
+                      ) : (
+                        <>
+                          🔴 Belum Lunas
+                          {h.totalDibayar > 0 && <><br /><small>Sisa: {formatRupiah(h.sisa)}</small></>}
+                        </>
+                      )}
                     </td>
                     <td className="tengah">
                       <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
-                        <button className="btn btn-blue btn-sm" onClick={() => ubahStatusHutangSupplierBaris(h)}>
-                          {h.status === 'Belum Lunas' ? '✅ Lunas' : '↩️ Batal'}
+                        <button className="btn btn-blue btn-sm" onClick={() => setDetailHutangId(h.id)}>
+                          💰 {h.lunas ? 'Riwayat' : 'Bayar'}
                         </button>
                         <button className="btn btn-red btn-sm" onClick={() => hapusHutangSupplierBaris(h)}>
                           🗑️
@@ -579,8 +637,98 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           ubahInvestor={ubahInvestor}
           hapusInvestor={hapusInvestor}
         />
+
+        {detailHutang && (
+          <ModalPembayaranSupplier
+            h={detailHutang}
+            formPembayaran={formPembayaran}
+            setFormPembayaran={setFormPembayaran}
+            savingPembayaran={savingPembayaran}
+            onSubmit={submitPembayaran}
+            onHapusPembayaran={hapusPembayaranBaris}
+            onCetak={cetakKwitansiBaris}
+            onClose={() => setDetailHutangId(null)}
+          />
+        )}
       </div>
     </div>
+  )
+}
+
+function ModalPembayaranSupplier({ h, formPembayaran, setFormPembayaran, savingPembayaran, onSubmit, onHapusPembayaran, onCetak, onClose }) {
+  // Dipakai buat hitung "sisa tagihan setelah pembayaran ini" per baris riwayat, karena kwitansi
+  // butuh angka itu (h.pembayaran sudah terurut tanggal naik).
+  let kumulatif = 0
+  const denganSisa = h.pembayaran.map((p) => {
+    kumulatif += p.nominal || 0
+    return { ...p, sisaSetelah: Math.max(0, h.nominal - kumulatif) }
+  })
+
+  return (
+    <Modal title={`💰 Pembayaran — ${h.namaSupplier}`} onClose={onClose}>
+      <p style={{ marginBottom: 4 }}>{h.deskripsi}</p>
+      <p style={{ fontSize: 13 }}>
+        Total Tagihan: <strong>{formatRupiah(h.nominal)}</strong> &nbsp;|&nbsp;
+        Sudah Dibayar: <strong>{formatRupiah(h.totalDibayar)}</strong> &nbsp;|&nbsp;
+        Sisa: <strong className={h.sisa > 0 ? 'merah' : 'hijau'}>{formatRupiah(h.sisa)}</strong>
+      </p>
+
+      {denganSisa.length > 0 && (
+        <div className="table-wrap" style={{ marginTop: 10 }}>
+          <table style={{ fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th className="angka">Nominal</th>
+                <th className="tengah">Cetak</th>
+                <th className="tengah">Hapus</th>
+              </tr>
+            </thead>
+            <tbody>
+              {denganSisa.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.tanggal}</td>
+                  <td className="angka">{formatRupiah(p.nominal)}</td>
+                  <td className="tengah">
+                    <button className="btn btn-blue btn-sm" onClick={() => onCetak(h, p, p.sisaSetelah)}>🖨️</button>
+                  </td>
+                  <td className="tengah">
+                    <button className="btn btn-red btn-sm" onClick={() => onHapusPembayaran(p)}>🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {h.sisa > 0 && (
+        <form onSubmit={onSubmit} className="row" style={{ alignItems: 'flex-end', marginTop: 14 }}>
+          <div className="field" style={{ flex: '1 1 140px' }}>
+            <label>Tanggal Bayar</label>
+            <input
+              type="date"
+              value={formPembayaran.tanggal}
+              onChange={(e) => setFormPembayaran((f) => ({ ...f, tanggal: e.target.value }))}
+            />
+          </div>
+          <div className="field" style={{ flex: '1 1 140px' }}>
+            <label>Nominal (Rp)</label>
+            <input
+              type="number"
+              min="0"
+              max={h.sisa}
+              value={formPembayaran.nominal}
+              onChange={(e) => setFormPembayaran((f) => ({ ...f, nominal: e.target.value }))}
+              placeholder="0"
+            />
+          </div>
+          <button className="btn btn-sm" type="submit" disabled={savingPembayaran} style={{ marginBottom: 12 }}>
+            {savingPembayaran ? 'Menyimpan…' : '➕ Catat Pembayaran'}
+          </button>
+        </form>
+      )}
+    </Modal>
   )
 }
 

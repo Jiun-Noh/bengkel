@@ -150,11 +150,23 @@ create table hutang_supplier (
   tanggal date not null,
   deskripsi text not null,
   nominal integer default 0,
-  status text not null default 'Belum Lunas' check (status in ('Belum Lunas', 'Lunas')),
-  tanggal_lunas date,
+  status text not null default 'Belum Lunas' check (status in ('Belum Lunas', 'Lunas')),  -- legacy, sejak hutang_supplier_pembayaran ada status dihitung dari situ
+  tanggal_lunas date,  -- legacy, idem
   bulan text,
   dibuat_pada timestamptz default now()
 );
+
+-- hutang_supplier_pembayaran: ledger cicilan/pembayaran sebagian ke supplier — tiap baris = satu
+-- kali bayar, supaya kwitansi bisa dicetak per pembayaran. Status Lunas/Belum Lunas & sisa tagihan
+-- dihitung di client dari jumlah baris ini, bukan dari kolom status di atas.
+create table hutang_supplier_pembayaran (
+  id uuid primary key default gen_random_uuid(),
+  hutang_supplier_id uuid not null references hutang_supplier(id) on delete cascade,
+  tanggal date not null,
+  nominal integer default 0,
+  dibuat_pada timestamptz default now()
+);
+create index idx_hutang_supplier_pembayaran_hutang on hutang_supplier_pembayaran (hutang_supplier_id);
 
 -- profil: akun login (auth.users) → nama tampil + peran (pemilik/karyawan).
 -- Terpisah dari `staff` (data HR) supaya login & kepegawaian gak saling ganggu.
@@ -177,6 +189,7 @@ alter table investor enable row level security;
 alter table jasa enable row level security;
 alter table profil enable row level security;
 alter table hutang_supplier enable row level security;
+alter table hutang_supplier_pembayaran enable row level security;
 alter table poin_ledger enable row level security;
 
 -- Helper: cek apakah user yang login sekarang berperan 'pemilik'.
@@ -234,6 +247,7 @@ create policy "investor pemilik" on investor for all using (is_pemilik()) with c
 create policy "lembur pemilik" on lembur for all using (is_pemilik()) with check (is_pemilik());
 create policy "pengeluaran pemilik" on pengeluaran for all using (is_pemilik()) with check (is_pemilik());
 create policy "hutang_supplier pemilik" on hutang_supplier for all using (is_pemilik()) with check (is_pemilik());
+create policy "hutang_supplier_pembayaran pemilik" on hutang_supplier_pembayaran for all using (is_pemilik()) with check (is_pemilik());
 
 -- Trigger: cegah karyawan mengubah harga_pokok/harga_jual barang lewat jalur UPDATE mana pun
 -- (mis. langsung lewat API, bukan lewat form Restock di app). Restock sungguhan cuma ubah stok.
