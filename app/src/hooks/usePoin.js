@@ -45,10 +45,12 @@ function hariIniISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function tambahSatuTahun(tanggalISO) {
+export const MASA_BERLAKU_POIN_TAHUN = 2 // lama berlaku poin sejak tanggal diperoleh
+
+function tambahMasaBerlaku(tanggalISO) {
   const [y, m, d] = tanggalISO.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
-  dt.setFullYear(dt.getFullYear() + 1)
+  dt.setFullYear(dt.getFullYear() + MASA_BERLAKU_POIN_TAHUN)
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }
 
@@ -65,7 +67,7 @@ export function usePoinMutations() {
       jenis: 'earn',
       jumlah: poinBaru,
       sisa: poinBaru,
-      kadaluarsa: tambahSatuTahun(tanggalISO),
+      kadaluarsa: tambahMasaBerlaku(tanggalISO),
       riwayat_id: riwayatId,
     })
     if (error) throw error
@@ -129,7 +131,7 @@ export function usePoinMutations() {
   // - Batch earn yang dibuat dari transaksi ini di-nol-kan sisanya (dicegah dipakai lagi;
   //   barisnya tetap disimpan sebagai histori, bukan dihapus).
   // - Poin yang tadinya DIPAKAI di transaksi ini dikembalikan sebagai batch earn BARU (kadaluarsa
-  //   1 tahun dari sekarang) — bukan restorasi presisi ke batch asal (butuh rincian per-batch
+  //   dihitung ulang dari sekarang) — bukan restorasi presisi ke batch asal (butuh rincian per-batch
   //   yang belum kita simpan), tapi saldo pelanggan tetap benar & bukan malah menguntungkan dia.
   async function batalkanPoinUntukRiwayat(riwayatId) {
     const { data: earnRows, error: errAmbilEarn } = await db

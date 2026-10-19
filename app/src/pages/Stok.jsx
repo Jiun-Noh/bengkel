@@ -43,8 +43,6 @@ function BarangSection() {
   const { data: barang = [], isLoading } = useBarangQuery(true)
   const { simpanBarang, hapusBarang } = useBarangMutations()
   const { notify, confirm } = useUI()
-  const { profil } = useAuth()
-  const unlocked = profil?.peran === 'pemilik'
 
   const [mode, setMode] = useState('list') // 'list' | 'form'
   const [form, setForm] = useState(FORM_KOSONG)
@@ -464,7 +462,7 @@ function BarangSection() {
         </Modal>
       )}
 
-      {unlocked && <Fab onClick={bukaTambah} title="Tambah Barang" />}
+      <Fab onClick={bukaTambah} title="Tambah Barang" />
     </div>
   )
 }

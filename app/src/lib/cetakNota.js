@@ -7,18 +7,27 @@ import { SHOP } from './shopInfo'
 // baris berikutnya berisi "jumlah x harga satuan" dan subtotal.
 // @page size dikunci ke 58mm karena printer thermal yang dibeli 58mm — kalau nanti ganti
 // ke printer 80mm, angka ini yang perlu diubah jadi 80mm.
+// Sengaja TIDAK pakai emoji berwarna di sini (beda dari halaman web) — di printer thermal
+// (1-bit, hitam-putih) glyph emoji yang penuh gradasi warna itu didither jadi buram/kabur.
+// Font juga sengaja sans-serif + agak tebal (bukan Courier New/monospace seperti biasanya
+// nota kasir) — alignment di sini sudah dikerjakan oleh <table>/.kanan, bukan oleh lebar
+// huruf yang rata, jadi tidak perlu monospace. Huruf tipis/serif (termasuk Courier New)
+// gampang "bolong" di tengah goresan pas dicetak di kepala cetak thermal 203dpi yang kecil.
+// Strong/penekanan dibedakan lewat font-weight SAJA (bukan ukuran) — nambah ukuran+tebal
+// sekaligus bikin glyph (terutama angka) ketebalan dan gampang kepotong bawahnya kalau
+// line-height-nya pas-pasan, makanya line-height dilebihin juga di sini.
 const CSS = `
 @page{size:58mm auto; margin:0}
-body{font-family:'Courier New',monospace; font-size:12px; margin:0; padding:2mm;}
-p{margin:3px 0;}
+body{font-family:Arial,Helvetica,sans-serif; font-weight:600; font-size:12px; line-height:1.5; margin:0; padding:2mm; -webkit-font-smoothing:none;}
+p{margin:4px 0;}
 .tengah{text-align:center;}
 .kanan{text-align:right; white-space:nowrap; padding-left:6px;}
 .garis{border-bottom:1px dashed #000; margin:6px 0;}
-table{width:100%; border-collapse:collapse; font-size:12px;}
-td{vertical-align:top;}
+table{width:100%; border-collapse:collapse; font-size:12px; line-height:1.5;}
+td{vertical-align:top; padding:1px 0;}
 .logo{max-width:min(200px,100%); max-height:100px; object-fit:contain;}
 .nw{white-space:nowrap;}
-@media (max-width:230px){ body,table{font-size:11px;} }
+strong{font-weight:700;}
 `
 
 function baris(label, nilai, tebal = false) {
@@ -46,7 +55,7 @@ export function cetakNota(data, saldoPoinSekarang, namaPencetak) {
   if (data.noTransaksi) nota += `<p>No. Transaksi: <strong>${data.noTransaksi}</strong></p>`
   nota += `<p>Tanggal: ${data.tgl}</p>`
   nota += `<p>Pelanggan: ${data.namaPelanggan}</p>`
-  nota += `<p>📱 HP: ${data.nomorHP || '-'}</p>`
+  nota += `<p>HP: ${data.nomorHP || '-'}</p>`
   nota += `<p>Plat/Motor: ${data.platKendaraan} / ${data.jenisMotor}</p>`
   nota += `<div class="garis"></div>`
 
@@ -60,26 +69,26 @@ export function cetakNota(data, saldoPoinSekarang, namaPencetak) {
 
   if ((data.jasaItems || []).length > 0) {
     data.jasaItems.forEach((j) => {
-      nota += baris(`🔧 ${j.nama}`, formatRupiah(j.harga))
+      nota += baris(j.nama, formatRupiah(j.harga))
     })
   } else if (data.biayaJasa > 0) {
-    nota += baris(`🔧 ${data.namaJasa || 'Jasa'}`, formatRupiah(data.biayaJasa))
+    nota += baris(data.namaJasa || 'Jasa', formatRupiah(data.biayaJasa))
   }
 
   nota += `<tr><td colspan="2"><div class="garis"></div></td></tr>`
 
   if (data.diskonPoin > 0) {
-    nota += baris(`🎁 Diskon Poin (${data.poinDigunakan} poin)`, `−${formatRupiah(data.diskonPoin)}`)
+    nota += baris(`Diskon Poin (${data.poinDigunakan} poin)`, `−${formatRupiah(data.diskonPoin)}`)
   }
 
   nota += baris('TOTAL', formatRupiah(data.totalBayar), true)
 
   if (data.uangdibayarkan > 0) {
-    nota += baris('💰 Total Bayar', formatRupiah(data.uangdibayarkan))
-    nota += baris('📉 Sisa Bayar', formatRupiah(data.sisaBayar))
+    nota += baris('Total Bayar', formatRupiah(data.uangdibayarkan))
+    nota += baris('Sisa Bayar', formatRupiah(data.sisaBayar))
   }
 
-  nota += baris('💳 Cara Bayar', data.caraBayar)
+  nota += baris('Cara Bayar', data.caraBayar)
   nota += `</table>`
 
   const adaHP = data.nomorHP && data.nomorHP !== '-'
@@ -87,11 +96,11 @@ export function cetakNota(data, saldoPoinSekarang, namaPencetak) {
   const poinDigunakan = data.poinDigunakan || 0
   if (adaHP && (poinDidapat > 0 || poinDigunakan > 0 || saldoPoinSekarang != null)) {
     const poinSebelumnya = saldoPoinSekarang != null ? saldoPoinSekarang - poinDidapat + poinDigunakan : null
-    nota += `<div class="garis"></div><p class="tengah"><strong>🎁 POIN MEMBER</strong></p><table>`
+    nota += `<div class="garis"></div><p class="tengah"><strong>POIN MEMBER</strong></p><table>`
     if (poinSebelumnya != null) nota += baris('Poin sebelumnya', poinSebelumnya)
     if (poinDidapat > 0) nota += baris('Poin transaksi', `+${poinDidapat}`)
     if (poinDigunakan > 0) nota += baris('Poin digunakan', `−${poinDigunakan}`)
-    if (saldoPoinSekarang != null) nota += baris('Poin sekarang', saldoPoinSekarang, true)
+    if (saldoPoinSekarang != null) nota += baris('Poin sekarang', saldoPoinSekarang)
     nota += `</table>`
   }
 

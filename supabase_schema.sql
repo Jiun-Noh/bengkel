@@ -203,10 +203,13 @@ create policy "lihat profil sendiri" on profil for select using (auth.uid() = id
 create policy "pemilik kelola profil" on profil for all
   using (is_pemilik()) with check (is_pemilik());
 
--- barang: semua login bisa lihat & restock (update), tapi cuma pemilik yang bisa
--- bikin barang baru / hapus. Ubah harga_pokok/harga_jual dijaga terpisah lewat trigger di bawah.
+-- barang: semua login bisa lihat, restock (update), dan daftarkan barang BARU (insert) —
+-- termasuk isi harga_pokok/harga_jual-nya saat pendaftaran (permintaan eksplisit pemilik).
+-- Hapus barang tetap cuma pemilik. Proteksi harga cuma berlaku buat UPDATE barang yang SUDAH
+-- ADA (lewat trigger cegah_ubah_harga_barang di bawah) — mencegah harga barang lama diam-diam
+-- diubah staf, bukan membatasi harga barang baru.
 create policy "barang select" on barang for select using (auth.role() = 'authenticated');
-create policy "barang insert" on barang for insert with check (is_pemilik());
+create policy "barang insert" on barang for insert with check (auth.role() = 'authenticated');
 create policy "barang update" on barang for update using (auth.role() = 'authenticated');
 create policy "barang delete" on barang for delete using (is_pemilik());
 

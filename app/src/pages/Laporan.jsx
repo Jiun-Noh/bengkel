@@ -108,13 +108,17 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const [formPembayaran, setFormPembayaran] = useState({ tanggal: new Date().toISOString().split('T')[0], nominal: '' })
   const [savingPembayaran, setSavingPembayaran] = useState(false)
 
-  const bulanIni = bulanIniISO()
-  const [thnIni, blnIni] = bulanIni.split('-')
-  const labelBulanIni = `${NAMA_BULAN[parseInt(blnIni, 10) - 1]} ${thnIni}`
+  // Bulan yang lagi ditampilkan di seksi "penutupan bulanan" (Pengeluaran s/d Pembagian Laba
+  // Bersih) — bawaannya bulan berjalan, tapi bisa diganti ke bulan lalu lewat date picker di
+  // bawah, supaya pemilik bisa lihat lagi hasil bulan-bulan sebelumnya. Beda dari dari/sampai
+  // di atas (itu cuma buat grafik & kartu ringkasan penjualan paling atas).
+  const [bulanDipilih, setBulanDipilih] = useState(bulanIniISO())
+  const [thnDipilih, blnDipilih] = bulanDipilih.split('-')
+  const labelBulanIni = `${NAMA_BULAN[parseInt(blnDipilih, 10) - 1]} ${thnDipilih}`
 
   const pengeluaranBulanIni = useMemo(
-    () => pengeluaran.filter((p) => p.bulan === bulanIni).sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
-    [pengeluaran, bulanIni],
+    () => pengeluaran.filter((p) => p.bulan === bulanDipilih).sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
+    [pengeluaran, bulanDipilih],
   )
 
   // Beda dari Pengeluaran: hutang belum lunas TIDAK reset tiap bulan, tetap tampil sampai dilunasi.
@@ -160,18 +164,18 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         const t = ambilTanggalDariTeks(r.tgl)
         if (!t) return false
         const iso = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0')
-        return iso === bulanIni
+        return iso === bulanDipilih
       }),
-    [riwayat, bulanIni],
+    [riwayat, bulanDipilih],
   )
 
   const daftarGajiStaf = useMemo(
-    () => hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.jamMasukStandar),
-    [staffList, daftarAbsensi, riwayat, lembur, bulanIni, pengSetting.jamMasukStandar],
+    () => hitungDaftarGajiStaf(staffList, daftarAbsensi, riwayat, lembur, bulanDipilih, pengSetting.jamMasukStandar),
+    [staffList, daftarAbsensi, riwayat, lembur, bulanDipilih, pengSetting.jamMasukStandar],
   )
   const daftarUangSakuMagang = useMemo(
-    () => hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanIni, pengSetting.jamMasukStandar),
-    [staffList, daftarAbsensi, lembur, bulanIni, pengSetting.jamMasukStandar],
+    () => hitungDaftarUangSakuMagang(staffList, daftarAbsensi, lembur, bulanDipilih, pengSetting.jamMasukStandar),
+    [staffList, daftarAbsensi, lembur, bulanDipilih, pengSetting.jamMasukStandar],
   )
   const totalGajiStaf = useMemo(() => daftarGajiStaf.reduce((s, x) => s + Math.max(0, x.total), 0), [daftarGajiStaf])
   const totalUangSakuMagang = useMemo(() => daftarUangSakuMagang.reduce((s, x) => s + Math.max(0, x.total), 0), [daftarUangSakuMagang])
@@ -185,7 +189,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     return { omset, totalJasa, labaBarang, labaKotor }
   }, [dataFilter])
 
-  // Kartu "Ringkasan Bulan Ini" — selalu bulan berjalan, tidak ikut filter Dari~Sampai, reset tiap awal bulan.
+  // Kartu "Ringkasan Bulan Ini" — ikut bulanDipilih (bisa bulan lalu), bukan filter Dari~Sampai di atas.
   const ringkasanBulanIni = useMemo(() => {
     const omset = dataBulanIni.reduce((s, r) => s + (r.totalBarang || 0), 0)
     const totalJasa = dataBulanIni.reduce((s, r) => s + (r.biayaJasa || 0), 0)
@@ -385,6 +389,17 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           <RingkasCard label="Total Jasa" value={ringkasan.totalJasa} bg="#e3f2fd" fg="#0d47a1" />
           <RingkasCard label="Laba Barang" value={ringkasan.labaBarang} bg="#fff3e0" fg="#e65100" />
           <RingkasCard label="Laba Kotor" value={ringkasan.labaKotor} bg="#f3e5f5" fg="#4a148c" />
+        </div>
+
+        <div style={{ margin: '20px 0 0', padding: 10, background: '#fff', borderRadius: 6, border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: 13 }}>📅 Bulan Penutupan (Pengeluaran s/d Pembagian Laba Bersih):</strong>
+          <input type="month" value={bulanDipilih} onChange={(e) => setBulanDipilih(e.target.value)} style={{ width: 160 }} />
+          {bulanDipilih !== bulanIniISO() && (
+            <button className="btn btn-blue btn-sm" onClick={() => setBulanDipilih(bulanIniISO())}>↩️ Bulan Ini</button>
+          )}
+          <span style={{ fontSize: 12, color: '#888' }}>
+            ⓘ Beda dari filter grafik di atas — ini ganti bulan untuk seluruh perhitungan gaji & laba bersih di bawah.
+          </span>
         </div>
 
         <div style={{ margin: '15px 0', padding: 15, background: '#fdf2f8', borderRadius: 6, border: '1px solid #fbcfe8' }}>
@@ -588,14 +603,14 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           daftar={daftarGajiStaf}
           labelBulanIni={labelBulanIni}
           simpanLembur={simpanLembur}
-          bulanIni={bulanIni}
+          bulanIni={bulanDipilih}
         />
 
         <TabelUangSakuMagang
           daftar={daftarUangSakuMagang}
           labelBulanIni={labelBulanIni}
           simpanLembur={simpanLembur}
-          bulanIni={bulanIni}
+          bulanIni={bulanDipilih}
         />
 
         <div style={{ margin: '15px 0', padding: 15, background: '#fff8e1', borderRadius: 6 }}>
