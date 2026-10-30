@@ -121,6 +121,23 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     [pengeluaran, bulanDipilih],
   )
 
+  // Pencarian/filter di tabel Pengeluaran & Hutang Supplier CUMA buat tampilan — total
+  // Operasional/Maintenance, Laba Bersih, dan Total Belum Lunas tetap dihitung dari data lengkap.
+  const [cariPengeluaran, setCariPengeluaran] = useState('')
+  const [filterKategoriPengeluaran, setFilterKategoriPengeluaran] = useState('')
+  const [cariHutang, setCariHutang] = useState('')
+  const [filterStatusHutang, setFilterStatusHutang] = useState('')
+
+  const pengeluaranTampil = useMemo(() => {
+    const q = cariPengeluaran.trim().toLowerCase()
+    return pengeluaranBulanIni.filter(
+      (p) =>
+        (!filterKategoriPengeluaran || p.kategori === filterKategoriPengeluaran) &&
+        (!q || (p.deskripsi || '').toLowerCase().includes(q) || (p.kategori || '').toLowerCase().includes(q)),
+    )
+  }, [pengeluaranBulanIni, cariPengeluaran, filterKategoriPengeluaran])
+  const pengeluaranDifilter = !!(cariPengeluaran.trim() || filterKategoriPengeluaran)
+
   // Beda dari Pengeluaran: hutang belum lunas TIDAK reset tiap bulan, tetap tampil sampai dilunasi.
   // Belum Lunas ditaruh di atas (terbaru dulu), baru Lunas di bawahnya. Status/sisa DIHITUNG dari
   // total pembayaran di ledger hutang_supplier_pembayaran (bisa dicicil beberapa kali), bukan dari
@@ -144,6 +161,16 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     () => hutangSupplierUrut.filter((h) => !h.lunas).reduce((s, h) => s + h.sisa, 0),
     [hutangSupplierUrut],
   )
+
+  const hutangTampil = useMemo(() => {
+    const q = cariHutang.trim().toLowerCase()
+    return hutangSupplierUrut.filter(
+      (h) =>
+        (!filterStatusHutang || (filterStatusHutang === 'lunas' ? h.lunas : !h.lunas)) &&
+        (!q || (h.namaSupplier || '').toLowerCase().includes(q) || (h.deskripsi || '').toLowerCase().includes(q)),
+    )
+  }, [hutangSupplierUrut, cariHutang, filterStatusHutang])
+  const hutangDifilter = !!(cariHutang.trim() || filterStatusHutang)
   const detailHutang = detailHutangId ? hutangSupplierUrut.find((h) => h.id === detailHutangId) : null
 
   const dataFilter = useMemo(() => {
@@ -444,7 +471,36 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
             </button>
           </form>
 
-          <div className="table-wrap">
+          <div className="row" style={{ gap: 8, margin: '4px 0 8px' }}>
+            <input
+              value={cariPengeluaran}
+              onChange={(e) => setCariPengeluaran(e.target.value)}
+              placeholder="🔍 Cari deskripsi / kategori…"
+              style={{ flex: '2 1 200px' }}
+            />
+            <select
+              value={filterKategoriPengeluaran}
+              onChange={(e) => setFilterKategoriPengeluaran(e.target.value)}
+              style={{ flex: '1 1 140px' }}
+            >
+              <option value="">Semua Kategori</option>
+              {KATEGORI_PENGELUARAN.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+            {pengeluaranDifilter && (
+              <button className="btn btn-sm" type="button" onClick={() => { setCariPengeluaran(''); setFilterKategoriPengeluaran('') }}>
+                ✖ Reset
+              </button>
+            )}
+          </div>
+          {pengeluaranDifilter && (
+            <p style={{ fontSize: 12, color: '#555', margin: '0 0 6px' }}>
+              Hasil: {pengeluaranTampil.length} dari {pengeluaranBulanIni.length} catatan · Jumlah: {formatRupiah(pengeluaranTampil.reduce((s, p) => s + (p.nominal || 0), 0))}
+            </p>
+          )}
+
+          <div className="table-wrap table-scroll">
             <table style={{ fontSize: 13 }}>
               <thead>
                 <tr>
@@ -456,14 +512,14 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
                 </tr>
               </thead>
               <tbody>
-                {pengeluaranBulanIni.length === 0 && (
+                {pengeluaranTampil.length === 0 && (
                   <tr>
                     <td colSpan={5} className="tengah" style={{ padding: 10, color: '#888' }}>
-                      📭 Belum ada pengeluaran bulan ini
+                      {pengeluaranDifilter ? '🔍 Tidak ada yang cocok' : '📭 Belum ada pengeluaran bulan ini'}
                     </td>
                   </tr>
                 )}
-                {pengeluaranBulanIni.map((p) => (
+                {pengeluaranTampil.map((p) => (
                   <tr key={p.id}>
                     <td>{p.tanggal}</td>
                     <td>{p.kategori}</td>
@@ -530,7 +586,31 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
             </button>
           </form>
 
-          <div className="table-wrap">
+          <div className="row" style={{ gap: 8, margin: '4px 0 8px' }}>
+            <input
+              value={cariHutang}
+              onChange={(e) => setCariHutang(e.target.value)}
+              placeholder="🔍 Cari supplier / deskripsi…"
+              style={{ flex: '2 1 200px' }}
+            />
+            <select value={filterStatusHutang} onChange={(e) => setFilterStatusHutang(e.target.value)} style={{ flex: '1 1 140px' }}>
+              <option value="">Semua Status</option>
+              <option value="belum">🔴 Belum Lunas</option>
+              <option value="lunas">✅ Lunas</option>
+            </select>
+            {hutangDifilter && (
+              <button className="btn btn-sm" type="button" onClick={() => { setCariHutang(''); setFilterStatusHutang('') }}>
+                ✖ Reset
+              </button>
+            )}
+          </div>
+          {hutangDifilter && (
+            <p style={{ fontSize: 12, color: '#555', margin: '0 0 6px' }}>
+              Hasil: {hutangTampil.length} dari {hutangSupplierUrut.length} catatan · Sisa belum lunas: {formatRupiah(hutangTampil.filter((h) => !h.lunas).reduce((s, h) => s + h.sisa, 0))}
+            </p>
+          )}
+
+          <div className="table-wrap table-scroll">
             <table style={{ fontSize: 13 }}>
               <thead>
                 <tr>
@@ -543,14 +623,14 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
                 </tr>
               </thead>
               <tbody>
-                {hutangSupplierUrut.length === 0 && (
+                {hutangTampil.length === 0 && (
                   <tr>
                     <td colSpan={6} className="tengah" style={{ padding: 10, color: '#888' }}>
-                      📭 Belum ada catatan hutang supplier
+                      {hutangDifilter ? '🔍 Tidak ada yang cocok' : '📭 Belum ada catatan hutang supplier'}
                     </td>
                   </tr>
                 )}
-                {hutangSupplierUrut.map((h) => (
+                {hutangTampil.map((h) => (
                   <tr key={h.id} className={!h.lunas ? 'baris-merah' : ''}>
                     <td>{h.tanggal}</td>
                     <td>{h.namaSupplier}</td>

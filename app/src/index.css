@@ -159,6 +159,23 @@ select:disabled {
   width: 100%;
 }
 
+/* Tabel yang barisnya bisa banyak: tinggi dibatasi, scroll di dalam, header tetap nempel di atas */
+.table-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+.table-scroll table {
+  margin-top: 0;
+}
+.table-scroll th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
