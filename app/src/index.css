@@ -176,6 +176,21 @@ select:disabled {
   z-index: 1;
 }
 
+/* Sel teks panjang: bungkus = turun ke baris berikutnya (isi tetap kelihatan semua),
+   potong = satu baris dengan "…" (tap buat buka, lihat SelMotor di Stok.jsx) */
+td.sel-bungkus {
+  white-space: normal;
+  min-width: 140px;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+td.sel-potong {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

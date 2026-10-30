@@ -54,13 +54,25 @@ function BarangSection() {
 
   const barangEditing = editingKode ? barang.find((b) => b.kode === editingKode) : null
 
+  const [filterStok, setFilterStok] = useState('semua') // 'semua' | 'menipis' | 'habis'
+
+  const jumlahMenipis = useMemo(() => barang.filter((b) => (b.stok || 0) <= STOK_MINIM).length, [barang])
+  const jumlahHabis = useMemo(() => barang.filter((b) => (b.stok || 0) <= 0).length, [barang])
+
+  // Filter Menipis/Habis diurutkan dari stok paling sedikit, biar yang paling mendesak di atas.
   const hasil = useMemo(() => {
     const kata = cari.trim().toUpperCase()
-    if (!kata) return barang
-    return barang.filter(
-      (b) => b.kode.includes(kata) || b.nama.toUpperCase().includes(kata) || (b.jenisMotor || '').toUpperCase().includes(kata),
-    )
-  }, [barang, cari])
+    let daftar = barang
+    if (kata) {
+      daftar = daftar.filter(
+        (b) => b.kode.includes(kata) || b.nama.toUpperCase().includes(kata) || (b.jenisMotor || '').toUpperCase().includes(kata),
+      )
+    }
+    if (filterStok === 'menipis') daftar = daftar.filter((b) => (b.stok || 0) <= STOK_MINIM)
+    if (filterStok === 'habis') daftar = daftar.filter((b) => (b.stok || 0) <= 0)
+    if (filterStok !== 'semua') daftar = [...daftar].sort((a, b) => (a.stok || 0) - (b.stok || 0))
+    return daftar
+  }, [barang, cari, filterStok])
 
   function ubahKode(nilai) {
     const kode = kapitalKode(nilai)
@@ -359,6 +371,23 @@ function BarangSection() {
           </AksiPemilik>
         </div>
         <input placeholder="🔍 Cari Kode / Nama Barang / Motor..." value={cari} onChange={(e) => setCari(e.target.value)} style={{ marginTop: 10 }} />
+        <div className="row" style={{ gap: 6, marginTop: 8 }}>
+          {[
+            ['semua', `Semua (${barang.length})`, '#2563eb'],
+            ['menipis', `⚠️ Menipis ≤${STOK_MINIM} (${jumlahMenipis})`, '#ea580c'],
+            ['habis', `❌ Habis (${jumlahHabis})`, '#dc2626'],
+          ].map(([nilai, label, warna]) => (
+            <button
+              key={nilai}
+              type="button"
+              className="btn btn-sm"
+              style={{ background: filterStok === nilai ? warna : '#ddd', color: filterStok === nilai ? 'white' : '#333' }}
+              onClick={() => setFilterStok(nilai)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -386,7 +415,11 @@ function BarangSection() {
               {!isLoading && hasil.length === 0 && (
                 <tr>
                   <td colSpan={10} className="tengah" style={{ padding: 12, color: '#888' }}>
-                    📭 Belum ada barang
+                    {barang.length === 0
+                      ? '📭 Belum ada barang'
+                      : filterStok !== 'semua' && !cari.trim()
+                        ? '✅ Tidak ada barang dengan stok ' + (filterStok === 'habis' ? 'habis' : 'menipis')
+                        : '🔍 Tidak ada yang cocok'}
                   </td>
                 </tr>
               )}
@@ -416,8 +449,8 @@ function BarangSection() {
                     </td>
                     <td className="tengah">{i + 1}</td>
                     <td>{b.kode}</td>
-                    <td>{b.nama}</td>
-                    <td>{b.jenisMotor || '-'}</td>
+                    <td className="sel-bungkus">{b.nama}</td>
+                    <SelMotor teks={b.jenisMotor || '-'} />
                     <td className="tengah">{b.satuan || 'PCS'}</td>
                     <td className="angka">{formatRupiah(b.hargaPokok)}</td>
                     <td className="angka">{formatRupiah(b.hargaJual)}</td>
@@ -464,6 +497,17 @@ function BarangSection() {
 
       <Fab onClick={bukaTambah} title="Tambah Barang" />
     </div>
+  )
+}
+
+// Daftar motor biasanya panjang & berupa daftar ("BEAT, SCOOPY, VARIO, …"), jadi dipotong
+// dengan "…" — tap selnya buat lihat lengkap (di HP nggak ada hover/tooltip).
+function SelMotor({ teks }) {
+  const [buka, setBuka] = useState(false)
+  return (
+    <td className={buka ? 'sel-bungkus' : 'sel-potong'} title={teks} onClick={() => setBuka((v) => !v)}>
+      {teks}
+    </td>
   )
 }
 
