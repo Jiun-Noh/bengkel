@@ -10,6 +10,7 @@ import { formatRupiah, kapitalNama, kapitalKode, waktuSekarang } from '../lib/fo
 import { cetakNota } from '../lib/cetakNota'
 import Modal from '../components/common/Modal'
 import AksiPemilik from '../components/common/AksiPemilik'
+import FilterPeriode from '../components/common/FilterPeriode'
 
 const FORM_KOSONG = {
   namaPelanggan: '',
@@ -18,6 +19,11 @@ const FORM_KOSONG = {
   jenisMotor: '',
   caraBayar: 'Tunai',
   uangdibayarkan: '0',
+}
+
+const CARA_BAYAR = ['Tunai', 'QRIS', 'Transfer', 'Kartu Debit', 'Kartu Kredit']
+function ikonCaraBayar(c) {
+  return c === 'Tunai' ? '💵' : c === 'QRIS' ? '📱' : c === 'Transfer' ? '🏦' : c === 'Kartu Debit' ? '🏧' : '💳'
 }
 
 const MAX_PERSEN_MEKANIK = 40 // total % bagi hasil semua mekanik di satu transaksi, disepakati dengan pemilik
@@ -380,8 +386,10 @@ export default function TransaksiPage() {
       })
     }
     if (filterDari || filterSampai) {
-      const tglDari = filterDari ? new Date(filterDari) : new Date('2000-01-01')
-      const tglSampai = filterSampai ? new Date(filterSampai) : new Date()
+      // 'YYYY-MM-DD' tanpa jam dibaca JS sebagai UTC (jam 07:00/08:00 waktu Indonesia), jadi
+      // transaksi di hari "Dari" sendiri ikut tersaring — tambah T00:00 biar dibaca waktu lokal.
+      const tglDari = filterDari ? new Date(filterDari + 'T00:00:00') : new Date('2000-01-01T00:00:00')
+      const tglSampai = filterSampai ? new Date(filterSampai + 'T00:00:00') : new Date()
       tglSampai.setHours(23, 59, 59)
       d = d.filter((r) => {
         const t = ambilTanggalDariTeks(r.tgl)
@@ -392,14 +400,10 @@ export default function TransaksiPage() {
     return d
   }, [riwayat, cari, filterDari, filterSampai])
 
-  const sekarang = new Date()
+  // Ringkasan mengikuti persis baris yang tampil di tabel (hasil filter tanggal & pencarian).
   const ringkasan = useMemo(() => {
-    const bulanIni = dataTampil.filter((r) => {
-      const t = ambilTanggalDariTeks(r.tgl)
-      return t && t.getMonth() === sekarang.getMonth() && t.getFullYear() === sekarang.getFullYear()
-    })
     let total = 0, tunai = 0, qris = 0, transfer = 0, kartuDebit = 0, kartuKredit = 0
-    bulanIni.forEach((r) => {
+    dataTampil.forEach((r) => {
       const n = r.totalBayar || 0
       total += n
       const c = (r.caraBayar || '').toUpperCase()
@@ -409,7 +413,7 @@ export default function TransaksiPage() {
       else if (c.includes('KREDIT')) kartuKredit += n
       else if (c.includes('DEBIT')) kartuDebit += n
     })
-    return { jumlah: bulanIni.length, total, tunai, qris, transfer, kartuDebit, kartuKredit }
+    return { jumlah: dataTampil.length, total, tunai, qris, transfer, kartuDebit, kartuKredit }
   }, [dataTampil])
 
   async function hapus(r) {
@@ -663,10 +667,10 @@ export default function TransaksiPage() {
         <div style={{ marginTop: 12, padding: 10, background: '#f0f8ff', borderRadius: 6 }}>
           <h3 style={{ fontSize: 15 }}>💳 Cara Pembayaran</h3>
           <div className="row">
-            {['Tunai', 'QRIS', 'Transfer', 'Kartu Debit', 'Kartu Kredit'].map((c) => (
+            {CARA_BAYAR.map((c) => (
               <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input type="radio" name="caraBayar" checked={form.caraBayar === c} onChange={() => setForm((f) => ({ ...f, caraBayar: c }))} style={{ width: 'auto', minHeight: 'auto' }} />
-                {c === 'Tunai' ? '💵' : c === 'QRIS' ? '📱' : c === 'Transfer' ? '🏦' : c === 'Kartu Debit' ? '🏧' : '💳'} {c}
+                {ikonCaraBayar(c)} {c}
               </label>
             ))}
           </div>
@@ -702,15 +706,9 @@ export default function TransaksiPage() {
         <h2>📝 Riwayat Penjualan</h2>
         <div style={{ marginBottom: 12, padding: 10, background: '#f0f7ff', borderRadius: 6 }}>
           <input placeholder="🔍 Ketik Nama / Plat / Nomor HP..." value={cari} onChange={(e) => setCari(e.target.value)} />
-          <div className="row" style={{ marginTop: 8 }}>
-            <label>Dari:</label>
-            <input type="date" value={filterDari} onChange={(e) => setFilterDari(e.target.value)} style={{ width: 150 }} />
-            <label>Sampai:</label>
-            <input type="date" value={filterSampai} onChange={(e) => setFilterSampai(e.target.value)} style={{ width: 150 }} />
-            <button className="btn btn-blue btn-sm" onClick={() => { setCari(''); setFilterDari(''); setFilterSampai('') }}>↩️ Tampilkan Semua</button>
-          </div>
+          <FilterPeriode dari={filterDari} sampai={filterSampai} onChange={(d, s) => { setFilterDari(d); setFilterSampai(s) }} />
           <p style={{ fontSize: 12, color: '#888', marginTop: 6, marginBottom: 0 }}>
-            ⓘ Bawaannya menampilkan transaksi bulan ini. Ubah tanggal atau pakai "Tampilkan Semua" untuk lihat bulan lain.
+            ⓘ Bawaannya menampilkan transaksi bulan ini. Pilih tombol periode atau ubah tanggal untuk lihat periode lain.
           </p>
         </div>
 
@@ -860,12 +858,12 @@ export default function TransaksiPage() {
               notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
             }
           }}
-          onCatatPelunasan={async (nominal) => {
+          onCatatPelunasan={async (nominal, caraBayar) => {
             const uangBaru = (editRiwayat.uangdibayarkan || 0) + nominal
             const sisaSebelum = editRiwayat.sisaBayar || 0
             const sisaBaru = Math.max(0, sisaSebelum - nominal)
             try {
-              await ubahRiwayat(editRiwayat.id, { uangdibayarkan: uangBaru, sisa_bayar: sisaBaru })
+              await ubahRiwayat(editRiwayat.id, { uangdibayarkan: uangBaru, sisa_bayar: sisaBaru, cara_bayar: caraBayar })
               // Poin baru dikreditkan pas transaksi ini LUNAS buat pertama kalinya (belum lunas → lunas).
               if (sisaSebelum > 0 && sisaBaru <= 0) {
                 await earnPoinSaatLunas({
@@ -876,7 +874,7 @@ export default function TransaksiPage() {
                   totalBayarSetelahDiskon: editRiwayat.totalBayar,
                 })
               }
-              notify(`✅ Pembayaran dicatat!\nDibayar: ${formatRupiah(nominal)}\nSisa sekarang: ${formatRupiah(sisaBaru)}`)
+              notify(`✅ Pembayaran dicatat!\nDibayar: ${formatRupiah(nominal)} (${caraBayar})\nSisa sekarang: ${formatRupiah(sisaBaru)}`)
               setEditIdx(null)
             } catch (err) {
               notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
@@ -962,6 +960,9 @@ function EditRiwayatModal({ data, onClose, onSimpanPelanggan, onCatatPelunasan }
   const [hp, setHp] = useState(data.nomorHP || '')
   const [mekanik, setMekanik] = useState(data.namaMekanik || '')
   const [nominal, setNominal] = useState(data.sisaBayar || 0)
+  // Cara bayar cuma bisa diganti selama transaksi BELUM LUNAS (dicatat bareng pelunasan) — yang sudah
+  // lunas dikunci, supaya cara bayar transaksi lama nggak bisa diubah diam-diam (mis. Tunai → QRIS).
+  const [caraBayar, setCaraBayar] = useState(data.caraBayar || 'Tunai')
 
   return (
     <Modal title="✏️ Ubah Transaksi" onClose={onClose}>
@@ -990,12 +991,28 @@ function EditRiwayatModal({ data, onClose, onSimpanPelanggan, onCatatPelunasan }
             <label>Uang Pelunasan</label>
             <input type="number" min="0" value={nominal} onChange={(e) => setNominal(e.target.value)} />
           </div>
+          <div className="field">
+            <label>💳 Cara Pembayaran</label>
+            <div className="row">
+              {CARA_BAYAR.map((c) => (
+                <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="radio" name="caraBayarPelunasan" checked={caraBayar === c} onChange={() => setCaraBayar(c)} style={{ width: 'auto', minHeight: 'auto' }} />
+                  {ikonCaraBayar(c)} {c}
+                </label>
+              ))}
+            </div>
+            {caraBayar !== (data.caraBayar || 'Tunai') && (
+              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                ⓘ Cara bayar transaksi ini akan diganti dari {data.caraBayar || 'Tunai'} ke {caraBayar}.
+              </p>
+            )}
+          </div>
           <button
             className="btn btn-block btn-blue"
             onClick={() => {
               const n = parseInt(nominal, 10) || 0
               if (n <= 0) return
-              onCatatPelunasan(n)
+              onCatatPelunasan(n, caraBayar)
             }}
           >
             💰 Catat Pelunasan

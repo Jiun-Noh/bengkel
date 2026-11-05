@@ -15,6 +15,7 @@ import { cetakSlipGaji } from '../lib/cetakSlipGaji'
 import { cetakSlipInvestor } from '../lib/cetakSlipInvestor'
 import { cetakKwitansiSupplier } from '../lib/cetakKwitansiSupplier'
 import Modal from '../components/common/Modal'
+import FilterPeriode from '../components/common/FilterPeriode'
 
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 
@@ -69,7 +70,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
 
   const [dari, setDari] = useState('')
   const [sampai, setSampai] = useState('')
-  const [jenisGrafik, setJenisGrafik] = useState('bulanan')
+  const [jenisGrafik, setJenisGrafik] = useState('tren') // 'tren' | 'jam'
   const [pengSetting, setPengSetting] = useState({
     persenPemilik: pengaturan?.persenPemilik ?? 60,
     persenCadangan: pengaturan?.persenCadangan ?? 15,
@@ -175,8 +176,9 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
 
   const dataFilter = useMemo(() => {
     if (!dari && !sampai) return riwayat
-    const tglDari = dari ? new Date(dari) : new Date('2000-01-01')
-    const tglSampai = sampai ? new Date(sampai) : new Date()
+    // + 'T00:00:00' biar dibaca waktu lokal, bukan UTC (kalau UTC, hari "Dari" sendiri ikut tersaring).
+    const tglDari = dari ? new Date(dari + 'T00:00:00') : new Date('2000-01-01T00:00:00')
+    const tglSampai = sampai ? new Date(sampai + 'T00:00:00') : new Date()
     tglSampai.setHours(23, 59, 59)
     return riwayat.filter((r) => {
       const t = ambilTanggalDariTeks(r.tgl)
@@ -384,18 +386,13 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
 
         <div style={{ margin: '10px 0', padding: 10, background: '#f0f8ff', borderRadius: 6 }}>
           <strong>📅 Filter Periode Laporan</strong>
-          <div className="row" style={{ marginTop: 8 }}>
-            <label>Dari:</label>
-            <input type="date" value={dari} onChange={(e) => setDari(e.target.value)} style={{ width: 150 }} />
-            <label>Sampai:</label>
-            <input type="date" value={sampai} onChange={(e) => setSampai(e.target.value)} style={{ width: 150 }} />
-            <button className="btn btn-blue btn-sm" onClick={() => { setDari(''); setSampai('') }}>↩️ Tampilkan Semua</button>
+          <FilterPeriode dari={dari} sampai={sampai} onChange={(d, s) => { setDari(d); setSampai(s) }}>
             <button className="btn btn-blue btn-sm" onClick={backupExcel}>📥 Backup Excel</button>
-          </div>
+          </FilterPeriode>
         </div>
 
         <div className="row" style={{ marginBottom: 12 }}>
-          {[['harian', '📅 Harian'], ['bulanan', '📆 Bulanan'], ['tahunan', '🗓️ Tahunan']].map(([v, label]) => (
+          {[['tren', '📈 Tren'], ['jam', '⏰ Jam Ramai']].map(([v, label]) => (
             <button
               key={v}
               className="btn btn-sm"
@@ -408,7 +405,12 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         </div>
 
         <div className="card" style={{ marginBottom: 15 }}>
-          <GrafikPenjualan data={dataFilter} jenis={jenisGrafik} />
+          <p style={{ fontSize: 12, color: '#888', margin: '0 0 6px' }}>
+            {jenisGrafik === 'jam'
+              ? 'ⓘ Total per jam dari semua hari di periode terpilih — buat lihat jam berapa bengkel paling ramai.'
+              : `ⓘ Urut sesuai tanggal, ${rentangTren(dataFilter, dari, sampai)?.perHari === false ? 'per bulan' : 'per hari'} (otomatis menyesuaikan panjang periode).`}
+          </p>
+          <GrafikPenjualan data={dataFilter} jenis={jenisGrafik} dari={dari} sampai={sampai} />
         </div>
 
         <div className="summary-grid">
@@ -1587,56 +1589,92 @@ function RingkasCard({ label, value, bg, fg }) {
 }
 
 
-function ambilDataRingkasan(riwayat, jenis) {
-  const data = {}
-  if (jenis === 'harian') {
-    const urutanJam = Array.from({ length: 24 }, (_, i) => String((i + 1) % 24).padStart(2, '0') + ':00')
-    urutanJam.forEach((jam) => { data[jam] = { transaksi: 0, penjualan: 0, jasa: 0 } })
+const MAKS_HARI_TREN_HARIAN = 62 // periode sampai ~2 bulan ditampilkan per hari, lebih dari itu per bulan
+
+// Rentang sumbu-X grafik Tren: dari Dari~Sampai kalau diisi; kalau kosong ("Semua"), dari transaksi
+// paling lama sampai hari ini. null kalau nggak ada data sama sekali.
+function rentangTren(riwayat, dari, sampai) {
+  let awal = dari ? new Date(dari + 'T00:00:00') : null
+  if (!awal) {
+    riwayat.forEach((r) => {
+      const t = ambilTanggalDariTeks(r.tgl)
+      if (t && (!awal || t < awal)) awal = t
+    })
+  }
+  if (!awal) return null
+  const akhir = sampai ? new Date(sampai + 'T00:00:00') : new Date()
+  akhir.setHours(0, 0, 0, 0)
+  if (akhir < awal) return null
+  const jumlahHari = Math.round((akhir - awal) / 86400000) + 1
+  return { awal, akhir, perHari: jumlahHari <= MAKS_HARI_TREN_HARIAN }
+}
+
+// 'jam'  → total per jam (00–23) dari semua hari di periode — pola jam ramai.
+// 'tren' → urut kalender; per hari atau per bulan tergantung panjang periode. Hari/bulan tanpa
+//          transaksi tetap ditampilkan (nilai 0) supaya garis waktunya jujur.
+function ambilDataRingkasan(riwayat, jenis, dari, sampai) {
+  const kosong = () => ({ transaksi: 0, penjualan: 0, jasa: 0 })
+  if (jenis === 'jam') {
+    const data = {}
+    const urutanJam = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00')
+    urutanJam.forEach((jam) => { data[jam] = kosong() })
     riwayat.forEach((r) => {
       if (!r.tgl) return
       const bagian = r.tgl.split(' ')
       if (bagian.length < 2) return
-      const jam = bagian[1].substring(0, 5)
+      // tgl berformat "DD/MM/YYYY HH:MM" — dibulatkan ke jamnya ("09:15" → "09:00")
+      const jam = bagian[1].substring(0, 2) + ':00'
       if (data[jam]) {
         data[jam].transaksi += 1
         data[jam].penjualan += r.totalBarang || 0
         data[jam].jasa += r.biayaJasa || 0
       }
     })
-    return urutanJam.map((jam) => [jam, data[jam]])
-  } else if (jenis === 'bulanan') {
-    for (let t = 1; t <= 31; t++) data[String(t).padStart(2, '0')] = { transaksi: 0, penjualan: 0, jasa: 0, urut: t }
-    riwayat.forEach((r) => {
-      const t = ambilTanggalDariTeks(r.tgl)
-      if (!t) return
-      const hari = String(t.getDate()).padStart(2, '0')
-      if (data[hari]) {
-        data[hari].transaksi += 1
-        data[hari].penjualan += r.totalBarang || 0
-        data[hari].jasa += r.biayaJasa || 0
-      }
-    })
-    return Object.entries(data).sort((a, b) => a[1].urut - b[1].urut)
-  } else {
-    NAMA_BULAN.forEach((nama, idx) => { data[nama] = { transaksi: 0, penjualan: 0, jasa: 0, urut: idx + 1 } })
-    riwayat.forEach((r) => {
-      const t = ambilTanggalDariTeks(r.tgl)
-      if (!t) return
-      const nama = NAMA_BULAN[t.getMonth()]
-      data[nama].transaksi += 1
-      data[nama].penjualan += r.totalBarang || 0
-      data[nama].jasa += r.biayaJasa || 0
-    })
-    return Object.entries(data).sort((a, b) => a[1].urut - b[1].urut)
+    // Buang jam kosong di awal & akhir (di luar jam buka), jam kosong di tengah tetap ditampilkan.
+    const adaIsi = urutanJam.map((jam) => data[jam].transaksi > 0)
+    const pertama = adaIsi.indexOf(true)
+    if (pertama < 0) return []
+    const terakhir = adaIsi.lastIndexOf(true)
+    return urutanJam.slice(pertama, terakhir + 1).map((jam) => [jam, data[jam]])
   }
+
+  const rentang = rentangTren(riwayat, dari, sampai)
+  if (!rentang) return []
+  const { awal, akhir, perHari } = rentang
+  const kunci = (t) => (perHari ? `${t.getFullYear()}-${t.getMonth()}-${t.getDate()}` : `${t.getFullYear()}-${t.getMonth()}`)
+  const urutan = []
+  const data = {}
+  if (perHari) {
+    for (let t = new Date(awal); t <= akhir; t.setDate(t.getDate() + 1)) {
+      const k = kunci(t)
+      urutan.push([k, `${t.getDate()} ${NAMA_BULAN[t.getMonth()].slice(0, 3)}`])
+      data[k] = kosong()
+    }
+  } else {
+    for (let t = new Date(awal.getFullYear(), awal.getMonth(), 1); t <= akhir; t.setMonth(t.getMonth() + 1)) {
+      const k = kunci(t)
+      urutan.push([k, `${NAMA_BULAN[t.getMonth()].slice(0, 3)} ${t.getFullYear()}`])
+      data[k] = kosong()
+    }
+  }
+  riwayat.forEach((r) => {
+    const t = ambilTanggalDariTeks(r.tgl)
+    if (!t) return
+    const d = data[kunci(t)]
+    if (!d) return
+    d.transaksi += 1
+    d.penjualan += r.totalBarang || 0
+    d.jasa += r.biayaJasa || 0
+  })
+  return urutan.map(([k, label]) => [label, data[k]])
 }
 
-function GrafikPenjualan({ data, jenis }) {
+function GrafikPenjualan({ data, jenis, dari, sampai }) {
   const canvasRef = useRef(null)
   const chartRef = useRef(null)
 
   useEffect(() => {
-    const daftar = ambilDataRingkasan(data, jenis)
+    const daftar = ambilDataRingkasan(data, jenis, dari, sampai)
     const label = daftar.map((x) => x[0])
     const dataPenjualan = daftar.map((x) => x[1].penjualan)
     const dataJasa = daftar.map((x) => x[1].jasa)
@@ -1674,7 +1712,7 @@ function GrafikPenjualan({ data, jenis }) {
     })
 
     return () => chartRef.current?.destroy()
-  }, [data, jenis])
+  }, [data, jenis, dari, sampai])
 
   return (
     <div style={{ position: 'relative', height: 260 }}>
