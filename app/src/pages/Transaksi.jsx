@@ -712,7 +712,7 @@ export default function TransaksiPage() {
           </p>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap table-scroll">
           <table style={{ minWidth: 900 }}>
             <thead>
               <tr>

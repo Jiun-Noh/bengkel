@@ -305,7 +305,7 @@ export default function AbsensiPage() {
 
       <div className="card">
         <h2>📋 Rekap Absensi {labelBulan}</h2>
-        <div className="table-wrap">
+        <div className="table-wrap table-scroll">
           <table>
             <thead>
               <tr>

@@ -159,9 +159,10 @@ select:disabled {
   width: 100%;
 }
 
-/* Tabel yang barisnya bisa banyak: tinggi dibatasi, scroll di dalam, header tetap nempel di atas */
+/* Tabel yang barisnya bisa banyak: tinggi dibatasi, scroll di dalam, header tetap nempel di atas.
+   Tinggi ikut layar (60vh), biar di HP selalu ada ruang di atas/bawah tabel buat scroll halaman. */
 .table-scroll {
-  max-height: 360px;
+  max-height: 60vh;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -177,7 +178,7 @@ select:disabled {
 }
 
 /* Sel teks panjang: bungkus = turun ke baris berikutnya (isi tetap kelihatan semua),
-   potong = satu baris dengan "…" (tap buat buka, lihat SelMotor di Stok.jsx) */
+   potong = satu baris dengan "…" (tap buat buka, lihat SelPotong di Stok.jsx) */
 td.sel-bungkus {
   white-space: normal;
   min-width: 140px;
@@ -185,7 +186,7 @@ td.sel-bungkus {
   overflow-wrap: anywhere;
 }
 td.sel-potong {
-  max-width: 140px;
+  max-width: var(--lebar-potong, 140px);
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;

@@ -388,7 +388,7 @@ function BarangSection() {
             </button>
           ))}
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap table-scroll" style={{ marginTop: 8 }}>
           <table>
             <thead>
               <tr>
@@ -448,9 +448,9 @@ function BarangSection() {
                       </div>
                     </td>
                     <td className="tengah">{i + 1}</td>
-                    <td>{b.kode}</td>
+                    <SelPotong teks={b.kode} lebar="100px" />
                     <td className="sel-bungkus">{b.nama}</td>
-                    <SelMotor teks={b.jenisMotor || '-'} />
+                    <SelPotong teks={b.jenisMotor || '-'} />
                     <td className="tengah">{b.satuan || 'PCS'}</td>
                     <td className="angka">{formatRupiah(b.hargaPokok)}</td>
                     <td className="angka">{formatRupiah(b.hargaJual)}</td>
@@ -500,12 +500,17 @@ function BarangSection() {
   )
 }
 
-// Daftar motor biasanya panjang & berupa daftar ("BEAT, SCOOPY, VARIO, …"), jadi dipotong
-// dengan "…" — tap selnya buat lihat lengkap (di HP nggak ada hover/tooltip).
-function SelMotor({ teks }) {
+// Sel yang dipotong dengan "…" kalau kepanjangan (Kode, daftar Motor "BEAT, SCOOPY, …") —
+// tap selnya buat lihat lengkap (di HP nggak ada hover/tooltip).
+function SelPotong({ teks, lebar }) {
   const [buka, setBuka] = useState(false)
   return (
-    <td className={buka ? 'sel-bungkus' : 'sel-potong'} title={teks} onClick={() => setBuka((v) => !v)}>
+    <td
+      className={buka ? 'sel-bungkus' : 'sel-potong'}
+      style={lebar ? { '--lebar-potong': lebar } : undefined}
+      title={teks}
+      onClick={() => setBuka((v) => !v)}
+    >
       {teks}
     </td>
   )
