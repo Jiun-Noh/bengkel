@@ -26,6 +26,22 @@ function ikonCaraBayar(c) {
   return c === 'Tunai' ? '💵' : c === 'QRIS' ? '📱' : c === 'Transfer' ? '🏦' : c === 'Kartu Debit' ? '🏧' : '💳'
 }
 
+// Pembeli cepat tanpa data pelanggan dicatat "Umum" (tombol 🚶 Pelanggan Umum). Data lama bisa
+// tertulis "Unknown" (diketik manual) atau "-" (nama kosong) — semuanya diperlakukan sama: nggak
+// muncul di saran nama & riwayat kunjungan, karena itu bukan satu orang yang sama.
+const NAMA_UMUM = 'Umum'
+function isPelangganUmum(nama) {
+  const n = (nama || '').trim().toUpperCase()
+  return !n || n === '-' || n === 'UMUM' || n === 'UNKNOWN'
+}
+function tanpaHP(hp) {
+  return !hp || hp.trim() === '-' || !hp.trim()
+}
+
+// Klaim poin susulan (transaksi tanpa No. HP, pelanggan baru kasih nomornya belakangan) — cuma pemilik,
+// & cuma buat transaksi yang umurnya ≤ batas ini, biar nggak bisa dipakai numpuk poin dari transaksi lama.
+const BATAS_HARI_KLAIM_POIN = 7
+
 const MAX_PERSEN_MEKANIK = 40 // total % bagi hasil semua mekanik di satu transaksi, disepakati dengan pemilik
 
 function ambilTanggalDariTeks(tgl) {
@@ -114,7 +130,7 @@ export default function TransaksiPage() {
   const daftarPelanggan = useMemo(() => {
     const daftar = []
     riwayat.forEach((r) => {
-      if (r.namaPelanggan && r.namaPelanggan !== '-') {
+      if (!isPelangganUmum(r.namaPelanggan)) {
         const ada = daftar.find((x) => x.nama === r.namaPelanggan && x.plat === r.platKendaraan)
         // riwayat sudah terurut dari yang terbaru, jadi kecocokan pertama = kunjungan terakhir pelanggan ini.
         if (!ada) daftar.push({ nama: r.namaPelanggan, plat: r.platKendaraan, motor: r.jenisMotor, nomorHP: r.nomorHP, kunjunganTerakhir: r.tgl })
@@ -126,7 +142,7 @@ export default function TransaksiPage() {
   const riwayatPelangganAktif = useMemo(() => {
     const nama = form.namaPelanggan.trim()
     const plat = form.platKendaraan.trim().toUpperCase()
-    if (!nama || !plat) return []
+    if (!nama || !plat || isPelangganUmum(nama)) return []
     return riwayat.filter((r) => r.namaPelanggan === nama && r.platKendaraan === plat).slice(0, 3)
   }, [riwayat, form.namaPelanggan, form.platKendaraan])
 
@@ -449,10 +465,21 @@ export default function TransaksiPage() {
           {saranAktif === 'nama' && saranList.length > 0 && (
             <SaranBox saranList={saranList} onPilih={pilihPelanggan} />
           )}
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ marginTop: 6, background: form.namaPelanggan === NAMA_UMUM ? '#2563eb' : '#ddd', color: form.namaPelanggan === NAMA_UMUM ? 'white' : '#333' }}
+            onClick={() => setForm((f) => ({ ...f, namaPelanggan: NAMA_UMUM }))}
+          >
+            🚶 Pelanggan Umum
+          </button>
         </div>
         <div className="field">
           <label>Nomor HP</label>
           <input value={form.nomorHP} onChange={(e) => isiDariHP(e.target.value)} placeholder="📱 Nomor HP / WhatsApp" />
+          <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+            ⓘ Pelanggan buru-buru? Cukup minta Nomor HP-nya — poin tetap tercatat walau nama nggak diisi.
+          </p>
         </div>
         <div className="field" style={{ position: 'relative' }}>
           <label>Nomor Plat</label>
@@ -848,7 +875,38 @@ export default function TransaksiPage() {
       {editRiwayat && (
         <EditRiwayatModal
           data={editRiwayat}
+          pemilik={profil?.peran === 'pemilik'}
+          poinSudahMasuk={poinLedger.some((l) => l.riwayatId === editRiwayat.id && l.jenis === 'earn')}
           onClose={() => setEditIdx(null)}
+          onKlaimPoin={async (hpBaru, namaBaru) => {
+            const lunas = (editRiwayat.sisaBayar || 0) <= 0
+            const kolom = { nomor_hp: hpBaru }
+            if (namaBaru && isPelangganUmum(editRiwayat.namaPelanggan)) kolom.nama_pelanggan = namaBaru
+            try {
+              await ubahRiwayat(editRiwayat.id, kolom)
+              // Belum lunas → cukup pasang No. HP; poinnya nanti masuk sendiri pas pelunasan.
+              if (lunas) {
+                // Masa berlaku dihitung dari tanggal transaksi, bukan hari klaim.
+                const tgl = ambilTanggalDariTeks(editRiwayat.tgl) || new Date()
+                await earnPoinSaatLunas({
+                  nomorHP: hpBaru,
+                  nama: kolom.nama_pelanggan || editRiwayat.namaPelanggan,
+                  tanggalISO: tanggalISO(tgl),
+                  riwayatId: editRiwayat.id,
+                  totalBayarSetelahDiskon: editRiwayat.totalBayar,
+                })
+              }
+              const poin = hitungPoinDidapat(editRiwayat.totalBayar)
+              notify(
+                lunas
+                  ? `✅ Poin susulan masuk!\n📱 ${hpBaru}\n🎁 +${poin} poin`
+                  : `✅ No. HP dipasang: ${hpBaru}\n🎁 ${poin} poin akan masuk setelah transaksi ini lunas.`,
+              )
+              setEditIdx(null)
+            } catch (err) {
+              notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
+            }
+          }}
           onSimpanPelanggan={async (kolom) => {
             try {
               await ubahRiwayat(editRiwayat.id, kolom)
@@ -953,7 +1011,7 @@ function SaranMekanikBox({ saranMekanik, onPilih }) {
   )
 }
 
-function EditRiwayatModal({ data, onClose, onSimpanPelanggan, onCatatPelunasan }) {
+function EditRiwayatModal({ data, pemilik, poinSudahMasuk, onClose, onSimpanPelanggan, onCatatPelunasan, onKlaimPoin }) {
   const [nama, setNama] = useState(data.namaPelanggan)
   const [plat, setPlat] = useState(data.platKendaraan)
   const [motor, setMotor] = useState(data.jenisMotor)
@@ -963,6 +1021,13 @@ function EditRiwayatModal({ data, onClose, onSimpanPelanggan, onCatatPelunasan }
   // Cara bayar cuma bisa diganti selama transaksi BELUM LUNAS (dicatat bareng pelunasan) — yang sudah
   // lunas dikunci, supaya cara bayar transaksi lama nggak bisa diubah diam-diam (mis. Tunai → QRIS).
   const [caraBayar, setCaraBayar] = useState(data.caraBayar || 'Tunai')
+  const [hpKlaim, setHpKlaim] = useState('')
+  const [namaKlaim, setNamaKlaim] = useState('')
+
+  const tglTransaksi = ambilTanggalDariTeks(data.tgl)
+  const umurHari = tglTransaksi ? Math.floor((new Date().setHours(0, 0, 0, 0) - tglTransaksi) / 86400000) : Infinity
+  const tampilKlaim = pemilik && tanpaHP(data.nomorHP) && !poinSudahMasuk
+  const bisaKlaim = umurHari <= BATAS_HARI_KLAIM_POIN
 
   return (
     <Modal title="✏️ Ubah Transaksi" onClose={onClose}>
@@ -970,7 +1035,12 @@ function EditRiwayatModal({ data, onClose, onSimpanPelanggan, onCatatPelunasan }
       <div className="field"><label>Nama Pelanggan</label><input value={nama} onChange={(e) => setNama(e.target.value)} /></div>
       <div className="field"><label>Nomor Plat</label><input value={plat} onChange={(e) => setPlat(e.target.value)} /></div>
       <div className="field"><label>Jenis Motor</label><input value={motor} onChange={(e) => setMotor(e.target.value)} /></div>
-      <div className="field"><label>Nomor HP</label><input value={hp} onChange={(e) => setHp(e.target.value)} /></div>
+      <div className="field">
+        <label>Nomor HP</label>
+        {/* No. HP = kunci poin pelanggan, jadi cuma pemilik yang boleh ubah */}
+        <input value={hp} onChange={(e) => setHp(e.target.value)} disabled={!pemilik} />
+        {!pemilik && <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>ⓘ Nomor HP cuma bisa diubah pemilik.</p>}
+      </div>
       <div className="field"><label>Nama Mekanik</label><input value={mekanik} onChange={(e) => setMekanik(e.target.value)} /></div>
       <button
         className="btn btn-block"
@@ -978,6 +1048,46 @@ function EditRiwayatModal({ data, onClose, onSimpanPelanggan, onCatatPelunasan }
       >
         💾 Simpan Data Pelanggan
       </button>
+
+      {tampilKlaim && (
+        <>
+          <hr style={{ margin: '18px 0' }} />
+          <h4>🎁 Klaim Poin Susulan</h4>
+          {bisaKlaim ? (
+            <>
+              <p style={{ fontSize: 12, color: '#888' }}>
+                ⓘ Transaksi ini belum punya No. HP, jadi poinnya belum masuk. Isi No. HP pelanggan buat
+                masukkan {hitungPoinDidapat(data.totalBayar)} poin dari transaksi ini (maks. {BATAS_HARI_KLAIM_POIN} hari setelah transaksi).
+              </p>
+              <div className="field">
+                <label>Nomor HP Pelanggan</label>
+                <input value={hpKlaim} onChange={(e) => setHpKlaim(e.target.value)} placeholder="📱 Nomor HP / WhatsApp" />
+              </div>
+              {isPelangganUmum(data.namaPelanggan) && (
+                <div className="field">
+                  <label>Nama Pelanggan (opsional)</label>
+                  <input value={namaKlaim} onChange={(e) => setNamaKlaim(kapitalNama(e.target.value))} placeholder="Nama Pelanggan" />
+                </div>
+              )}
+              <button
+                className="btn btn-block btn-blue"
+                onClick={() => {
+                  const h = hpKlaim.trim()
+                  if (h.replace(/\D/g, '').length < 8) return
+                  onKlaimPoin(h, namaKlaim.trim())
+                }}
+                disabled={hpKlaim.replace(/\D/g, '').length < 8}
+              >
+                🎁 Klaim Poin
+              </button>
+            </>
+          ) : (
+            <p style={{ fontSize: 12, color: '#888' }}>
+              ⓘ Sudah lewat {BATAS_HARI_KLAIM_POIN} hari sejak transaksi — poin susulan nggak bisa diklaim lagi.
+            </p>
+          )}
+        </>
+      )}
 
       <hr style={{ margin: '18px 0' }} />
 
