@@ -433,13 +433,40 @@ export default function TransaksiPage() {
   }, [dataTampil])
 
   async function hapus(r) {
-    const ok = await confirm('⚠️ Hapus riwayat ini?')
+    const items = r.items || []
+    const ok = await confirm(
+      items.length > 0
+        ? '⚠️ Hapus riwayat ini?\nStok barang di transaksi ini akan dikembalikan & angka Terjual dikurangi.'
+        : '⚠️ Hapus riwayat ini?',
+    )
     if (!ok) return
     try {
       await batalkanPoinUntukRiwayat(r.id)
       await hapusRiwayat(r.id)
     } catch (err) {
       notify('❌ Gagal menghapus di cloud: ' + err.message, 'error')
+      return
+    }
+
+    // Kembalikan stok SETELAH riwayat terhapus — kalau urutannya dibalik dan hapusnya gagal,
+    // stok sudah terlanjur bertambah dan menghapus ulang bakal menambah stok dua kali.
+    const gagal = []
+    for (const item of items) {
+      const b = barang.find((x) => x.kode === item.kode)
+      if (!b) {
+        gagal.push(`${item.nama} (barang sudah tidak ada di katalog)`)
+        continue
+      }
+      try {
+        await ubahStokTerjual(b.kode, (b.stok || 0) + item.jumlah, Math.max(0, (b.terjual || 0) - item.jumlah))
+      } catch (err) {
+        gagal.push(`${item.nama} (${err.message})`)
+      }
+    }
+    if (gagal.length > 0) {
+      notify(`⚠️ Riwayat terhapus, tapi stok ini GAGAL dikembalikan — cek manual di Katalog:\n- ${gagal.join('\n- ')}`, 'error')
+    } else if (items.length > 0) {
+      notify(`✅ Riwayat dihapus & stok dikembalikan:\n${items.map((i) => `- ${i.nama} +${i.jumlah} ${i.satuan || ''}`).join('\n')}`)
     }
   }
 

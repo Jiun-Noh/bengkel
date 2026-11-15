@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from './contexts/AuthContext'
 import { useUI } from './contexts/UIContext'
 import { useRealtimeSync } from './hooks/useRealtimeSync'
@@ -10,6 +10,9 @@ import AbsensiPage from './pages/Absensi'
 import StokPage from './pages/Stok'
 import TransaksiPage from './pages/Transaksi'
 import LaporanPage from './pages/Laporan'
+import PopupPembaruan from './components/common/PopupPembaruan'
+import { pembaruanBelumDilihat, semuaPembaruan, tandaiSudahDilihat } from './lib/pembaruan'
+import { useVersiBaru } from './lib/versiBaru'
 
 const TABS = [
   { key: 'home', label: 'Beranda', icon: '🏠' },
@@ -23,8 +26,24 @@ const TABS = [
 export default function App() {
   const { session, profil, recoveryMode } = useAuth()
   const [tab, setTab] = useState('home')
+  const [popupPembaruan, setPopupPembaruan] = useState(null) // null = tertutup, [] = daftar entri
+  const versiBaru = useVersiBaru()
 
   useRealtimeSync(!!session)
+
+  // Begitu login & peran sudah diketahui: tampilkan pembaruan yang belum dilihat di HP ini.
+  const peran = profil?.peran
+  useEffect(() => {
+    if (!session || !peran) return
+    const baru = pembaruanBelumDilihat(peran)
+    if (baru.length) setPopupPembaruan(baru)
+    else tandaiSudahDilihat() // entri terbaru cuma buat peran lain → anggap sudah dilihat
+  }, [session, peran])
+
+  function tutupPembaruan() {
+    tandaiSudahDilihat()
+    setPopupPembaruan(null)
+  }
 
   if (recoveryMode) {
     return <ResetPassword />
@@ -40,7 +59,14 @@ export default function App() {
 
   return (
     <div>
-      <AppHeader />
+      <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+        <AppHeader onBukaPembaruan={() => setPopupPembaruan(semuaPembaruan(peran))} />
+        {versiBaru && (
+          <button className="banner-versi-baru" onClick={() => window.location.reload()}>
+            🔄 Versi baru tersedia — ketuk untuk muat ulang
+          </button>
+        )}
+      </div>
 
       <main className="app-main">
         {tab === 'home' && <Dashboard onNavigate={setTab} />}
@@ -59,11 +85,13 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {popupPembaruan && <PopupPembaruan daftar={popupPembaruan} onClose={tutupPembaruan} />}
     </div>
   )
 }
 
-function AppHeader() {
+function AppHeader({ onBukaPembaruan }) {
   const { profil, logout } = useAuth()
   const { notify } = useUI()
 
@@ -79,23 +107,28 @@ function AppHeader() {
         <span style={{ fontSize: 13, color: 'white', opacity: 0.9 }}>
           {profil?.peran === 'pemilik' ? '🔓' : '🔒'} {profil?.nama || '—'}
         </span>
+        <button onClick={onBukaPembaruan} title="Apa yang baru" style={TOMBOL_HEADER}>
+          📢
+        </button>
         <button
           onClick={handleLogout}
           title="Keluar"
-          style={{
-            background: 'rgba(255,255,255,0.15)',
-            border: 'none',
-            borderRadius: 8,
-            color: 'white',
-            padding: '6px 10px',
-            fontSize: 13,
-            cursor: 'pointer',
-            minHeight: 'auto',
-          }}
+          style={TOMBOL_HEADER}
         >
           Keluar
         </button>
       </div>
     </header>
   )
+}
+
+const TOMBOL_HEADER = {
+  background: 'rgba(255,255,255,0.15)',
+  border: 'none',
+  borderRadius: 8,
+  color: 'white',
+  padding: '6px 10px',
+  fontSize: 13,
+  cursor: 'pointer',
+  minHeight: 'auto',
 }
