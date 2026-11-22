@@ -41,7 +41,7 @@ export default function StokPage() {
 
 function BarangSection() {
   const { data: barang = [], isLoading } = useBarangQuery(true)
-  const { simpanBarang, hapusBarang } = useBarangMutations()
+  const { tambahBarang, ubahInfoBarang, hapusBarang, restockBarang, batalRestock } = useBarangMutations()
   const { notify, confirm } = useUI()
 
   const [mode, setMode] = useState('list') // 'list' | 'form'
@@ -51,8 +51,6 @@ function BarangSection() {
   const [cari, setCari] = useState('')
   const [riwayatKode, setRiwayatKode] = useState(null)
   const [saving, setSaving] = useState(false)
-
-  const barangEditing = editingKode ? barang.find((b) => b.kode === editingKode) : null
 
   const [filterStok, setFilterStok] = useState('semua') // 'semua' | 'menipis' | 'habis'
 
@@ -145,50 +143,33 @@ function BarangSection() {
       return
     }
 
-    let baris
+    let simpan
     let pesan
 
     if (editingKode) {
-      const b = barangEditing
-      baris = {
-        kode,
-        nama,
-        jenis_motor: form.jenisMotor.trim(),
-        satuan: form.satuan,
-        harga_pokok: pokok,
-        harga_jual: jual,
-        stok: b.stok,
-        stok_awal: b.stokAwal,
-        restock: b.restock,
-        terjual: b.terjual,
-        tanggal_stok_awal: b.tanggalStokAwal,
-        riwayat_restock: b.riwayatRestock || [],
-      }
+      // Cuma data katalog — stok/terjual/restock nggak ikut ditulis (bisa basi di HP ini)
+      simpan = () =>
+        ubahInfoBarang(kode, {
+          nama,
+          jenis_motor: form.jenisMotor.trim(),
+          satuan: form.satuan,
+          harga_pokok: pokok,
+          harga_jual: jual,
+        })
       pesan = '✅ Data barang berhasil diubah!'
     } else if (restockMode) {
       if (!adaSebelumnya) {
         notify('❌ Barang tidak ditemukan, mungkin sudah dihapus.', 'error')
         return
       }
-      const b = adaSebelumnya
-      const riwayatRestockBaru = [...(b.riwayatRestock || []), { jumlah, tanggal: waktu }]
-      baris = {
-        kode: b.kode,
-        nama: b.nama,
-        jenis_motor: b.jenisMotor,
-        satuan: b.satuan,
-        harga_pokok: b.hargaPokok,
-        harga_jual: b.hargaJual,
-        stok: (b.stok || 0) + jumlah,
-        stok_awal: b.stokAwal,
-        restock: (b.restock || 0) + jumlah,
-        terjual: b.terjual,
-        tanggal_stok_awal: b.tanggalStokAwal,
-        riwayat_restock: riwayatRestockBaru,
+      if (jumlah <= 0) {
+        notify('⚠️ Jumlah restock minimal 1!', 'error')
+        return
       }
-      pesan = `✅ Restock berhasil!\nJumlah: ${jumlah} ${form.satuan}\nStok Sekarang: ${baris.stok} ${form.satuan}`
+      simpan = () => restockBarang(adaSebelumnya.kode, jumlah, waktu)
+      pesan = `✅ Restock berhasil!\nJumlah: +${jumlah} ${form.satuan}`
     } else {
-      baris = {
+      const baris = {
         kode,
         nama,
         jenis_motor: form.jenisMotor.trim(),
@@ -202,12 +183,13 @@ function BarangSection() {
         tanggal_stok_awal: waktu,
         riwayat_restock: [{ jumlah, tanggal: waktu }],
       }
+      simpan = () => tambahBarang(baris)
       pesan = `✅ Barang baru berhasil ditambahkan!`
     }
 
     setSaving(true)
     try {
-      await simpanBarang(baris)
+      await simpan()
       notify(pesan)
       resetForm()
       setMode('list')
@@ -233,22 +215,8 @@ function BarangSection() {
     const entry = b.riwayatRestock[index]
     const ok = await confirm(`⚠️ Batalkan restock +${entry.jumlah} ${b.satuan || 'PCS'} (${entry.tanggal})?\nStok akan dikurangi kembali.`)
     if (!ok) return
-    const riwayatBaru = b.riwayatRestock.filter((_, i) => i !== index)
     try {
-      await simpanBarang({
-        kode: b.kode,
-        nama: b.nama,
-        jenis_motor: b.jenisMotor,
-        satuan: b.satuan,
-        harga_pokok: b.hargaPokok,
-        harga_jual: b.hargaJual,
-        stok: (b.stok || 0) - entry.jumlah,
-        stok_awal: b.stokAwal,
-        restock: (b.restock || 0) - entry.jumlah,
-        terjual: b.terjual,
-        tanggal_stok_awal: b.tanggalStokAwal,
-        riwayat_restock: riwayatBaru,
-      })
+      await batalRestock(b.kode, entry.jumlah, entry.tanggal)
       notify('✅ Restock dibatalkan, stok sudah disesuaikan.')
     } catch (err) {
       notify('❌ Gagal membatalkan di cloud: ' + err.message, 'error')

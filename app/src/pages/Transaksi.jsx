@@ -68,7 +68,7 @@ export default function TransaksiPage() {
   const { data: riwayat = [], isLoading } = useRiwayatQuery(true)
   const { data: staffList = [] } = useStaffQuery(true)
   const { data: poinLedger = [] } = usePoinLedgerQuery(true)
-  const { ubahStokTerjual } = useBarangMutations()
+  const { jualBarang } = useBarangMutations()
   const { tambahRiwayat, hapusRiwayat, ubahRiwayat } = useRiwayatMutations()
   const { prosesPoin, earnPoinSaatLunas, batalkanPoinUntukRiwayat } = usePoinMutations()
   const { notify, confirm } = useUI()
@@ -331,9 +331,7 @@ export default function TransaksiPage() {
     setSaving(true)
     try {
       for (const item of keranjang) {
-        const b = barang.find((x) => x.kode === item.kode)
-        if (!b) continue
-        await ubahStokTerjual(b.kode, (b.stok || 0) - item.jumlah, (b.terjual || 0) + item.jumlah)
+        await jualBarang(item.kode, item.jumlah)
       }
 
       const totalModal = keranjang.reduce((s, i) => s + i.hargaPokok * i.jumlah, 0)
@@ -452,13 +450,8 @@ export default function TransaksiPage() {
     // stok sudah terlanjur bertambah dan menghapus ulang bakal menambah stok dua kali.
     const gagal = []
     for (const item of items) {
-      const b = barang.find((x) => x.kode === item.kode)
-      if (!b) {
-        gagal.push(`${item.nama} (barang sudah tidak ada di katalog)`)
-        continue
-      }
       try {
-        await ubahStokTerjual(b.kode, (b.stok || 0) + item.jumlah, Math.max(0, (b.terjual || 0) - item.jumlah))
+        await jualBarang(item.kode, -item.jumlah)
       } catch (err) {
         gagal.push(`${item.nama} (${err.message})`)
       }

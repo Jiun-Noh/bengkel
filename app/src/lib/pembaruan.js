@@ -7,6 +7,14 @@
 
 export const DAFTAR_PEMBARUAN = [
   {
+    versi: '2026-11-16-2',
+    tanggal: '16 November 2026 (2)',
+    item: [
+      { teks: '📦 Perbaikan stok: angka Stok & Terjual sekarang selalu pas walau jualan dari beberapa HP sekaligus atau sinyal sempat putus (sebelumnya kadang ada penjualan yang nggak tercatat di stok).' },
+      { teks: '✏️ Ubah data barang (nama/harga) nggak lagi ikut menimpa angka stok.', untuk: 'pemilik' },
+    ],
+  },
+  {
     versi: '2026-11-16',
     tanggal: '16 November 2026',
     item: [

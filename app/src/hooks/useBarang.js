@@ -30,8 +30,20 @@ export function useBarangMutations() {
   const queryClient = useQueryClient()
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['barang'] })
 
-  async function simpanBarang(baris) {
-    const { error } = await db.from('barang').upsert(baris)
+  // Stok/terjual/restock JANGAN pernah ditulis sebagai angka jadi dari data di HP (bisa basi →
+  // penjualan hilang). Semua perubahan angka lewat fungsi database yang menambah/mengurangi
+  // nilai saat ini (lihat migrasi_stok_atomik.sql).
+
+  async function tambahBarang(baris) {
+    // insert (bukan upsert): kalau kode sudah ada, ditolak — nggak menimpa barang lama
+    const { error } = await db.from('barang').insert(baris)
+    if (error) throw error
+    await invalidate()
+  }
+
+  // Cuma data katalog (nama, motor, satuan, harga) — angka stok tidak ikut ditulis.
+  async function ubahInfoBarang(kode, kolom) {
+    const { error } = await db.from('barang').update(kolom).eq('kode', kode)
     if (error) throw error
     await invalidate()
   }
@@ -42,10 +54,24 @@ export function useBarangMutations() {
     await invalidate()
   }
 
-  async function ubahStokTerjual(kode, stok, terjual) {
-    const { error } = await db.from('barang').update({ stok, terjual }).eq('kode', kode)
+  // jumlah positif = terjual, negatif = dikembalikan (transaksi dihapus)
+  async function jualBarang(kode, jumlah) {
+    const { error } = await db.rpc('jual_barang', { p_kode: kode, p_jumlah: jumlah })
     if (error) throw error
+    await invalidate()
   }
 
-  return { simpanBarang, hapusBarang, ubahStokTerjual }
+  async function restockBarang(kode, jumlah, tanggal) {
+    const { error } = await db.rpc('restock_barang', { p_kode: kode, p_jumlah: jumlah, p_tanggal: tanggal })
+    if (error) throw error
+    await invalidate()
+  }
+
+  async function batalRestock(kode, jumlah, tanggal) {
+    const { error } = await db.rpc('batal_restock_barang', { p_kode: kode, p_jumlah: jumlah, p_tanggal: tanggal })
+    if (error) throw error
+    await invalidate()
+  }
+
+  return { tambahBarang, ubahInfoBarang, hapusBarang, jualBarang, restockBarang, batalRestock }
 }
