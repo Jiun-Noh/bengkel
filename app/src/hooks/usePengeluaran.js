@@ -36,11 +36,18 @@ export function usePengeluaranMutations() {
     await invalidate()
   }
 
+  // Dipakai buat pindah kategori (mis. Operasional → Belanja Stok) langsung dari tabel.
+  async function ubahKategoriPengeluaran(id, kategori) {
+    const { error } = await db.from('pengeluaran').update({ kategori }).eq('id', id)
+    if (error) throw error
+    await invalidate()
+  }
+
   async function hapusPengeluaran(id) {
     const { error } = await db.from('pengeluaran').delete().eq('id', id)
     if (error) throw error
     await invalidate()
   }
 
-  return { tambahPengeluaran, hapusPengeluaran }
+  return { tambahPengeluaran, ubahKategoriPengeluaran, hapusPengeluaran }
 }

@@ -464,3 +464,15 @@ th {
   font-size: 14px;
   cursor: pointer;
 }
+
+/* Tabel ringkasan 2 kolom (label | angka) di Laporan — tidak dibungkus .table-wrap, jadi kalau
+   semua sel nowrap, label panjang + angka besar bikin tabel tembus keluar kartu di HP.
+   Label boleh turun baris, angka tetap satu baris & mepet kanan. */
+table.tabel-ringkas td:first-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+table.tabel-ringkas td.angka {
+  width: 1%;
+  padding-left: 10px;
+}

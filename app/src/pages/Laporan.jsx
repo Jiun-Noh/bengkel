@@ -8,6 +8,9 @@ import { useStaffQuery } from '../hooks/useStaff'
 import { useAbsensiQuery } from '../hooks/useAbsensi'
 import { useLemburQuery, useLemburMutations } from '../hooks/useLembur'
 import { useInvestorQuery, useInvestorMutations } from '../hooks/useInvestor'
+import { useBarangQuery } from '../hooks/useBarang'
+import { usePembelianQuery } from '../hooks/usePembelian'
+import { KATEGORI_BELANJA_STOK, cariBarangCocok, hariIniLokal, siapkanNormBarang } from '../lib/belanjaStok'
 import { useUI } from '../contexts/UIContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatRupiah, waktuSekarang } from '../lib/format'
@@ -16,6 +19,7 @@ import { cetakSlipInvestor } from '../lib/cetakSlipInvestor'
 import { cetakKwitansiSupplier } from '../lib/cetakKwitansiSupplier'
 import Modal from '../components/common/Modal'
 import FilterPeriode from '../components/common/FilterPeriode'
+import { SHOP } from '../lib/shopInfo'
 
 const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 
@@ -52,12 +56,16 @@ function bulanIniISO() {
   return s.getFullYear() + '-' + String(s.getMonth() + 1).padStart(2, '0')
 }
 
-const KATEGORI_PENGELUARAN = ['Operasional', 'Maintenance']
+// 'Belanja Stok' = belanja barang dagangan (bukan biaya → TIDAK dipotong dari Laba Bersih; modalnya
+// sudah terpotong lewat Laba Barang waktu barangnya terjual). Belanja baru sebaiknya lewat 🛒 Pembelian.
+const KATEGORI_PENGELUARAN = ['Operasional', 'Maintenance', KATEGORI_BELANJA_STOK]
 
 function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const { notify, confirm } = useUI()
   const { data: pengeluaran = [] } = usePengeluaranQuery(true)
-  const { tambahPengeluaran, hapusPengeluaran } = usePengeluaranMutations()
+  const { tambahPengeluaran, ubahKategoriPengeluaran, hapusPengeluaran } = usePengeluaranMutations()
+  const { data: barang = [] } = useBarangQuery(true)
+  const { data: pembelian = [] } = usePembelianQuery(true)
   const { data: hutangSupplier = [] } = useHutangSupplierQuery(true)
   const { data: pembayaranSupplier = [] } = useHutangSupplierPembayaranQuery(true)
   const { tambahHutangSupplier, hapusHutangSupplier, tambahPembayaranSupplier, hapusPembayaranSupplier } = useHutangSupplierMutations()
@@ -91,22 +99,24 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   }, [pengaturan])
 
   const [formPengeluaran, setFormPengeluaran] = useState({
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: hariIniLokal(),
     kategori: 'Operasional',
     deskripsi: '',
     nominal: '',
   })
   const [savingPengeluaran, setSavingPengeluaran] = useState(false)
+  const [ubahKategoriId, setUbahKategoriId] = useState(null)
 
   const [formHutangSupplier, setFormHutangSupplier] = useState({
     namaSupplier: '',
-    tanggal: new Date().toISOString().split('T')[0],
+    tanggal: hariIniLokal(),
     deskripsi: '',
     nominal: '',
   })
   const [savingHutangSupplier, setSavingHutangSupplier] = useState(false)
   const [detailHutangId, setDetailHutangId] = useState(null)
-  const [formPembayaran, setFormPembayaran] = useState({ tanggal: new Date().toISOString().split('T')[0], nominal: '' })
+  const [bukaBelumDibayar, setBukaBelumDibayar] = useState(false)
+  const [formPembayaran, setFormPembayaran] = useState({ tanggal: hariIniLokal(), nominal: '' })
   const [savingPembayaran, setSavingPembayaran] = useState(false)
 
   // Bulan yang lagi ditampilkan di seksi "penutupan bulanan" (Pengeluaran s/d Pembagian Laba
@@ -116,6 +126,12 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const [bulanDipilih, setBulanDipilih] = useState(bulanIniISO())
   const [thnDipilih, blnDipilih] = bulanDipilih.split('-')
   const labelBulanIni = `${NAMA_BULAN[parseInt(blnDipilih, 10) - 1]} ${thnDipilih}`
+
+  const pembelianBulanIni = useMemo(() => pembelian.filter((p) => p.bulan === bulanDipilih), [pembelian, bulanDipilih])
+
+  // Saran "📦 Cocok dengan katalog" buat catatan Operasional yang deskripsinya mirip nama barang
+  // — kemungkinan itu belanja barang dagangan yang salah kategori.
+  const normBarang = useMemo(() => siapkanNormBarang(barang), [barang])
 
   const pengeluaranBulanIni = useMemo(
     () => pengeluaran.filter((p) => p.bulan === bulanDipilih).sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
@@ -226,9 +242,42 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     const labaKotor = labaBarang + totalJasa
     const biayaOp = pengeluaranBulanIni.filter((p) => p.kategori === 'Operasional').reduce((s, p) => s + (p.nominal || 0), 0)
     const biayaMt = pengeluaranBulanIni.filter((p) => p.kategori === 'Maintenance').reduce((s, p) => s + (p.nominal || 0), 0)
-    const labaBersih = labaKotor - biayaOp - biayaMt - totalGajiStaf - totalUangSakuMagang
-    return { omset, totalJasa, labaBarang, labaKotor, biayaOp, biayaMt, totalGajiStaf, totalUangSakuMagang, labaBersih }
-  }, [dataBulanIni, pengeluaranBulanIni, totalGajiStaf, totalUangSakuMagang])
+    // Potongan harga dari tukar poin: uang yang betul-betul nggak diterima (Laba Barang & Jasa
+    // dihitung dari harga penuh), jadi dikurangkan di sini.
+    const diskonPoin = dataBulanIni.reduce((s, r) => s + (r.diskonPoin || 0), 0)
+    const labaBersih = labaKotor - diskonPoin - biayaOp - biayaMt - totalGajiStaf - totalUangSakuMagang
+
+    // Info saja (tidak mengubah Laba Bersih):
+    // - belanja stok: barang yang dibeli bulan ini = uang berubah jadi barang di rak, bukan biaya
+    const belanjaStokPembelian = pembelianBulanIni.reduce((s, p) => s + (p.total || 0), 0)
+    const belanjaStokCatatan = pengeluaranBulanIni.filter((p) => p.kategori === KATEGORI_BELANJA_STOK).reduce((s, p) => s + (p.nominal || 0), 0)
+    // - transaksi bulan ini yang belum dibayar penuh pelanggan (sudah termasuk di Laba di atas)
+    const belumDibayar = dataBulanIni.reduce((s, r) => s + Math.max(0, r.sisaBayar || 0), 0)
+    const jumlahBelumDibayar = dataBulanIni.filter((r) => (r.sisaBayar || 0) > 0).length
+    return {
+      omset, totalJasa, labaBarang, labaKotor, diskonPoin, biayaOp, biayaMt, totalGajiStaf, totalUangSakuMagang, labaBersih,
+      belanjaStok: belanjaStokPembelian + belanjaStokCatatan, belanjaStokPembelian, belanjaStokCatatan, belumDibayar, jumlahBelumDibayar,
+    }
+  }, [dataBulanIni, pengeluaranBulanIni, pembelianBulanIni, totalGajiStaf, totalUangSakuMagang])
+
+  // Transaksi yang belum dibayar penuh (sisa_bayar > 0) — bulan terpilih & bulan-bulan lain
+  // (piutang bulan lalu yang belum lunas nggak kelihatan di angka bulan ini, jadi ditampilkan terpisah).
+  const piutang = useMemo(() => {
+    const semua = riwayat
+      .filter((r) => (r.sisaBayar || 0) > 0)
+      .map((r) => {
+        const t = ambilTanggalDariTeks(r.tgl)
+        const bulan = t ? t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') : ''
+        return { ...r, _waktu: t ? t.getTime() : 0, _bulan: bulan }
+      })
+      .sort((a, b) => a._waktu - b._waktu) // paling lama dulu = paling perlu ditagih
+    const bulanIni = semua.filter((r) => r._bulan === bulanDipilih)
+    const lain = semua.filter((r) => r._bulan !== bulanDipilih)
+    return { bulanIni, lain, totalLain: lain.reduce((s, r) => s + r.sisaBayar, 0) }
+  }, [riwayat, bulanDipilih])
+
+  // Nilai modal barang yang masih ada di rak SAAT INI (bukan per bulan): Σ stok × harga pokok.
+  const nilaiStok = useMemo(() => barang.reduce((s, b) => s + Math.max(0, b.stok || 0) * (b.hargaPokok || 0), 0), [barang])
 
   async function simpanSetting() {
     try {
@@ -264,6 +313,19 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
       notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
     } finally {
       setSavingPengeluaran(false)
+    }
+  }
+
+  async function ubahKategoriBaris(p, kategori) {
+    if (kategori === p.kategori) return
+    setUbahKategoriId(p.id)
+    try {
+      await ubahKategoriPengeluaran(p.id, kategori)
+      notify(`✅ "${p.deskripsi}" → ${kategori}`)
+    } catch (err) {
+      notify('❌ Gagal mengubah kategori: ' + err.message, 'error')
+    } finally {
+      setUbahKategoriId(null)
     }
   }
 
@@ -447,7 +509,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
               <input
                 value={formPengeluaran.deskripsi}
                 onChange={(e) => setFormPengeluaran((f) => ({ ...f, deskripsi: e.target.value }))}
-                placeholder="Contoh: Listrik, Sewa, Beli sabun cuci"
+                placeholder="Listrik, sewa, sabun… (belanja barang dagangan → 🛒 Pembelian)"
               />
             </div>
             <div className="field" style={{ flex: '1 1 140px' }}>
@@ -473,6 +535,12 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
             </button>
           </form>
 
+          {formPengeluaran.kategori === KATEGORI_BELANJA_STOK && (
+            <p style={{ fontSize: 12, color: '#9a3412', background: '#fff7ed', padding: '6px 10px', borderRadius: 6, margin: '0 0 8px' }}>
+              ⓘ Belanja barang dagangan sebaiknya dicatat di 🗂️ Katalog → 🛒 Pembelian, supaya stok & harga pokok ikut ter-update. Kategori ini
+              cuma buat belanja yang nggak bisa dicatat per barang. Tidak dipotong dari Laba Bersih.
+            </p>
+          )}
           <div className="row" style={{ gap: 8, margin: '4px 0 8px' }}>
             <input
               value={cariPengeluaran}
@@ -521,11 +589,37 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
                     </td>
                   </tr>
                 )}
-                {pengeluaranTampil.map((p) => (
+                {pengeluaranTampil.map((p) => {
+                  const cocok = p.kategori === 'Operasional' ? cariBarangCocok(p.deskripsi, normBarang) : null
+                  return (
                   <tr key={p.id}>
                     <td>{p.tanggal}</td>
-                    <td>{p.kategori}</td>
-                    <td>{p.deskripsi}</td>
+                    <td>
+                      <select
+                        value={p.kategori}
+                        onChange={(e) => ubahKategoriBaris(p, e.target.value)}
+                        disabled={ubahKategoriId === p.id}
+                        style={{ minWidth: 120, padding: '4px 6px', fontSize: 13, minHeight: 32 }}
+                      >
+                        {(KATEGORI_PENGELUARAN.includes(p.kategori) ? KATEGORI_PENGELUARAN : [p.kategori, ...KATEGORI_PENGELUARAN]).map((k) => (
+                          <option key={k} value={k}>{k}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      {p.deskripsi}
+                      {cocok && (
+                        <button
+                          type="button"
+                          className="badge"
+                          onClick={() => ubahKategoriBaris(p, KATEGORI_BELANJA_STOK)}
+                          title={`Mirip barang "${cocok.nama}" di katalog — ketuk buat pindah ke ${KATEGORI_BELANJA_STOK}`}
+                          style={{ display: 'block', marginTop: 4, border: 'none', cursor: 'pointer', background: cocok.jenis === 'persis' ? '#dbeafe' : '#f1f5f9', color: '#1e40af' }}
+                        >
+                          📦 Cocok dengan katalog{cocok.jenis === 'mirip' ? ` (${cocok.nama}?)` : ''} → {KATEGORI_BELANJA_STOK}
+                        </button>
+                      )}
+                    </td>
                     <td className="angka">{formatRupiah(p.nominal)}</td>
                     <td className="tengah">
                       <button className="btn btn-red btn-sm" onClick={() => hapusPengeluaranBaris(p)}>
@@ -533,14 +627,19 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
 
           <p style={{ marginTop: 10, fontWeight: 700 }}>
             Total Operasional: {formatRupiah(ringkasanBulanIni.biayaOp)} &nbsp;|&nbsp; Total Maintenance: {formatRupiah(ringkasanBulanIni.biayaMt)}
+            {ringkasanBulanIni.belanjaStokCatatan > 0 && <> &nbsp;|&nbsp; {KATEGORI_BELANJA_STOK}: {formatRupiah(ringkasanBulanIni.belanjaStokCatatan)}</>}
           </p>
+          {ringkasanBulanIni.belanjaStokCatatan > 0 && (
+            <p style={{ fontSize: 12, color: '#888', marginTop: -6 }}>ⓘ {KATEGORI_BELANJA_STOK} tidak dipotong dari Laba Bersih (modal barang dipotong waktu barangnya terjual).</p>
+          )}
         </div>
 
         <div style={{ margin: '15px 0', padding: 15, background: '#fff7ed', borderRadius: 6, border: '1px solid #fed7aa' }}>
@@ -700,24 +799,54 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           <p style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 10 }}>
             ⓘ Semua angka di kartu ini bulan berjalan saja (reset tiap awal bulan), tidak ikut filter periode di grafik atas.
           </p>
-          <table>
+          <table className="tabel-ringkas">
             <tbody>
               <tr><td>💰 Omset Penjualan</td><td className="angka">{formatRupiah(ringkasanBulanIni.omset)}</td></tr>
               <tr><td>🔧 Total Jasa</td><td className="angka">{formatRupiah(ringkasanBulanIni.totalJasa)}</td></tr>
               <tr><td>📦 Laba Barang</td><td className="angka">{formatRupiah(ringkasanBulanIni.labaBarang)}</td></tr>
               <tr><td>📊 Laba Kotor</td><td className="angka">{formatRupiah(ringkasanBulanIni.labaKotor)}</td></tr>
+              {ringkasanBulanIni.diskonPoin > 0 && (
+                <tr><td>➖ Diskon Tukar Poin</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.diskonPoin)}</td></tr>
+              )}
               <tr><td>➖ Total Gaji Staf</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.totalGajiStaf)}</td></tr>
               <tr><td>➖ Total Uang Saku Magang</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.totalUangSakuMagang)}</td></tr>
               <tr><td>➖ Biaya Operasional</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.biayaOp)}</td></tr>
               <tr><td>➖ Biaya Maintenance</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.biayaMt)}</td></tr>
               <tr style={{ fontWeight: 700, borderTop: '2px solid #ccc' }}>
                 <td>✅ Laba Bersih</td>
-                <td className="angka hijau">{formatRupiah(Math.max(0, ringkasanBulanIni.labaBersih))}</td>
+                <td className={`angka ${ringkasanBulanIni.labaBersih < 0 ? 'merah' : 'hijau'}`}>
+                  {ringkasanBulanIni.labaBersih < 0 ? '− ' : ''}{formatRupiah(Math.abs(ringkasanBulanIni.labaBersih))}
+                </td>
               </tr>
             </tbody>
           </table>
+          {ringkasanBulanIni.labaBersih < 0 && (
+            <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>⚠️ Bulan ini rugi — Pembagian Laba Bersih di bawah jadi Rp 0.</p>
+          )}
           <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
             ⓘ "Bagi Hasil Mekanik" sudah termasuk di dalam Total Gaji Staf di atas, jadi tidak dipotong dua kali di sini.
+          </p>
+
+          <p style={{ fontWeight: 600, margin: '14px 0 4px' }}>ℹ️ Info lain (tidak mengubah Laba Bersih)</p>
+          <table className="tabel-ringkas">
+            <tbody>
+              <tr onClick={() => setBukaBelumDibayar(true)} style={{ cursor: 'pointer' }} title="Lihat rincian">
+                <td>
+                  ⏳ <span style={{ textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>Belum dibayar pelanggan</span>
+                  {ringkasanBulanIni.jumlahBelumDibayar > 0 && <small style={{ color: '#888' }}> ({ringkasanBulanIni.jumlahBelumDibayar} transaksi)</small>}
+                  {piutang.lain.length > 0 && (
+                    <small style={{ display: 'block', color: '#c2410c' }}>+ bulan lain: {piutang.lain.length} transaksi · <span style={{ whiteSpace: 'nowrap' }}>{formatRupiah(piutang.totalLain)}</span></small>
+                  )}
+                </td>
+                <td className={`angka ${ringkasanBulanIni.belumDibayar > 0 ? 'merah' : ''}`}>{formatRupiah(ringkasanBulanIni.belumDibayar)} ›</td>
+              </tr>
+              <tr><td>📦 Belanja Stok bulan ini</td><td className="angka">{formatRupiah(ringkasanBulanIni.belanjaStok)}</td></tr>
+              <tr><td>🏪 Nilai stok di rak saat ini</td><td className="angka">{formatRupiah(nilaiStok)}</td></tr>
+            </tbody>
+          </table>
+          <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+            ⓘ Laba Bersih sudah termasuk transaksi yang belum dibayar penuh — uangnya belum tentu sudah di tangan. Belanja Stok bukan biaya: uangnya
+            berubah jadi barang di rak (lihat Nilai stok), modalnya dipotong waktu barangnya terjual.
           </p>
         </div>
 
@@ -735,6 +864,10 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           hapusInvestor={hapusInvestor}
         />
 
+        {bukaBelumDibayar && (
+          <ModalBelumDibayar piutang={piutang} labelBulanIni={labelBulanIni} onClose={() => setBukaBelumDibayar(false)} />
+        )}
+
         {detailHutang && (
           <ModalPembayaranSupplier
             h={detailHutang}
@@ -749,6 +882,91 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         )}
       </div>
     </div>
+  )
+}
+
+// Nomor HP Indonesia → format wa.me (62…). null kalau bukan nomor yang masuk akal.
+function nomorWhatsApp(hp) {
+  let d = (hp || '').replace(/\D/g, '')
+  if (d.startsWith('0')) d = '62' + d.slice(1)
+  else if (d.startsWith('8')) d = '62' + d
+  return /^62\d{8,13}$/.test(d) ? d : null
+}
+
+function linkTagihWA(r) {
+  const nomor = nomorWhatsApp(r.nomorHP)
+  if (!nomor) return null
+  const nama = (r.namaPelanggan || '').trim()
+  const sapaan = !nama || ['-', 'UMUM', 'UNKNOWN'].includes(nama.toUpperCase()) ? 'Kak' : `Kak ${nama}`
+  const tanggal = (r.tgl || '').split(' ')[0]
+  const pesan =
+    `Halo ${sapaan}, salam dari ${SHOP.nama} 🙏\n` +
+    `Mau mengingatkan, servis tanggal ${tanggal}${r.platKendaraan ? ` (${r.platKendaraan})` : ''} masih ada sisa pembayaran ${formatRupiah(r.sisaBayar)}.\n` +
+    `Bisa dibayar tunai di bengkel, QRIS, atau transfer. Terima kasih banyak 🙏`
+  return `https://wa.me/${nomor}?text=${encodeURIComponent(pesan)}`
+}
+
+function BarisPiutang({ r }) {
+  const wa = linkTagihWA(r)
+  const dibayar = Math.max(0, (r.totalBayar || 0) - (r.sisaBayar || 0))
+  return (
+    <div style={{ borderTop: '1px solid #eee', padding: '8px 0' }}>
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}>
+          <b>{r.tgl}</b>
+          {r.noTransaksi && <small style={{ color: '#888' }}> · {r.noTransaksi}</small>}
+          <div>
+            {r.namaPelanggan || '-'}
+            {r.platKendaraan && <span style={{ color: '#666' }}> · {r.platKendaraan}</span>}
+          </div>
+          <small style={{ color: '#666' }}>
+            Total {formatRupiah(r.totalBayar)} · Dibayar {formatRupiah(dibayar)}
+            {r.nomorHP && r.nomorHP !== '-' && <> · 📱 {r.nomorHP}</>}
+          </small>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <b className="merah" style={{ whiteSpace: 'nowrap' }}>{formatRupiah(r.sisaBayar)}</b>
+          {wa && (
+            <div style={{ marginTop: 4 }}>
+              <a className="btn btn-sm" href={wa} target="_blank" rel="noreferrer" style={{ background: '#25d366', textDecoration: 'none' }}>
+                💬 WA
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalBelumDibayar({ piutang, labelBulanIni, onClose }) {
+  const totalIni = piutang.bulanIni.reduce((s, r) => s + r.sisaBayar, 0)
+  return (
+    <Modal title={`⏳ Belum Dibayar — ${labelBulanIni}`} onClose={onClose}>
+      {piutang.bulanIni.length === 0 ? (
+        <p style={{ color: '#888', textAlign: 'center' }}>✅ Semua transaksi bulan ini sudah lunas</p>
+      ) : (
+        <>
+          {piutang.bulanIni.map((r) => <BarisPiutang key={r.id} r={r} />)}
+          <p style={{ fontWeight: 700, borderTop: '2px solid #ddd', paddingTop: 8 }}>
+            Total sisa: {formatRupiah(totalIni)} ({piutang.bulanIni.length} transaksi)
+          </p>
+        </>
+      )}
+
+      {piutang.lain.length > 0 && (
+        <>
+          <h4 style={{ margin: '16px 0 4px', color: '#c2410c' }}>
+            📅 Bulan lain yang belum lunas — {piutang.lain.length} transaksi · {formatRupiah(piutang.totalLain)}
+          </h4>
+          {piutang.lain.map((r) => <BarisPiutang key={r.id} r={r} />)}
+        </>
+      )}
+
+      <p style={{ fontSize: 12, color: '#888', marginTop: 12 }}>
+        ⓘ Pelunasan dicatat di 🛒 Transaksi → Riwayat Penjualan → ✏️ Ubah. Tombol 💬 WA membuka WhatsApp dengan pesan pengingat (bisa diedit dulu sebelum dikirim).
+      </p>
+    </Modal>
   )
 }
 

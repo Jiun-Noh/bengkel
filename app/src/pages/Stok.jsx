@@ -7,47 +7,64 @@ import { formatRupiah, kapitalKode, kapitalNama, waktuSekarang } from '../lib/fo
 import Modal from '../components/common/Modal'
 import Fab from '../components/common/Fab'
 import AksiPemilik from '../components/common/AksiPemilik'
+import PembelianSection, { buatDraftPembelian, tambahKeDraft } from './Pembelian'
 
 const STOK_MINIM = 3
 const FORM_KOSONG = { kode: '', nama: '', jenisMotor: '', satuan: 'PCS', hargaPokok: '', hargaJual: '', jumlahStok: '' }
 const FORM_JASA_KOSONG = { nama: '', harga: '' }
 
 export default function StokPage() {
-  const [kategori, setKategori] = useState('barang') // 'barang' | 'jasa'
+  const { profil } = useAuth()
+  const pemilik = profil?.peran === 'pemilik'
+  const [kategori, setKategori] = useState('barang') // 'barang' | 'jasa' | 'pembelian'
+  // Draf nota Pembelian disimpan di sini (bukan di dalam tab Pembelian), supaya isinya nggak
+  // hilang waktu pindah ke tab Barang buat menambah barang lain lewat tombol 🔄.
+  const [draftPembelian, setDraftPembelian] = useState(buatDraftPembelian)
+
+  const tab = [
+    ['barang', '📦 Barang'],
+    ['jasa', '🔧 Jasa'],
+    ...(pemilik ? [['pembelian', '🛒 Pembelian']] : []),
+  ]
 
   return (
     <div>
       <h1>🗂️ Manajemen Katalog</h1>
       <div className="row" style={{ marginBottom: 12 }}>
-        <button
-          className="btn btn-sm"
-          style={{ background: kategori === 'barang' ? '#2563eb' : '#ddd', color: kategori === 'barang' ? 'white' : '#333' }}
-          onClick={() => setKategori('barang')}
-        >
-          📦 Barang
-        </button>
-        <button
-          className="btn btn-sm"
-          style={{ background: kategori === 'jasa' ? '#2563eb' : '#ddd', color: kategori === 'jasa' ? 'white' : '#333' }}
-          onClick={() => setKategori('jasa')}
-        >
-          🔧 Jasa
-        </button>
+        {tab.map(([nilai, label]) => (
+          <button
+            key={nilai}
+            className="btn btn-sm"
+            style={{ background: kategori === nilai ? '#2563eb' : '#ddd', color: kategori === nilai ? 'white' : '#333' }}
+            onClick={() => setKategori(nilai)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      {kategori === 'barang' ? <BarangSection /> : <JasaSection />}
+      {kategori === 'barang' && (
+        <BarangSection
+          onRestock={(b) => {
+            setDraftPembelian((d) => tambahKeDraft(d, b))
+            setKategori('pembelian')
+            window.scrollTo(0, 0)
+          }}
+        />
+      )}
+      {kategori === 'jasa' && <JasaSection />}
+      {kategori === 'pembelian' && pemilik && <PembelianSection draft={draftPembelian} setDraft={setDraftPembelian} />}
     </div>
   )
 }
 
-function BarangSection() {
+function BarangSection({ onRestock }) {
   const { data: barang = [], isLoading } = useBarangQuery(true)
-  const { tambahBarang, ubahInfoBarang, hapusBarang, restockBarang, batalRestock } = useBarangMutations()
+  const { tambahBarang, ubahInfoBarang, hapusBarang, batalRestock } = useBarangMutations()
   const { notify, confirm } = useUI()
 
   const [mode, setMode] = useState('list') // 'list' | 'form'
   const [form, setForm] = useState(FORM_KOSONG)
   const [editingKode, setEditingKode] = useState(null)
-  const [restockMode, setRestockMode] = useState(false)
   const [cari, setCari] = useState('')
   const [riwayatKode, setRiwayatKode] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -80,7 +97,6 @@ function BarangSection() {
   function resetForm() {
     setForm(FORM_KOSONG)
     setEditingKode(null)
-    setRestockMode(false)
   }
 
   function bukaTambah() {
@@ -90,7 +106,6 @@ function BarangSection() {
 
   function mulaiEdit(b) {
     setEditingKode(b.kode)
-    setRestockMode(false)
     setForm({
       kode: b.kode,
       nama: b.nama,
@@ -99,21 +114,6 @@ function BarangSection() {
       hargaPokok: b.hargaPokok,
       hargaJual: b.hargaJual,
       jumlahStok: b.stok,
-    })
-    setMode('form')
-  }
-
-  function mulaiRestock(b) {
-    setEditingKode(null)
-    setRestockMode(true)
-    setForm({
-      kode: b.kode,
-      nama: b.nama,
-      jenisMotor: b.jenisMotor || '',
-      satuan: b.satuan || 'PCS',
-      hargaPokok: b.hargaPokok,
-      hargaJual: b.hargaJual,
-      jumlahStok: '',
     })
     setMode('form')
   }
@@ -138,8 +138,8 @@ function BarangSection() {
     const waktu = waktuSekarang()
     const adaSebelumnya = barang.find((b) => b.kode === kode)
 
-    if (!editingKode && !restockMode && adaSebelumnya) {
-      notify(`❌ Kode "${kode}" sudah dipakai oleh "${adaSebelumnya.nama}"!\nPakai tombol 🔄 Restock di daftar untuk menambah stok, atau pakai kode lain.`, 'error')
+    if (!editingKode && adaSebelumnya) {
+      notify(`❌ Kode "${kode}" sudah dipakai oleh "${adaSebelumnya.nama}"!\nPakai tombol 🔄 di daftar (🛒 Pembelian) untuk menambah stok, atau pakai kode lain.`, 'error')
       return
     }
 
@@ -157,17 +157,6 @@ function BarangSection() {
           harga_jual: jual,
         })
       pesan = '✅ Data barang berhasil diubah!'
-    } else if (restockMode) {
-      if (!adaSebelumnya) {
-        notify('❌ Barang tidak ditemukan, mungkin sudah dihapus.', 'error')
-        return
-      }
-      if (jumlah <= 0) {
-        notify('⚠️ Jumlah restock minimal 1!', 'error')
-        return
-      }
-      simpan = () => restockBarang(adaSebelumnya.kode, jumlah, waktu)
-      pesan = `✅ Restock berhasil!\nJumlah: +${jumlah} ${form.satuan}`
     } else {
       const baris = {
         kode,
@@ -242,19 +231,13 @@ function BarangSection() {
       <div>
         <div className="form-header">
           <button className="btn-back" onClick={kembaliKeDaftar} aria-label="Kembali">←</button>
-          <h1>{editingKode ? '✏️ Ubah Barang' : restockMode ? '📦 Restock Barang' : '➕ Tambah Barang'}</h1>
+          <h1>{editingKode ? '✏️ Ubah Barang' : '➕ Tambah Barang'}</h1>
         </div>
 
         <form className="card" onSubmit={submit}>
-          {restockMode && (
-            <div className="edit-banner" style={{ background: '#e3f2fd', color: '#0d47a1' }}>
-              <span>📦 Restock — kode/nama/harga terkunci, cuma jumlah yang ditambahkan ke stok "{form.nama}"</span>
-            </div>
-          )}
-
           <div className="field">
             <label>Kode Barang</label>
-            <input value={form.kode} onChange={(e) => ubahKode(e.target.value)} readOnly={!!editingKode || restockMode} placeholder="Kode Barang" autoFocus={!restockMode} />
+            <input value={form.kode} onChange={(e) => ubahKode(e.target.value)} readOnly={!!editingKode} placeholder="Kode Barang" autoFocus />
           </div>
           <div className="field">
             <label>Nama Barang</label>
@@ -262,7 +245,6 @@ function BarangSection() {
               value={form.nama}
               onChange={(e) => setForm((f) => ({ ...f, nama: kapitalNama(e.target.value) }))}
               placeholder="Nama Barang"
-              disabled={restockMode}
             />
           </div>
           <div className="field">
@@ -271,12 +253,11 @@ function BarangSection() {
               value={form.jenisMotor}
               onChange={(e) => setForm((f) => ({ ...f, jenisMotor: kapitalNama(e.target.value) }))}
               placeholder="Contoh: BEAT, SCOOPY"
-              disabled={restockMode}
             />
           </div>
           <div className="field">
             <label>Satuan</label>
-            <select value={form.satuan} onChange={(e) => setForm((f) => ({ ...f, satuan: e.target.value }))} disabled={restockMode}>
+            <select value={form.satuan} onChange={(e) => setForm((f) => ({ ...f, satuan: e.target.value }))}>
               <option value="PCS">PCS</option>
               <option value="BTL">BOTOL</option>
               <option value="SET">SET</option>
@@ -289,7 +270,6 @@ function BarangSection() {
               value={form.hargaPokok}
               onChange={(e) => setForm((f) => ({ ...f, hargaPokok: e.target.value }))}
               placeholder="Harga Modal Beli"
-              disabled={restockMode}
             />
           </div>
           <div className="field">
@@ -299,28 +279,31 @@ function BarangSection() {
               value={form.hargaJual}
               onChange={(e) => setForm((f) => ({ ...f, hargaJual: e.target.value }))}
               placeholder="Harga Jual ke Pelanggan"
-              disabled={restockMode}
             />
           </div>
           <div className="field">
-            <label>{editingKode ? 'Jumlah Stok (terkunci)' : restockMode ? 'Jumlah Restock' : 'Jumlah Stok'}</label>
+            <label>{editingKode ? 'Jumlah Stok (terkunci)' : 'Jumlah Stok Awal'}</label>
             <input
               type="number"
               value={form.jumlahStok}
               onChange={(e) => setForm((f) => ({ ...f, jumlahStok: e.target.value }))}
               placeholder="Jumlah Stok"
-              autoFocus={restockMode}
               disabled={!!editingKode}
             />
             {editingKode && (
               <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                ⓘ Ubah jumlah stok cuma lewat 🔄 Restock atau ✕ batalkan di Riwayat Restock, biar histori selalu sesuai.
+                ⓘ Tambah stok lewat 🔄 / 🛒 Pembelian (harga pokok ikut dihitung ulang). Salah input? Batalkan pembeliannya di 🛒 Pembelian.
+              </p>
+            )}
+            {!editingKode && (
+              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                ⓘ Barang baru yang baru dibeli? Boleh isi 0 di sini, lalu catat belanjanya di 🛒 Pembelian biar modalnya tercatat.
               </p>
             )}
           </div>
 
           <button className="btn btn-block" type="submit" disabled={saving}>
-            {saving ? 'Menyimpan…' : restockMode ? '✅ Simpan Restock' : '✅ Simpan Barang'}
+            {saving ? 'Menyimpan…' : '✅ Simpan Barang'}
           </button>
         </form>
       </div>
@@ -397,11 +380,11 @@ function BarangSection() {
                   <tr key={b.kode} className={rendah ? 'baris-merah' : ''}>
                     <td className="tengah">
                       <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
-                        <button className="btn btn-sm" onClick={() => mulaiRestock(b)} title="Restock">
-                          🔄
-                        </button>
                         <AksiPemilik>
                           <div className="row" style={{ flexWrap: 'nowrap', gap: 4, justifyContent: 'center' }}>
+                            <button className="btn btn-sm" onClick={() => onRestock(b)} title="Beli / tambah stok (🛒 Pembelian)">
+                              🔄
+                            </button>
                             <button className="btn btn-blue btn-sm" onClick={() => setRiwayatKode(b.kode)}>
                               📋
                             </button>
@@ -453,9 +436,13 @@ function BarangSection() {
                   style={{ padding: '4px 0', borderBottom: '1px dashed #eee', justifyContent: 'space-between', alignItems: 'center' }}
                 >
                   <span>{i + 1}. +{r.jumlah} {barangRiwayat.satuan || 'PCS'} — {r.tanggal}</span>
-                  <button className="btn btn-red btn-sm" onClick={() => revertRestock(barangRiwayat, i)} title="Batalkan restock ini">
-                    ✕
-                  </button>
+                  {r.pembelian_id ? (
+                    <span style={{ fontSize: 12, color: '#888' }} title="Batalkan lewat daftar di 🛒 Pembelian">🛒 Pembelian</span>
+                  ) : (
+                    <button className="btn btn-red btn-sm" onClick={() => revertRestock(barangRiwayat, i)} title="Batalkan restock ini">
+                      ✕
+                    </button>
+                  )}
                 </div>
               ))}
             </>

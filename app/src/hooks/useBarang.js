@@ -61,17 +61,13 @@ export function useBarangMutations() {
     await invalidate()
   }
 
-  async function restockBarang(kode, jumlah, tanggal) {
-    const { error } = await db.rpc('restock_barang', { p_kode: kode, p_jumlah: jumlah, p_tanggal: tanggal })
-    if (error) throw error
-    await invalidate()
-  }
-
+  // Tambah stok sekarang lewat 🛒 Pembelian (usePembelian). Ini cuma buat membatalkan entri
+  // restock lama (sebelum ada Pembelian) di Riwayat Restock.
   async function batalRestock(kode, jumlah, tanggal) {
     const { error } = await db.rpc('batal_restock_barang', { p_kode: kode, p_jumlah: jumlah, p_tanggal: tanggal })
     if (error) throw error
     await invalidate()
   }
 
-  return { tambahBarang, ubahInfoBarang, hapusBarang, jualBarang, restockBarang, batalRestock }
+  return { tambahBarang, ubahInfoBarang, hapusBarang, jualBarang, batalRestock }
 }

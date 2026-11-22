@@ -7,6 +7,18 @@
 
 export const DAFTAR_PEMBARUAN = [
   {
+    versi: '2026-11-23',
+    tanggal: '23 November 2026',
+    item: [
+      { teks: '🛒 Baru: Katalog → 🛒 Pembelian. Beli barang dagangan cukup catat di sini: pilih barang, jumlah, harga beli → stok bertambah, harga pokok dihitung ulang otomatis (rata-rata), dan kalau hutang langsung masuk Hutang Supplier. Tombol 🔄 di daftar Barang juga membuka layar ini.', untuk: 'pemilik' },
+      { teks: '📈 Laba Bersih sekarang dihitung benar: belanja stok BUKAN biaya lagi (modal barang sudah dipotong waktu barangnya terjual). Sebelumnya modal yang sama terpotong dua kali, jadi laba kelihatan lebih kecil dari aslinya. Bulan-bulan lalu juga sudah dihitung ulang.', untuk: 'pemilik' },
+      { teks: '💸 Pengeluaran: kategori baru "Belanja Stok", kategori bisa diganti langsung di tabel, dan catatan yang mirip nama barang diberi tanda 📦 Cocok dengan katalog. Mulai sekarang Operasional cuma buat listrik, sewa, sabun, dll.', untuk: 'pemilik' },
+      { teks: '📊 Ringkasan Bulan Ini: diskon tukar poin ikut dipotong, bulan rugi ditampilkan minus (bukan 0), plus info Belum dibayar pelanggan, Belanja Stok bulan ini, dan Nilai stok di rak.', untuk: 'pemilik' },
+      { teks: '⏳ Ketuk "Belum dibayar pelanggan" buat lihat siapa saja yang belum lunas (termasuk dari bulan lalu), lengkap dengan tombol 💬 WA untuk kirim pesan pengingat.', untuk: 'pemilik' },
+      { teks: '🔒 Tambah stok (🔄) sekarang khusus pemilik. Jualan tetap seperti biasa.', untuk: 'karyawan' },
+    ],
+  },
+  {
     versi: '2026-11-16-2',
     tanggal: '16 November 2026 (2)',
     item: [
