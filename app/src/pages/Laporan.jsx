@@ -59,6 +59,10 @@ function bulanIniISO() {
 // 'Belanja Stok' = belanja barang dagangan (bukan biaya → TIDAK dipotong dari Laba Bersih; modalnya
 // sudah terpotong lewat Laba Barang waktu barangnya terjual). Belanja baru sebaiknya lewat 🛒 Pembelian.
 const KATEGORI_PENGELUARAN = ['Operasional', 'Maintenance', KATEGORI_BELANJA_STOK]
+// Form tambah pengeluaran: TANPA Belanja Stok — belanja barang dagangan wajib lewat 🛒 Pembelian
+// (biar stok & harga pokok ikut ter-update). Belanja Stok cuma muncul di filter & ubah kategori
+// di tabel, buat merapikan catatan lama.
+const KATEGORI_INPUT_PENGELUARAN = ['Operasional', 'Maintenance']
 
 function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   const { notify, confirm } = useUI()
@@ -499,7 +503,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
             <div className="field" style={{ flex: '1 1 140px' }}>
               <label>Kategori</label>
               <select value={formPengeluaran.kategori} onChange={(e) => setFormPengeluaran((f) => ({ ...f, kategori: e.target.value }))}>
-                {KATEGORI_PENGELUARAN.map((k) => (
+                {KATEGORI_INPUT_PENGELUARAN.map((k) => (
                   <option key={k} value={k}>{k}</option>
                 ))}
               </select>
@@ -535,12 +539,6 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
             </button>
           </form>
 
-          {formPengeluaran.kategori === KATEGORI_BELANJA_STOK && (
-            <p style={{ fontSize: 12, color: '#9a3412', background: '#fff7ed', padding: '6px 10px', borderRadius: 6, margin: '0 0 8px' }}>
-              ⓘ Belanja barang dagangan sebaiknya dicatat di 🗂️ Katalog → 🛒 Pembelian, supaya stok & harga pokok ikut ter-update. Kategori ini
-              cuma buat belanja yang nggak bisa dicatat per barang. Tidak dipotong dari Laba Bersih.
-            </p>
-          )}
           <div className="row" style={{ gap: 8, margin: '4px 0 8px' }}>
             <input
               value={cariPengeluaran}
