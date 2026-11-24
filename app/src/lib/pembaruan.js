@@ -7,6 +7,16 @@
 
 export const DAFTAR_PEMBARUAN = [
   {
+    versi: '2026-11-24',
+    tanggal: '24 November 2026',
+    item: [
+      { teks: '📈 Ringkasan Bulan Ini lebih gampang dibaca: dibagi jadi Penjualan → Laba Kotor → Potongan → Laba Bersih, lengkap dengan tanda + − =. Ada baris "Modal barang terjual" biar kelihatan modal dipotong waktu barangnya laku.', untuk: 'pemilik' },
+      { teks: '🧾 Baris baru "Total Omset" (barang + jasa) — angkanya sama dengan Total Semua Bayar di Transaksi. "Omset Penjualan" diganti nama jadi "Penjualan Barang" (cuma barang).', untuk: 'pemilik' },
+      { teks: '💸 Form Pengeluaran sekarang cuma Operasional & Maintenance. Belanja barang dagangan wajib lewat 🗂️ Katalog → 🛒 Pembelian.', untuk: 'pemilik' },
+      { teks: '📱 Perbaikan tampilan: angka besar di Ringkasan nggak lagi keluar dari kotak di HP.', untuk: 'pemilik' },
+    ],
+  },
+  {
     versi: '2026-11-23',
     tanggal: '23 November 2026',
     item: [

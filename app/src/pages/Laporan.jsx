@@ -240,7 +240,9 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
 
   // Kartu "Ringkasan Bulan Ini" — ikut bulanDipilih (bisa bulan lalu), bukan filter Dari~Sampai di atas.
   const ringkasanBulanIni = useMemo(() => {
-    const omset = dataBulanIni.reduce((s, r) => s + (r.totalBarang || 0), 0)
+    const omset = dataBulanIni.reduce((s, r) => s + (r.totalBarang || 0), 0) // barang saja
+    // Total tagihan (barang + jasa − diskon poin) — sama dengan "Total Semua Bayar" di Transaksi
+    const totalOmset = dataBulanIni.reduce((s, r) => s + (r.totalBayar || 0), 0)
     const totalJasa = dataBulanIni.reduce((s, r) => s + (r.biayaJasa || 0), 0)
     const labaBarang = dataBulanIni.reduce((s, r) => s + (r.labaBarang || 0), 0)
     const labaKotor = labaBarang + totalJasa
@@ -259,7 +261,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     const belumDibayar = dataBulanIni.reduce((s, r) => s + Math.max(0, r.sisaBayar || 0), 0)
     const jumlahBelumDibayar = dataBulanIni.filter((r) => (r.sisaBayar || 0) > 0).length
     return {
-      omset, totalJasa, labaBarang, labaKotor, diskonPoin, biayaOp, biayaMt, totalGajiStaf, totalUangSakuMagang, labaBersih,
+      omset, totalOmset, totalJasa, labaBarang, labaKotor, diskonPoin, biayaOp, biayaMt, totalGajiStaf, totalUangSakuMagang, labaBersih,
       belanjaStok: belanjaStokPembelian + belanjaStokCatatan, belanjaStokPembelian, belanjaStokCatatan, belumDibayar, jumlahBelumDibayar,
     }
   }, [dataBulanIni, pengeluaranBulanIni, pembelianBulanIni, totalGajiStaf, totalUangSakuMagang])
@@ -480,7 +482,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         </div>
 
         <div className="summary-grid">
-          <RingkasCard label="Omset Penjualan" value={ringkasan.omset} bg="#e8f5e9" fg="#1b5e20" />
+          <RingkasCard label="Penjualan Barang" value={ringkasan.omset} bg="#e8f5e9" fg="#1b5e20" />
           <RingkasCard label="Total Jasa" value={ringkasan.totalJasa} bg="#e3f2fd" fg="#0d47a1" />
           <RingkasCard label="Laba Barang" value={ringkasan.labaBarang} bg="#fff3e0" fg="#e65100" />
           <RingkasCard label="Laba Kotor" value={ringkasan.labaKotor} bg="#f3e5f5" fg="#4a148c" />
@@ -795,35 +797,55 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         <div style={{ margin: '15px 0', padding: 15, background: '#fff8e1', borderRadius: 6 }}>
           <h3>📈 Ringkasan Bulan Ini — {labelBulanIni}</h3>
           <p style={{ fontSize: 12, color: '#888', marginTop: -8, marginBottom: 10 }}>
-            ⓘ Semua angka di kartu ini bulan berjalan saja (reset tiap awal bulan), tidak ikut filter periode di grafik atas.
+            ⓘ Semua angka di kartu ini bulan berjalan saja (reset tiap awal bulan), tidak ikut filter periode di grafik atas. Total Omset = Total Semua Bayar di 🛒 Transaksi (bulan ini).
           </p>
-          <table className="tabel-ringkas">
-            <tbody>
-              <tr><td>💰 Omset Penjualan</td><td className="angka">{formatRupiah(ringkasanBulanIni.omset)}</td></tr>
-              <tr><td>🔧 Total Jasa</td><td className="angka">{formatRupiah(ringkasanBulanIni.totalJasa)}</td></tr>
-              <tr><td>📦 Laba Barang</td><td className="angka">{formatRupiah(ringkasanBulanIni.labaBarang)}</td></tr>
-              <tr><td>📊 Laba Kotor</td><td className="angka">{formatRupiah(ringkasanBulanIni.labaKotor)}</td></tr>
-              {ringkasanBulanIni.diskonPoin > 0 && (
-                <tr><td>➖ Diskon Tukar Poin</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.diskonPoin)}</td></tr>
-              )}
-              <tr><td>➖ Total Gaji Staf</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.totalGajiStaf)}</td></tr>
-              <tr><td>➖ Total Uang Saku Magang</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.totalUangSakuMagang)}</td></tr>
-              <tr><td>➖ Biaya Operasional</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.biayaOp)}</td></tr>
-              <tr><td>➖ Biaya Maintenance</td><td className="angka merah">{formatRupiah(ringkasanBulanIni.biayaMt)}</td></tr>
-              <tr style={{ fontWeight: 700, borderTop: '2px solid #ccc' }}>
-                <td>✅ Laba Bersih</td>
-                <td className={`angka ${ringkasanBulanIni.labaBersih < 0 ? 'merah' : 'hijau'}`}>
-                  {ringkasanBulanIni.labaBersih < 0 ? '− ' : ''}{formatRupiah(Math.abs(ringkasanBulanIni.labaBersih))}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          {(() => {
+            const r = ringkasanBulanIni
+            // Modal = penjualan − laba barang (bukan jumlah modal_keluar tersimpan), supaya
+            // susunan angka di bawah selalu pas dijumlah walau ada transaksi lama yang diedit.
+            const modalTerjual = r.omset - r.labaBarang
+            const totalPotongan = r.diskonPoin + r.totalGajiStaf + r.totalUangSakuMagang + r.biayaOp + r.biayaMt
+            return (
+              <table className="tabel-ringkas">
+                <tbody>
+                  <JudulSeksi>🧾 Penjualan</JudulSeksi>
+                  <BarisRingkas label="Total Omset" sub="barang + jasa, sudah dipotong diskon poin" nilai={r.totalOmset} tebal />
+                  <BarisRingkas tanda="·" label="Penjualan Barang" nilai={r.omset} />
+                  <BarisRingkas tanda="·" label="Jasa" nilai={r.totalJasa} />
+
+                  <JudulSeksi>📊 Laba Kotor</JudulSeksi>
+                  <BarisRingkas label="Penjualan Barang" nilai={r.omset} />
+                  <BarisRingkas tanda="−" label="Modal barang terjual" sub="harga pokok × jumlah terjual" nilai={modalTerjual} merah />
+                  <BarisRingkas tanda="=" label="Laba Barang" nilai={r.labaBarang} subtotal />
+                  <BarisRingkas tanda="+" label="Jasa" nilai={r.totalJasa} />
+                  <BarisRingkas tanda="=" label="Laba Kotor" nilai={r.labaKotor} subtotal tebal />
+
+                  <JudulSeksi>➖ Potongan Bulan Ini</JudulSeksi>
+                  <BarisRingkas label="Diskon Tukar Poin" nilai={r.diskonPoin} merah />
+                  <BarisRingkas label="Gaji Staf" sub="termasuk bagi hasil mekanik" nilai={r.totalGajiStaf} merah />
+                  <BarisRingkas label="Uang Saku Magang" nilai={r.totalUangSakuMagang} merah />
+                  <BarisRingkas label="Biaya Operasional" nilai={r.biayaOp} merah />
+                  <BarisRingkas label="Biaya Maintenance" nilai={r.biayaMt} merah />
+                  <BarisRingkas tanda="=" label="Total Potongan" nilai={totalPotongan} subtotal tebal merah />
+
+                  <tr style={{ fontWeight: 700, borderTop: '3px double #bbb', fontSize: 16 }}>
+                    <td>
+                      ✅ Laba Bersih
+                      <small style={{ display: 'block', fontWeight: 400, color: '#888', fontSize: 12 }}>
+                        <span style={{ whiteSpace: 'nowrap' }}>{formatRupiah(r.labaKotor)}</span> − <span style={{ whiteSpace: 'nowrap' }}>{formatRupiah(totalPotongan)}</span>
+                      </small>
+                    </td>
+                    <td className={`angka ${r.labaBersih < 0 ? 'merah' : 'hijau'}`}>
+                      {r.labaBersih < 0 ? '− ' : ''}{formatRupiah(Math.abs(r.labaBersih))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )
+          })()}
           {ringkasanBulanIni.labaBersih < 0 && (
             <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>⚠️ Bulan ini rugi — Pembagian Laba Bersih di bawah jadi Rp 0.</p>
           )}
-          <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-            ⓘ "Bagi Hasil Mekanik" sudah termasuk di dalam Total Gaji Staf di atas, jadi tidak dipotong dua kali di sini.
-          </p>
 
           <p style={{ fontWeight: 600, margin: '14px 0 4px' }}>ℹ️ Info lain (tidak mengubah Laba Bersih)</p>
           <table className="tabel-ringkas">
@@ -880,6 +902,33 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         )}
       </div>
     </div>
+  )
+}
+
+// Baris tabel Ringkasan Bulan Ini. tanda: '+', '−', '=' (kolom kecil di kiri biar alur hitungnya
+// kebaca). Potongan yang nilainya 0 dibuat abu-abu biar yang penting menonjol.
+function JudulSeksi({ children }) {
+  return (
+    <tr>
+      <td colSpan={2} style={{ paddingTop: 16, paddingBottom: 4, fontWeight: 700, fontSize: 13, color: '#6b7280', letterSpacing: 0.5, textTransform: 'uppercase', borderBottom: '1px solid #e5d9a8' }}>
+        {children}
+      </td>
+    </tr>
+  )
+}
+
+function BarisRingkas({ tanda = '', label, sub, nilai, tebal, subtotal, merah }) {
+  const nol = !nilai
+  const warna = nol && merah && !subtotal ? '#bbb' : undefined
+  return (
+    <tr style={{ fontWeight: tebal ? 700 : 400, borderTop: subtotal ? '2px solid #ccc' : undefined, color: warna }}>
+      <td>
+        <span style={{ display: 'inline-block', width: 16, fontWeight: 700, color: warna || '#666' }}>{tanda}</span>
+        {label}
+        {sub && <small style={{ display: 'block', fontWeight: 400, color: '#999', fontSize: 11, paddingLeft: 16 }}>{sub}</small>}
+      </td>
+      <td className={`angka ${merah && !nol ? 'merah' : ''}`}>{formatRupiah(nilai)}</td>
+    </tr>
   )
 }
 
