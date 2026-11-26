@@ -30,7 +30,7 @@ function ambilTanggalDariTeks(tgl) {
   return new Date(p[2], p[1] - 1, p[0])
 }
 
-export default function LaporanPage() {
+export default function LaporanPage({ onBukaPembelian }) {
   const { data: pengaturan } = usePengaturanQuery(true)
   const { data: riwayat = [] } = useRiwayatQuery(true)
   const { simpanPengaturan } = usePengaturanMutations()
@@ -48,7 +48,7 @@ export default function LaporanPage() {
     )
   }
 
-  return <LaporanIsi pengaturan={pengaturan} riwayat={riwayat} simpanPengaturan={simpanPengaturan} />
+  return <LaporanIsi pengaturan={pengaturan} riwayat={riwayat} simpanPengaturan={simpanPengaturan} onBukaPembelian={onBukaPembelian} />
 }
 
 function bulanIniISO() {
@@ -63,8 +63,18 @@ const KATEGORI_PENGELUARAN = ['Operasional', 'Maintenance', KATEGORI_BELANJA_STO
 // (biar stok & harga pokok ikut ter-update). Belanja Stok cuma muncul di filter & ubah kategori
 // di tabel, buat merapikan catatan lama.
 const KATEGORI_INPUT_PENGELUARAN = ['Operasional', 'Maintenance']
+// Mulai tanggal ini belanja stok dicatat lewat 🛒 Pembelian. Catatan Pengeluaran SEBELUMNYA masih
+// boleh dipindah ke Belanja Stok (merapikan data lama); yang sesudahnya tidak — harus lewat Pembelian.
+const TANGGAL_MULAI_PEMBELIAN = '2026-11-23'
+// Baris 🛒 Pembelian ikut ditampilkan (read-only) di tabel Pengeluaran biar semua uang keluar
+// kelihatan di satu tempat — supaya nggak dicatat dua kali.
+const LABEL_PEMBELIAN = '🛒 Pembelian'
 
-function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
+function uraianPembelian(p) {
+  return p.items.map((it) => `${it.nama} ×${it.jumlah}`).join(', ')
+}
+
+function LaporanIsi({ pengaturan, riwayat, simpanPengaturan, onBukaPembelian }) {
   const { notify, confirm } = useUI()
   const { data: pengeluaran = [] } = usePengeluaranQuery(true)
   const { tambahPengeluaran, ubahKategoriPengeluaran, hapusPengeluaran } = usePengeluaranMutations()
@@ -110,6 +120,9 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   })
   const [savingPengeluaran, setSavingPengeluaran] = useState(false)
   const [ubahKategoriId, setUbahKategoriId] = useState(null)
+  const [saranDeskripsiAktif, setSaranDeskripsiAktif] = useState(false)
+  const inputDeskripsiRef = useRef(null)
+  const [nominalTerakhir, setNominalTerakhir] = useState(null) // petunjuk di kolom Nominal setelah pilih saran
 
   const [formHutangSupplier, setFormHutangSupplier] = useState({
     namaSupplier: '',
@@ -137,6 +150,42 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
   // — kemungkinan itu belanja barang dagangan yang salah kategori.
   const normBarang = useMemo(() => siapkanNormBarang(barang), [barang])
 
+  // Saran deskripsi Pengeluaran dari catatan Operasional/Maintenance sebelumnya (semua bulan).
+  // Belanja Stok, 🛒 Pembelian, dan deskripsi yang cocok dengan barang di Katalog SENGAJA tidak ikut —
+  // biar autocomplete nggak malah memudahkan belanja stok dicatat di sini lagi.
+  const kumpulanSaranDeskripsi = useMemo(() => {
+    const per = new Map()
+    pengeluaran.forEach((p) => {
+      if (!KATEGORI_INPUT_PENGELUARAN.includes(p.kategori)) return
+      const teks = (p.deskripsi || '').trim()
+      if (!teks || cariBarangCocok(teks, normBarang)) return
+      const kunci = teks.toUpperCase().replace(/\s+/g, ' ')
+      const ada = per.get(kunci)
+      if (!ada) per.set(kunci, { deskripsi: teks, kategori: p.kategori, nominal: p.nominal, tanggal: p.tanggal, kali: 1 })
+      else {
+        ada.kali += 1
+        if (p.tanggal > ada.tanggal) Object.assign(ada, { deskripsi: teks, kategori: p.kategori, nominal: p.nominal, tanggal: p.tanggal })
+      }
+    })
+    return [...per.values()].sort((a, b) => b.kali - a.kali || b.tanggal.localeCompare(a.tanggal))
+  }, [pengeluaran, normBarang])
+
+  const saranDeskripsi = useMemo(() => {
+    const kata = formPengeluaran.deskripsi.trim().toUpperCase()
+    if (!kata) return []
+    return kumpulanSaranDeskripsi
+      .filter((x) => x.deskripsi.toUpperCase().includes(kata) && x.deskripsi.toUpperCase() !== kata)
+      .slice(0, 8)
+  }, [kumpulanSaranDeskripsi, formPengeluaran.deskripsi])
+
+  // Pilih saran → deskripsi & kategori terisi. Nominal SENGAJA tidak diisi (mis. token listrik tiap kali
+  // beda) — nominal terakhir cuma jadi petunjuk di kolom Nominal.
+  function pilihSaranDeskripsi(x) {
+    setFormPengeluaran((f) => ({ ...f, deskripsi: x.deskripsi, kategori: x.kategori }))
+    setNominalTerakhir(x.nominal)
+    setSaranDeskripsiAktif(false)
+  }
+
   const pengeluaranBulanIni = useMemo(
     () => pengeluaran.filter((p) => p.bulan === bulanDipilih).sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
     [pengeluaran, bulanDipilih],
@@ -151,12 +200,22 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
 
   const pengeluaranTampil = useMemo(() => {
     const q = cariPengeluaran.trim().toLowerCase()
-    return pengeluaranBulanIni.filter(
-      (p) =>
-        (!filterKategoriPengeluaran || p.kategori === filterKategoriPengeluaran) &&
-        (!q || (p.deskripsi || '').toLowerCase().includes(q) || (p.kategori || '').toLowerCase().includes(q)),
-    )
-  }, [pengeluaranBulanIni, cariPengeluaran, filterKategoriPengeluaran])
+    const barisPembelian = pembelianBulanIni.map((p) => ({
+      id: 'pb-' + p.id,
+      tanggal: p.tanggal,
+      kategori: LABEL_PEMBELIAN,
+      deskripsi: uraianPembelian(p) + (p.namaSupplier ? ` · ${p.namaSupplier}` : ''),
+      nominal: p.total,
+      pembelian: p,
+    }))
+    return [...pengeluaranBulanIni, ...barisPembelian]
+      .filter(
+        (p) =>
+          (!filterKategoriPengeluaran || p.kategori === filterKategoriPengeluaran) &&
+          (!q || (p.deskripsi || '').toLowerCase().includes(q) || (p.kategori || '').toLowerCase().includes(q)),
+      )
+      .sort((a, b) => b.tanggal.localeCompare(a.tanggal))
+  }, [pengeluaranBulanIni, pembelianBulanIni, cariPengeluaran, filterKategoriPengeluaran])
   const pengeluaranDifilter = !!(cariPengeluaran.trim() || filterKategoriPengeluaran)
 
   // Beda dari Pengeluaran: hutang belum lunas TIDAK reset tiap bulan, tetap tampil sampai dilunasi.
@@ -282,6 +341,26 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
     return { bulanIni, lain, totalLain: lain.reduce((s, r) => s + r.sisaBayar, 0) }
   }, [riwayat, bulanDipilih])
 
+  // Pesanan stok yang sudah dibayar/hutang tapi barangnya belum datang (dari bulan mana pun)
+  // Stok yang dimasukkan sebagai "📦 Stok lama" (tanpa catatan belanja) di bulan terpilih — biar kelihatan
+  // kalau ternyata dipakai buat barang yang sebenarnya baru dibeli.
+  const stokLamaBulanIni = useMemo(() => {
+    const [thn, bln] = bulanDipilih.split('-')
+    const daftar = []
+    barang.forEach((b) =>
+      (b.riwayatRestock || []).forEach((r) => {
+        const [, m, y] = (r.tanggal || '').split(' ')[0].split('/')
+        if (r.stok_lama && m === bln && y === thn) daftar.push({ nama: b.nama, jumlah: r.jumlah, nilai: (r.jumlah || 0) * (b.hargaPokok || 0) })
+      }),
+    )
+    return daftar
+  }, [barang, bulanDipilih])
+
+  const pesananBelumDatang = useMemo(() => {
+    const daftar = pembelian.filter((p) => p.statusBarang === 'Dipesan')
+    return { jumlah: daftar.length, total: daftar.reduce((s, p) => s + p.total, 0) }
+  }, [pembelian])
+
   // Nilai modal barang yang masih ada di rak SAAT INI (bukan per bulan): Σ stok × harga pokok.
   const nilaiStok = useMemo(() => barang.reduce((s, b) => s + Math.max(0, b.stok || 0) * (b.hargaPokok || 0), 0), [barang])
 
@@ -305,16 +384,35 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
       notify('⚠️ Isi nominal yang benar!', 'error')
       return
     }
+
+    // Cegah belanja stok dicatat (lagi) di sini: (1) sudah ada 🛒 Pembelian di tanggal yang sama
+    // dengan nominal mirip, atau (2) deskripsinya cocok dengan barang di Katalog.
+    const deskripsi = formPengeluaran.deskripsi.trim()
+    const kembar = pembelian.find(
+      (p) => p.tanggal === formPengeluaran.tanggal && Math.abs(p.total - nominal) <= Math.max(1000, nominal * 0.02),
+    )
+    const cocok = cariBarangCocok(deskripsi, normBarang)
+    if (kembar || cocok) {
+      const ok = await confirm(
+        (kembar
+          ? `⚠️ Sepertinya ini sudah tercatat di 🛒 Pembelian:\n• ${uraianPembelian(kembar)} · ${formatRupiah(kembar.total)}\n\nNggak perlu dicatat lagi di sini — Pembelian sudah otomatis masuk laporan.`
+          : `⚠️ "${deskripsi}" sepertinya barang dagangan di Katalog (${cocok.nama}).\n\nBelanja barang dicatat lewat tombol 🛒 Catat Pembelian Stok, supaya stok & harga pokok ikut ter-update.`) +
+          `\n\nTetap simpan sebagai ${formPengeluaran.kategori}?`,
+      )
+      if (!ok) return
+    }
+
     setSavingPengeluaran(true)
     try {
       await tambahPengeluaran({
         tanggal: formPengeluaran.tanggal,
         kategori: formPengeluaran.kategori,
-        deskripsi: formPengeluaran.deskripsi.trim(),
+        deskripsi,
         nominal,
       })
       notify('✅ Pengeluaran dicatat!')
       setFormPengeluaran((f) => ({ ...f, deskripsi: '', nominal: '' }))
+      setNominalTerakhir(null)
     } catch (err) {
       notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
     } finally {
@@ -500,7 +598,17 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
         </div>
 
         <div style={{ margin: '15px 0', padding: 15, background: '#fdf2f8', borderRadius: 6, border: '1px solid #fbcfe8' }}>
-          <h3>💸 Pengeluaran Bulan Ini — {labelBulanIni}</h3>
+          <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>💸 Pengeluaran Bulan Ini — {labelBulanIni}</h3>
+            {onBukaPembelian && (
+              <button type="button" className="btn btn-sm btn-blue" onClick={onBukaPembelian}>
+                🛒 Catat Pembelian Stok
+              </button>
+            )}
+          </div>
+          <p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>
+            ⓘ Belanja barang dagangan dicatat di 🛒 Pembelian dan otomatis muncul di tabel ini (baris abu-abu) — nggak perlu dicatat lagi di sini.
+          </p>
           <form onSubmit={submitPengeluaran} className="row" style={{ alignItems: 'flex-end' }}>
             <div className="field" style={{ flex: '1 1 140px' }}>
               <label>Kategori</label>
@@ -512,11 +620,58 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
             </div>
             <div className="field" style={{ flex: '2 1 200px' }}>
               <label>Deskripsi</label>
-              <input
-                value={formPengeluaran.deskripsi}
-                onChange={(e) => setFormPengeluaran((f) => ({ ...f, deskripsi: e.target.value }))}
-                placeholder="Listrik, sewa, sabun… (belanja barang dagangan → 🛒 Pembelian)"
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  ref={inputDeskripsiRef}
+                  value={formPengeluaran.deskripsi}
+                  style={{ paddingRight: 36 }}
+                  onChange={(e) => {
+                    setFormPengeluaran((f) => ({ ...f, deskripsi: e.target.value }))
+                    setSaranDeskripsiAktif(true)
+                    setNominalTerakhir(null)
+                  }}
+                  onFocus={() => setSaranDeskripsiAktif(true)}
+                  onBlur={() => setTimeout(() => setSaranDeskripsiAktif(false), 150)}
+                  placeholder="Listrik, sewa, sabun… (belanja barang dagangan → 🛒 Pembelian)"
+                  autoComplete="off"
+                />
+                {formPengeluaran.deskripsi && (
+                  <button
+                    type="button"
+                    aria-label="Hapus deskripsi"
+                    title="Hapus"
+                    onMouseDown={(e) => e.preventDefault()} // jangan sampai input kehilangan fokus
+                    onClick={() => {
+                      setFormPengeluaran((f) => ({ ...f, deskripsi: '' }))
+                      setNominalTerakhir(null)
+                      inputDeskripsiRef.current?.focus()
+                    }}
+                    style={{
+                      position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                      width: 26, height: 26, minHeight: 0, padding: 0, border: 'none', borderRadius: '50%',
+                      background: '#e5e7eb', color: '#555', fontSize: 13, lineHeight: '26px', cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+                {saranDeskripsiAktif && saranDeskripsi.length > 0 && (
+                  <div style={{ position: 'absolute', zIndex: 5, background: 'white', border: '1px solid #ddd', borderRadius: 8, width: '100%', marginTop: 4, boxShadow: '0 4px 10px rgba(0,0,0,0.1)', maxHeight: 280, overflowY: 'auto' }}>
+                    {saranDeskripsi.map((x) => (
+                      <div
+                        key={x.deskripsi}
+                        style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+                        onMouseDown={() => pilihSaranDeskripsi(x)}
+                      >
+                        {x.deskripsi}
+                        <small style={{ display: 'block', color: '#888' }}>
+                          {x.kategori} · terakhir {formatRupiah(x.nominal)} ({x.tanggal}){x.kali > 1 ? ` · ${x.kali}×` : ''}
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="field" style={{ flex: '1 1 140px' }}>
               <label>Nominal (Rp)</label>
@@ -525,7 +680,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
                 min="0"
                 value={formPengeluaran.nominal}
                 onChange={(e) => setFormPengeluaran((f) => ({ ...f, nominal: e.target.value }))}
-                placeholder="0"
+                placeholder={nominalTerakhir != null ? `terakhir: ${formatRupiah(nominalTerakhir)}` : '0'}
               />
             </div>
             <div className="field" style={{ flex: '1 1 140px' }}>
@@ -554,7 +709,7 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
               style={{ flex: '1 1 140px' }}
             >
               <option value="">Semua Kategori</option>
-              {KATEGORI_PENGELUARAN.map((k) => (
+              {[...KATEGORI_PENGELUARAN, LABEL_PEMBELIAN].map((k) => (
                 <option key={k} value={k}>{k}</option>
               ))}
             </select>
@@ -566,79 +721,105 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           </div>
           {pengeluaranDifilter && (
             <p style={{ fontSize: 12, color: '#555', margin: '0 0 6px' }}>
-              Hasil: {pengeluaranTampil.length} dari {pengeluaranBulanIni.length} catatan · Jumlah: {formatRupiah(pengeluaranTampil.reduce((s, p) => s + (p.nominal || 0), 0))}
+              Hasil: {pengeluaranTampil.length} dari {pengeluaranBulanIni.length + pembelianBulanIni.length} catatan · Jumlah: {formatRupiah(pengeluaranTampil.reduce((s, p) => s + (p.nominal || 0), 0))}
             </p>
           )}
 
-          <div className="table-wrap table-scroll">
-            <table style={{ fontSize: 13 }}>
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Kategori</th>
-                  <th>Deskripsi</th>
-                  <th className="angka">Nominal</th>
-                  <th className="tengah">Hapus</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pengeluaranTampil.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="tengah" style={{ padding: 10, color: '#888' }}>
-                      {pengeluaranDifilter ? '🔍 Tidak ada yang cocok' : '📭 Belum ada pengeluaran bulan ini'}
-                    </td>
-                  </tr>
-                )}
-                {pengeluaranTampil.map((p) => {
-                  const cocok = p.kategori === 'Operasional' ? cariBarangCocok(p.deskripsi, normBarang) : null
-                  return (
-                  <tr key={p.id}>
-                    <td>{p.tanggal}</td>
-                    <td>
-                      <select
-                        value={p.kategori}
-                        onChange={(e) => ubahKategoriBaris(p, e.target.value)}
+          <p style={{ fontSize: 11, color: '#999', margin: '0 0 4px' }}>
+            {LABEL_PEMBELIAN} · 🚚 Hutang · ⏳ Belum datang · 📥 Data lama — baris abu-abu dikelola di 🗂️ Katalog → 🛒 Pembelian
+          </p>
+          <div className="table-scroll" style={{ border: '1px solid #f3d4e4', borderRadius: 8, background: 'white' }}>
+            {pengeluaranTampil.length === 0 && (
+              <p style={{ padding: 12, margin: 0, color: '#888', textAlign: 'center' }}>
+                {pengeluaranDifilter ? '🔍 Tidak ada yang cocok' : '📭 Belum ada pengeluaran bulan ini'}
+              </p>
+            )}
+            {pengeluaranTampil.map((p) => {
+              if (p.pembelian) {
+                const pb = p.pembelian
+                return (
+                  <KartuPengeluaran
+                    key={p.id}
+                    abu
+                    deskripsi={p.deskripsi}
+                    nominal={p.nominal}
+                    info={
+                      <>
+                        {tglPendek(p.tanggal)} · <Chip warna="#dbeafe" teks="#1e40af">{LABEL_PEMBELIAN}</Chip>
+                        {pb.statusBayar === 'Hutang' && <Chip warna="#ffedd5" teks="#c2410c">🚚 Hutang</Chip>}
+                        {pb.statusBarang === 'Dipesan' && <Chip warna="#ede9fe" teks="#6d28d9">⏳ Belum datang</Chip>}
+                        {pb.dataLama && <Chip warna="#e2e8f0" teks="#64748b">📥 Lama</Chip>}
+                      </>
+                    }
+                    aksi={<span style={{ color: '#bbb', fontSize: 15 }} title="Dikelola di 🗂️ Katalog → 🛒 Pembelian">🔒</span>}
+                  />
+                )
+              }
+              const lama = p.tanggal < TANGGAL_MULAI_PEMBELIAN
+              const cocok = p.kategori === 'Operasional' ? cariBarangCocok(p.deskripsi, normBarang) : null
+              // Belanja Stok cuma bisa dipilih buat catatan lama (atau yang memang sudah Belanja Stok)
+              const pilihan = KATEGORI_PENGELUARAN.filter((k) => k !== KATEGORI_BELANJA_STOK || lama || p.kategori === k)
+              return (
+                <KartuPengeluaran
+                  key={p.id}
+                  deskripsi={p.deskripsi}
+                  nominal={p.nominal}
+                  info={
+                    <>
+                      {tglPendek(p.tanggal)} ·{' '}
+                      <PilihKategoriChip
+                        nilai={p.kategori}
+                        pilihan={pilihan.includes(p.kategori) ? pilihan : [p.kategori, ...pilihan]}
                         disabled={ubahKategoriId === p.id}
-                        style={{ minWidth: 120, padding: '4px 6px', fontSize: 13, minHeight: 32 }}
-                      >
-                        {(KATEGORI_PENGELUARAN.includes(p.kategori) ? KATEGORI_PENGELUARAN : [p.kategori, ...KATEGORI_PENGELUARAN]).map((k) => (
-                          <option key={k} value={k}>{k}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      {p.deskripsi}
-                      {cocok && (
+                        onUbah={(k) => ubahKategoriBaris(p, k)}
+                      />
+                    </>
+                  }
+                  aksi={
+                    <button className="btn btn-red btn-sm" style={{ padding: '4px 8px', minHeight: 30 }} onClick={() => hapusPengeluaranBaris(p)} title="Hapus">
+                      🗑️
+                    </button>
+                  }
+                  catatan={
+                    <>
+                      {cocok && !lama && (
+                        <button
+                          type="button"
+                          className="badge"
+                          onClick={onBukaPembelian}
+                          title="Barang dagangan dicatat di 🛒 Pembelian supaya stok & harga pokok ikut ter-update"
+                          style={{ display: 'block', marginTop: 4, border: 'none', cursor: 'pointer', background: '#fef3c7', color: '#92400e', whiteSpace: 'normal', textAlign: 'left' }}
+                        >
+                          ⚠️ Barang dagangan ({cocok.nama})? Catat di 🛒 Pembelian, lalu hapus baris ini
+                        </button>
+                      )}
+                      {cocok && lama && (
                         <button
                           type="button"
                           className="badge"
                           onClick={() => ubahKategoriBaris(p, KATEGORI_BELANJA_STOK)}
                           title={`Mirip barang "${cocok.nama}" di katalog — ketuk buat pindah ke ${KATEGORI_BELANJA_STOK}`}
-                          style={{ display: 'block', marginTop: 4, border: 'none', cursor: 'pointer', background: cocok.jenis === 'persis' ? '#dbeafe' : '#f1f5f9', color: '#1e40af' }}
+                          style={{ display: 'block', marginTop: 4, border: 'none', cursor: 'pointer', whiteSpace: 'normal', textAlign: 'left', background: cocok.jenis === 'persis' ? '#dbeafe' : '#f1f5f9', color: '#1e40af' }}
                         >
                           📦 Cocok dengan katalog{cocok.jenis === 'mirip' ? ` (${cocok.nama}?)` : ''} → {KATEGORI_BELANJA_STOK}
                         </button>
                       )}
-                    </td>
-                    <td className="angka">{formatRupiah(p.nominal)}</td>
-                    <td className="tengah">
-                      <button className="btn btn-red btn-sm" onClick={() => hapusPengeluaranBaris(p)}>
-                        🗑️
-                      </button>
-                    </td>
-                  </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                    </>
+                  }
+                />
+              )
+            })}
           </div>
 
           <p style={{ marginTop: 10, fontWeight: 700 }}>
             Total Operasional: {formatRupiah(ringkasanBulanIni.biayaOp)} &nbsp;|&nbsp; Total Maintenance: {formatRupiah(ringkasanBulanIni.biayaMt)}
             {ringkasanBulanIni.belanjaStokCatatan > 0 && <> &nbsp;|&nbsp; {KATEGORI_BELANJA_STOK}: {formatRupiah(ringkasanBulanIni.belanjaStokCatatan)}</>}
+            {ringkasanBulanIni.belanjaStokPembelian > 0 && <> &nbsp;|&nbsp; {LABEL_PEMBELIAN}: {formatRupiah(ringkasanBulanIni.belanjaStokPembelian)}</>}
           </p>
-          {ringkasanBulanIni.belanjaStokCatatan > 0 && (
-            <p style={{ fontSize: 12, color: '#888', marginTop: -6 }}>ⓘ {KATEGORI_BELANJA_STOK} tidak dipotong dari Laba Bersih (modal barang dipotong waktu barangnya terjual).</p>
+          {ringkasanBulanIni.belanjaStok > 0 && (
+            <p style={{ fontSize: 12, color: '#888', marginTop: -6 }}>
+              ⓘ {KATEGORI_BELANJA_STOK} &amp; {LABEL_PEMBELIAN} tidak dipotong dari Laba Bersih (modal barang dipotong waktu barangnya terjual).
+            </p>
           )}
         </div>
 
@@ -862,6 +1043,26 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
               </tr>
               <tr><td>📦 Belanja Stok bulan ini</td><td className="angka">{formatRupiah(ringkasanBulanIni.belanjaStok)}</td></tr>
               <tr><td>🏪 Nilai stok di rak saat ini</td><td className="angka">{formatRupiah(nilaiStok)}</td></tr>
+              {stokLamaBulanIni.length > 0 && (
+                <tr>
+                  <td>
+                    📦 Stok lama (tanpa catatan belanja)
+                    <small style={{ display: 'block', color: '#b45309' }}>
+                      {stokLamaBulanIni.map((x) => `${x.nama} ×${x.jumlah}`).join(', ')} — kalau ini sebenarnya baru dibeli, belanjanya belum tercatat
+                    </small>
+                  </td>
+                  <td className="angka" style={{ color: '#b45309' }}>{formatRupiah(stokLamaBulanIni.reduce((s, x) => s + x.nilai, 0))}</td>
+                </tr>
+              )}
+              {pesananBelumDatang.jumlah > 0 && (
+                <tr onClick={onBukaPembelian} style={{ cursor: onBukaPembelian ? 'pointer' : undefined }} title="Buka 🛒 Pembelian">
+                  <td>
+                    ⏳ <span style={{ textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>Pesanan belum datang</span>
+                    <small style={{ color: '#888' }}> ({pesananBelumDatang.jumlah} nota — sudah dibayar/hutang, belum masuk stok)</small>
+                  </td>
+                  <td className="angka" style={{ color: '#6d28d9' }}>{formatRupiah(pesananBelumDatang.total)} ›</td>
+                </tr>
+              )}
             </tbody>
           </table>
           <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
@@ -901,6 +1102,61 @@ function LaporanIsi({ pengaturan, riwayat, simpanPengaturan }) {
           />
         )}
       </div>
+    </div>
+  )
+}
+
+const BULAN_PENDEK = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+function tglPendek(iso) {
+  const [, m, d] = (iso || '').split('-')
+  return m ? `${parseInt(d, 10)} ${BULAN_PENDEK[parseInt(m, 10) - 1]}` : iso
+}
+
+function Chip({ warna, teks, children }) {
+  return (
+    <span className="badge" style={{ background: warna, color: teks, fontSize: 11, padding: '2px 7px', marginRight: 4 }}>
+      {children}
+    </span>
+  )
+}
+
+// Kategori dalam bentuk chip kecil. <select> asli ditaruh transparan di atasnya (font 16px) — supaya
+// di HP tetap buka pemilih bawaan, dan iOS nggak nge-zoom layar (zoom terjadi kalau font < 16px).
+function PilihKategoriChip({ nilai, pilihan, disabled, onUbah }) {
+  return (
+    <span style={{ position: 'relative', display: 'inline-block' }}>
+      <span className="badge" style={{ background: '#fce7f3', color: '#9d174d', fontSize: 11, padding: '2px 8px', opacity: disabled ? 0.5 : 1 }}>
+        {nilai} ▾
+      </span>
+      <select
+        value={nilai}
+        disabled={disabled}
+        onChange={(e) => onUbah(e.target.value)}
+        aria-label="Ubah kategori"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', minHeight: 0, padding: 0, opacity: 0, fontSize: 16, cursor: 'pointer' }}
+      >
+        {pilihan.map((k) => (
+          <option key={k} value={k}>{k}</option>
+        ))}
+      </select>
+    </span>
+  )
+}
+
+// Satu catatan Pengeluaran / 🛒 Pembelian sebagai kartu 2–3 baris (pengganti tabel 5 kolom yang harus
+// di-scroll ke samping di HP): baris 1 deskripsi + nominal, baris 2 tanggal/kategori + aksi, baris 3 catatan.
+function KartuPengeluaran({ deskripsi, nominal, info, aksi, catatan, abu }) {
+  return (
+    <div style={{ padding: '8px 10px', borderBottom: '1px solid #f3e8ee', background: abu ? '#f1f5f9' : undefined }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <span style={{ fontWeight: 600, fontSize: 14, overflowWrap: 'anywhere', minWidth: 0 }}>{deskripsi}</span>
+        <b style={{ whiteSpace: 'nowrap', fontSize: 14 }}>{formatRupiah(nominal)}</b>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginTop: 4 }}>
+        <span style={{ fontSize: 12, color: '#666', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>{info}</span>
+        {aksi}
+      </div>
+      {catatan}
     </div>
   )
 }

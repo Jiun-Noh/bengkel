@@ -26,6 +26,8 @@ const TABS = [
 export default function App() {
   const { session, profil, recoveryMode } = useAuth()
   const [tab, setTab] = useState('home')
+  // Sub-tab Katalog yang dibuka (mis. tombol 🛒 Catat Pembelian di Laporan → langsung ke Pembelian)
+  const [katalogAwal, setKatalogAwal] = useState('barang')
   const [popupPembaruan, setPopupPembaruan] = useState(null) // null = tertutup, [] = daftar entri
   const versiBaru = useVersiBaru()
 
@@ -72,14 +74,22 @@ export default function App() {
         {tab === 'home' && <Dashboard onNavigate={setTab} />}
         {tab === 'staff' && <StaffPage />}
         {tab === 'absensi' && <AbsensiPage />}
-        {tab === 'stok' && <StokPage />}
+        {tab === 'stok' && <StokPage awal={katalogAwal} />}
         {tab === 'transaksi' && <TransaksiPage />}
-        {tab === 'laporan' && <LaporanPage />}
+        {tab === 'laporan' && (
+          <LaporanPage
+            onBukaPembelian={() => {
+              setKatalogAwal('pembelian')
+              setTab('stok')
+              window.scrollTo(0, 0)
+            }}
+          />
+        )}
       </main>
 
       <nav className="bottom-nav">
         {TABS.map((t) => (
-          <button key={t.key} className={tab === t.key ? 'active' : ''} onClick={() => setTab(t.key)}>
+          <button key={t.key} className={tab === t.key ? 'active' : ''} onClick={() => { setKatalogAwal('barang'); setTab(t.key) }}>
             <span className="ic">{t.icon}</span>
             <span>{t.label}</span>
           </button>
@@ -93,9 +103,11 @@ export default function App() {
 
 function AppHeader({ onBukaPembaruan }) {
   const { profil, logout } = useAuth()
-  const { notify } = useUI()
+  const { notify, confirm } = useUI()
 
   async function handleLogout() {
+    // Tombolnya sekarang cuma ikon → gampang kepencet, jadi tanya dulu
+    if (!(await confirm('Keluar dari aplikasi?'))) return
     await logout()
     notify('👋 Berhasil keluar')
   }
@@ -104,31 +116,42 @@ function AppHeader({ onBukaPembaruan }) {
     <header className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>📦 BENGKEL MANAGER</span>
       <div className="row" style={{ flexWrap: 'nowrap', gap: 8, alignItems: 'center' }}>
-        <span style={{ fontSize: 13, color: 'white', opacity: 0.9 }}>
+        <span
+          style={{ fontSize: 13, color: 'white', opacity: 0.9, minWidth: 0, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          title={profil?.nama || ''}
+        >
           {profil?.peran === 'pemilik' ? '🔓' : '🔒'} {profil?.nama || '—'}
         </span>
-        <button onClick={onBukaPembaruan} title="Apa yang baru" style={TOMBOL_HEADER}>
+        <button onClick={onBukaPembaruan} title="Apa yang baru" aria-label="Apa yang baru" style={TOMBOL_HEADER}>
           📢
         </button>
-        <button
-          onClick={handleLogout}
-          title="Keluar"
-          style={TOMBOL_HEADER}
-        >
-          Keluar
+        <button onClick={handleLogout} title="Keluar" aria-label="Keluar" style={TOMBOL_HEADER}>
+          {/* ikon "keluar" (pintu + panah) */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
         </button>
       </div>
     </header>
   )
 }
 
+// Tombol ikon kotak ukuran tetap — nggak ikut menyusut waktu header sempit (dulu teks "Keluar" sampai keluar dari tombol)
 const TOMBOL_HEADER = {
   background: 'rgba(255,255,255,0.15)',
   border: 'none',
   borderRadius: 8,
   color: 'white',
-  padding: '6px 10px',
-  fontSize: 13,
+  width: 34,
+  height: 34,
+  padding: 0,
+  fontSize: 16,
   cursor: 'pointer',
   minHeight: 'auto',
+  flexShrink: 0,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 }

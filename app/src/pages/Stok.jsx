@@ -8,15 +8,16 @@ import Modal from '../components/common/Modal'
 import Fab from '../components/common/Fab'
 import AksiPemilik from '../components/common/AksiPemilik'
 import PembelianSection, { buatDraftPembelian, tambahKeDraft } from './Pembelian'
+import { usePembelianQuery } from '../hooks/usePembelian'
 
 const STOK_MINIM = 3
 const FORM_KOSONG = { kode: '', nama: '', jenisMotor: '', satuan: 'PCS', hargaPokok: '', hargaJual: '', jumlahStok: '' }
 const FORM_JASA_KOSONG = { nama: '', harga: '' }
 
-export default function StokPage() {
+export default function StokPage({ awal = 'barang' }) {
   const { profil } = useAuth()
   const pemilik = profil?.peran === 'pemilik'
-  const [kategori, setKategori] = useState('barang') // 'barang' | 'jasa' | 'pembelian'
+  const [kategori, setKategori] = useState(awal) // 'barang' | 'jasa' | 'pembelian'
   // Draf nota Pembelian disimpan di sini (bukan di dalam tab Pembelian), supaya isinya nggak
   // hilang waktu pindah ke tab Barang buat menambah barang lain lewat tombol 🔄.
   const [draftPembelian, setDraftPembelian] = useState(buatDraftPembelian)
@@ -44,8 +45,8 @@ export default function StokPage() {
       </div>
       {kategori === 'barang' && (
         <BarangSection
-          onRestock={(b) => {
-            setDraftPembelian((d) => tambahKeDraft(d, b))
+          onRestock={(b, jumlah) => {
+            setDraftPembelian((d) => tambahKeDraft(d, b, jumlah))
             setKategori('pembelian')
             window.scrollTo(0, 0)
           }}
@@ -59,6 +60,18 @@ export default function StokPage() {
 
 function BarangSection({ onRestock }) {
   const { data: barang = [], isLoading } = useBarangQuery(true)
+  const { profil } = useAuth()
+  const pemilik = profil?.peran === 'pemilik'
+  // Pesanan yang belum datang (khusus pemilik — tabel pembelian nggak bisa dibaca karyawan):
+  // ditampilkan kecil di kolom Stok biar jelas barangnya sudah dibeli tapi belum masuk stok.
+  const { data: pembelian = [] } = usePembelianQuery(profil?.peran === 'pemilik')
+  const dipesanPerKode = useMemo(() => {
+    const per = {}
+    pembelian
+      .filter((p) => p.statusBarang === 'Dipesan')
+      .forEach((p) => p.items.forEach((it) => (per[it.kode] = (per[it.kode] || 0) + (it.jumlah || 0))))
+    return per
+  }, [pembelian])
   const { tambahBarang, ubahInfoBarang, hapusBarang, batalRestock } = useBarangMutations()
   const { notify, confirm } = useUI()
 
@@ -68,6 +81,9 @@ function BarangSection({ onRestock }) {
   const [cari, setCari] = useState('')
   const [riwayatKode, setRiwayatKode] = useState(null)
   const [saving, setSaving] = useState(false)
+  // Barang baru: stok lama (bukan belanja baru, mis. stok awal waktu buka bengkel) boleh langsung diisi.
+  // Selain itu barang disimpan stok 0 lalu langsung dilanjutkan ke 🛒 Pembelian, biar belanjanya tercatat.
+  const [stokLama, setStokLama] = useState(false)
 
   const [filterStok, setFilterStok] = useState('semua') // 'semua' | 'menipis' | 'habis'
 
@@ -97,6 +113,7 @@ function BarangSection({ onRestock }) {
   function resetForm() {
     setForm(FORM_KOSONG)
     setEditingKode(null)
+    setStokLama(false)
   }
 
   function bukaTambah() {
@@ -145,6 +162,7 @@ function BarangSection({ onRestock }) {
 
     let simpan
     let pesan
+    let lanjutBeli = false
 
     if (editingKode) {
       // Cuma data katalog — stok/terjual/restock nggak ikut ditulis (bisa basi di HP ini)
@@ -158,6 +176,9 @@ function BarangSection({ onRestock }) {
         })
       pesan = '✅ Data barang berhasil diubah!'
     } else {
+      // Stok langsung diisi cuma kalau pemilik menandai "stok lama". Barang yang baru dibeli disimpan
+      // stok 0, lalu dilanjutkan ke 🛒 Pembelian (stok + harga pokok + catatan belanja masuk dari sana).
+      const isiLangsung = pemilik && stokLama ? jumlah : 0
       const baris = {
         kode,
         nama,
@@ -165,15 +186,30 @@ function BarangSection({ onRestock }) {
         satuan: form.satuan,
         harga_pokok: pokok,
         harga_jual: jual,
-        stok: jumlah,
-        stok_awal: jumlah,
-        restock: jumlah,
+        stok: isiLangsung,
+        stok_awal: isiLangsung,
+        restock: isiLangsung,
         terjual: 0,
         tanggal_stok_awal: waktu,
-        riwayat_restock: [{ jumlah, tanggal: waktu }],
+        // stok_lama: true → ditandai di Riwayat Restock & Laporan, biar kelihatan stok yang masuk tanpa catatan belanja
+        riwayat_restock: isiLangsung > 0 ? [{ jumlah: isiLangsung, tanggal: waktu, stok_lama: true }] : [],
       }
       simpan = () => tambahBarang(baris)
-      pesan = `✅ Barang baru berhasil ditambahkan!`
+      pesan = !pemilik
+        ? '✅ Barang baru ditambahkan (stok 0). Stoknya diisi pemilik lewat 🛒 Pembelian.'
+        : stokLama
+          ? '✅ Barang baru berhasil ditambahkan!'
+          : `✅ Barang "${nama}" tersimpan — lanjut catat belanjanya di 🛒 Pembelian.`
+      lanjutBeli = pemilik && !stokLama
+
+      if (isiLangsung > 0) {
+        const yakin = await confirm(
+          `⚠️ Yakin "${nama}" ×${isiLangsung} ini BUKAN barang yang baru dibeli?\n\n` +
+            'Stok lama masuk TANPA catatan belanja — nggak muncul di 🛒 Pembelian & Laporan.\n\n' +
+            'Kalau barangnya baru dibeli, pilih Batal lalu hapus centang 📦 Stok lama.',
+        )
+        if (!yakin) return
+      }
     }
 
     setSaving(true)
@@ -182,6 +218,7 @@ function BarangSection({ onRestock }) {
       notify(pesan)
       resetForm()
       setMode('list')
+      if (lanjutBeli) onRestock({ kode, hargaPokok: pokok }, jumlah)
     } catch (err) {
       notify('❌ Gagal menyimpan ke cloud: ' + err.message, 'error')
     } finally {
@@ -281,29 +318,44 @@ function BarangSection({ onRestock }) {
               placeholder="Harga Jual ke Pelanggan"
             />
           </div>
-          <div className="field">
-            <label>{editingKode ? 'Jumlah Stok (terkunci)' : 'Jumlah Stok Awal'}</label>
-            <input
-              type="number"
-              value={form.jumlahStok}
-              onChange={(e) => setForm((f) => ({ ...f, jumlahStok: e.target.value }))}
-              placeholder="Jumlah Stok"
-              disabled={!!editingKode}
-            />
-            {editingKode && (
+          {editingKode && (
+            <div className="field">
+              <label>Jumlah Stok (terkunci)</label>
+              <input type="number" value={form.jumlahStok} disabled />
               <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
                 ⓘ Tambah stok lewat 🔄 / 🛒 Pembelian (harga pokok ikut dihitung ulang). Salah input? Batalkan pembeliannya di 🛒 Pembelian.
               </p>
-            )}
-            {!editingKode && (
-              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                ⓘ Barang baru yang baru dibeli? Boleh isi 0 di sini, lalu catat belanjanya di 🛒 Pembelian biar modalnya tercatat.
+            </div>
+          )}
+          {!editingKode && !pemilik && (
+            <p style={{ fontSize: 12, color: '#888', margin: '0 0 12px' }}>
+              ⓘ Barang baru disimpan dengan stok 0. Stoknya diisi pemilik lewat 🛒 Pembelian (biar belanjanya tercatat).
+            </p>
+          )}
+          {!editingKode && pemilik && (
+            <div className="field">
+              <label>{stokLama ? 'Jumlah Stok (stok lama)' : 'Jumlah Dibeli'}</label>
+              <input
+                type="number"
+                min="0"
+                value={form.jumlahStok}
+                onChange={(e) => setForm((f) => ({ ...f, jumlahStok: e.target.value }))}
+                placeholder={stokLama ? 'Jumlah stok yang sudah ada' : 'Berapa yang dibeli'}
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontWeight: 400, fontSize: 13 }}>
+                <input type="checkbox" checked={stokLama} onChange={(e) => setStokLama(e.target.checked)} style={{ width: 'auto', minHeight: 'auto' }} />
+                📦 Stok lama (sudah ada dari dulu, bukan belanja baru)
+              </label>
+              <p style={{ fontSize: 12, color: stokLama ? '#b45309' : '#888', marginTop: 4 }}>
+                {stokLama
+                  ? '⚠️ Stok langsung masuk TANPA catatan belanja. Pakai ini cuma buat stok yang memang sudah ada (bukan baru dibeli).'
+                  : 'ⓘ Barang disimpan, lalu langsung lanjut ke 🛒 Pembelian (jumlah & harga pokok sudah terisi) — tinggal pilih Lunas/Hutang & sudah datang/belum, lalu simpan.'}
               </p>
-            )}
-          </div>
+            </div>
+          )}
 
           <button className="btn btn-block" type="submit" disabled={saving}>
-            {saving ? 'Menyimpan…' : '✅ Simpan Barang'}
+            {saving ? 'Menyimpan…' : editingKode || stokLama || !pemilik ? '✅ Simpan Barang' : '✅ Simpan & catat pembelian 🛒'}
           </button>
         </form>
       </div>
@@ -405,7 +457,11 @@ function BarangSection({ onRestock }) {
                     <td className="tengah">{b.satuan || 'PCS'}</td>
                     <td className="angka">{formatRupiah(b.hargaPokok)}</td>
                     <td className="angka">{formatRupiah(b.hargaJual)}</td>
-                    <td className={`angka ${rendah ? 'merah' : ''}`}>{b.stok || 0}</td>
+                    <td className={`angka ${rendah ? 'merah' : ''}`}>{b.stok || 0}
+                      {dipesanPerKode[b.kode] > 0 && (
+                        <small style={{ display: 'block', color: '#6d28d9', fontWeight: 400 }} title="Sudah dipesan, belum datang">⏳ +{dipesanPerKode[b.kode]}</small>
+                      )}
+                    </td>
                     <td className="angka">{b.terjual || 0}</td>
                   </tr>
                 )
@@ -435,7 +491,14 @@ function BarangSection({ onRestock }) {
                   className="row"
                   style={{ padding: '4px 0', borderBottom: '1px dashed #eee', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <span>{i + 1}. +{r.jumlah} {barangRiwayat.satuan || 'PCS'} — {r.tanggal}</span>
+                  <span>
+                    {i + 1}. +{r.jumlah} {barangRiwayat.satuan || 'PCS'} — {r.tanggal}
+                    {r.stok_lama && (
+                      <span className="badge" style={{ display: 'block', width: 'fit-content', marginTop: 2, background: '#fef3c7', color: '#92400e' }} title="Masuk tanpa catatan belanja">
+                        📦 Stok lama (tanpa catatan belanja)
+                      </span>
+                    )}
+                  </span>
                   {r.pembelian_id ? (
                     <span style={{ fontSize: 12, color: '#888' }} title="Batalkan lewat daftar di 🛒 Pembelian">🛒 Pembelian</span>
                   ) : (

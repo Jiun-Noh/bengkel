@@ -10,15 +10,18 @@ import { hariIniLokal } from '../lib/belanjaStok'
 // Laporan → Pengeluaran. Satu simpan = stok bertambah + harga pokok dihitung ulang (rata-rata
 // tertimbang) + catatan pembelian + (kalau hutang) masuk Hutang Supplier. Semua dikerjakan
 // database dalam satu langkah — lihat migrasi_pembelian.sql.
+// Barang belum datang (sudah dibayar/hutang duluan) → dicatat sebagai PESANAN: stok belum ditambah;
+// nanti tekan "✅ Terima barang" waktu barangnya datang (lihat migrasi_pembelian_pesanan.sql).
 
 export function buatDraftPembelian() {
-  return { tanggal: hariIniLokal(), namaSupplier: '', statusBayar: 'Lunas', items: [] }
+  return { tanggal: hariIniLokal(), namaSupplier: '', statusBayar: 'Lunas', sudahDatang: true, items: [] }
 }
 
 // Tambah barang ke draf; kalau sudah ada di draf, cukup biarkan (jumlahnya diisi di tab Pembelian).
-export function tambahKeDraft(draft, b) {
+// jumlah opsional — dipakai waktu barang baru didaftarkan (jumlah yang dibeli sudah diketik di form).
+export function tambahKeDraft(draft, b, jumlah = '') {
   if (draft.items.some((it) => it.kode === b.kode)) return draft
-  return { ...draft, items: [...draft.items, { kode: b.kode, jumlah: '', harga: b.hargaPokok ? String(b.hargaPokok) : '' }] }
+  return { ...draft, items: [...draft.items, { kode: b.kode, jumlah: jumlah ? String(jumlah) : '', harga: b.hargaPokok ? String(b.hargaPokok) : '' }] }
 }
 
 // Sama persis dengan hitungan di catat_pembelian: stok ≤ 0 → harga beli; selain itu rata-rata tertimbang.
@@ -43,13 +46,13 @@ export default function PembelianSection({ draft, setDraft }) {
   const { data: barang = [] } = useBarangQuery(true)
   const { data: pembelian = [], isLoading } = usePembelianQuery(true)
   const { data: hutangSupplier = [] } = useHutangSupplierQuery(true)
-  const { catatPembelian, batalPembelian } = usePembelianMutations()
+  const { catatPembelian, terimaPembelian, batalPembelian } = usePembelianMutations()
   const { notify, confirm } = useUI()
 
   const [cari, setCari] = useState('')
   const [saving, setSaving] = useState(false)
   const [bulanLihat, setBulanLihat] = useState(hariIniLokal().substring(0, 7))
-  const [batalId, setBatalId] = useState(null)
+  const [prosesId, setProsesId] = useState(null) // pembelian yang sedang dibatalkan / diterima
 
   const barangPerKode = useMemo(() => Object.fromEntries(barang.map((b) => [b.kode, b])), [barang])
 
@@ -95,6 +98,12 @@ export default function PembelianSection({ draft, setDraft }) {
     [pembelian, bulanLihat],
   )
   const totalBulan = pembelianBulan.reduce((s, p) => s + p.total, 0)
+  // Pesanan yang belum datang — dari bulan mana pun, biar nggak kelupaan
+  const pesananMenunggu = useMemo(
+    () => pembelian.filter((p) => p.statusBarang === 'Dipesan').sort((a, b) => a.tanggal.localeCompare(b.tanggal)),
+    [pembelian],
+  )
+  const sudahDatang = draft.sudahDatang !== false
 
   function ubahDraft(kolom) {
     setDraft((d) => ({ ...d, ...kolom }))
@@ -139,9 +148,10 @@ export default function PembelianSection({ draft, setDraft }) {
 
     const gratis = baris.filter((r) => r.harga === 0)
     const ok = await confirm(
-      `🛒 Simpan pembelian ${formatRupiah(total)}?\n\n` +
-        baris.map((r) => `• ${r.b.nama} +${r.jumlah} @ ${formatRupiah(r.harga)}`).join('\n') +
-        (draft.statusBayar === 'Hutang' ? `\n\n🚚 Masuk Hutang Supplier: ${supplier}` : '\n\n✅ Lunas') +
+      `🛒 Simpan ${sudahDatang ? 'pembelian' : 'PESANAN'} ${formatRupiah(total)}?\n\n` +
+        baris.map((r) => `• ${r.b.nama} ${sudahDatang ? '+' : '×'}${r.jumlah} @ ${formatRupiah(r.harga)}`).join('\n') +
+        (sudahDatang ? '\n\n📦 Barang sudah datang → stok langsung bertambah.' : '\n\n⏳ Barang belum datang → stok BELUM bertambah. Tekan "✅ Terima barang" nanti waktu barangnya datang.') +
+        (draft.statusBayar === 'Hutang' ? `\n🚚 Masuk Hutang Supplier: ${supplier}` : '\n✅ Lunas') +
         (gratis.length ? `\n\n⚠️ Harga beli Rp 0: ${gratis.map((r) => r.b.nama).join(', ')} (barang gratis/bonus?)` : ''),
     )
     if (!ok) return
@@ -154,8 +164,12 @@ export default function PembelianSection({ draft, setDraft }) {
         statusBayar: draft.statusBayar,
         items: baris.map((r) => ({ kode: r.kode, jumlah: r.jumlah, harga: r.harga })),
         waktu: waktuRestock(draft.tanggal),
+        sudahDatang,
       })
-      notify(`✅ Pembelian tersimpan! Stok & harga pokok sudah diperbarui.${draft.statusBayar === 'Hutang' ? '\n🚚 Tercatat di Hutang Supplier.' : ''}`)
+      notify(
+        (sudahDatang ? '✅ Pembelian tersimpan! Stok & harga pokok sudah diperbarui.' : '✅ Pesanan tersimpan. Stok ditambah nanti waktu barangnya datang (✅ Terima barang).') +
+          (draft.statusBayar === 'Hutang' ? '\n🚚 Tercatat di Hutang Supplier.' : ''),
+      )
       setDraft({ ...buatDraftPembelian(), tanggal: draft.tanggal, namaSupplier: draft.namaSupplier, statusBayar: draft.statusBayar })
       setBulanLihat(draft.tanggal.substring(0, 7))
     } catch (err) {
@@ -166,21 +180,41 @@ export default function PembelianSection({ draft, setDraft }) {
   }
 
   async function batalkan(p) {
+    const pesanan = p.statusBarang === 'Dipesan'
     const ok = await confirm(
-      `⚠️ Batalkan pembelian ${p.tanggal} (${formatRupiah(p.total)})?\n\n` +
-        p.items.map((it) => `• ${it.nama} −${it.jumlah}`).join('\n') +
-        '\n\nStok dikurangi lagi.' +
+      `⚠️ Batalkan ${pesanan ? 'pesanan' : 'pembelian'} ${p.tanggal} (${formatRupiah(p.total)})?\n\n` +
+        p.items.map((it) => `• ${it.nama} ${pesanan ? '×' : '−'}${it.jumlah}`).join('\n') +
+        (pesanan ? '\n\nBarangnya belum masuk stok, jadi stok tidak berubah.' : '\n\nStok dikurangi lagi.') +
         (p.hutangSupplierId ? ' Catatan Hutang Supplier-nya ikut dihapus.' : ''),
     )
     if (!ok) return
-    setBatalId(p.id)
+    setProsesId(p.id)
     try {
       await batalPembelian(p.id)
-      notify('✅ Pembelian dibatalkan, stok sudah disesuaikan.')
+      notify(pesanan ? '✅ Pesanan dibatalkan.' : '✅ Pembelian dibatalkan, stok sudah disesuaikan.')
     } catch (err) {
       notify('❌ Gagal membatalkan: ' + err.message, 'error')
     } finally {
-      setBatalId(null)
+      setProsesId(null)
+    }
+  }
+
+  async function terima(p) {
+    const hariIni = hariIniLokal()
+    const ok = await confirm(
+      `📦 Barang pesanan ${p.tanggal} sudah datang SEMUA?\n\n` +
+        p.items.map((it) => `• ${it.nama} +${it.jumlah}`).join('\n') +
+        `\n\nStok bertambah hari ini (${hariIni}) dan harga pokok dihitung ulang.`,
+    )
+    if (!ok) return
+    setProsesId(p.id)
+    try {
+      await terimaPembelian(p.id, hariIni, waktuRestock(hariIni))
+      notify('✅ Barang diterima — stok & harga pokok sudah diperbarui.')
+    } catch (err) {
+      notify('❌ Gagal menerima barang: ' + err.message, 'error')
+    } finally {
+      setProsesId(null)
     }
   }
 
@@ -234,6 +268,31 @@ export default function PembelianSection({ draft, setDraft }) {
           </div>
         </div>
 
+        <div className="field">
+          <label>Barangnya sudah datang?</label>
+          <div className="row">
+            {[
+              [true, '📦 Sudah datang', '#2563eb'],
+              [false, '⏳ Belum (pesan dulu)', '#7c3aed'],
+            ].map(([nilai, label, warna]) => (
+              <button
+                key={label}
+                type="button"
+                className="btn btn-sm"
+                style={{ background: sudahDatang === nilai ? warna : '#ddd', color: sudahDatang === nilai ? 'white' : '#333' }}
+                onClick={() => ubahDraft({ sudahDatang: nilai })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {!sudahDatang && (
+            <p style={{ fontSize: 12, color: '#6d28d9', marginTop: 4 }}>
+              ⓘ Dicatat sebagai pesanan: pembayaran/hutang dicatat sekarang, stok BELUM ditambah. Waktu barangnya datang, tekan ✅ Terima barang di daftar bawah.
+            </p>
+          )}
+        </div>
+
         <div className="field" style={{ position: 'relative' }}>
           <label>Tambah barang</label>
           <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="🔍 Ketik kode / nama / motor…" />
@@ -273,7 +332,7 @@ export default function PembelianSection({ draft, setDraft }) {
         )}
 
         {baris.map((r) => (
-          <BarisPembelian key={r.idx} r={r} onUbah={(kolom) => ubahItem(r.idx, kolom)} onHapus={() => hapusItem(r.idx)} />
+          <BarisPembelian key={r.idx} r={r} sudahDatang={sudahDatang} onUbah={(kolom) => ubahItem(r.idx, kolom)} onHapus={() => hapusItem(r.idx)} />
         ))}
 
         {baris.length > 0 && (
@@ -283,11 +342,23 @@ export default function PembelianSection({ draft, setDraft }) {
               <span>{formatRupiah(total)}</span>
             </div>
             <button className="btn btn-block" type="submit" disabled={saving}>
-              {saving ? 'Menyimpan…' : '💾 Simpan Pembelian'}
+              {saving ? 'Menyimpan…' : sudahDatang ? '💾 Simpan Pembelian' : '💾 Simpan Pesanan'}
             </button>
           </>
         )}
       </form>
+
+      {pesananMenunggu.length > 0 && (
+        <div className="card" style={{ border: '2px solid #c4b5fd', background: '#faf5ff' }}>
+          <h2 style={{ marginTop: 0 }}>⏳ Pesanan Belum Datang ({pesananMenunggu.length})</h2>
+          <p style={{ fontSize: 12, color: '#6d28d9', marginTop: -6 }}>
+            ⓘ Sudah dibayar/hutang, tapi barangnya belum masuk stok. Tekan ✅ Terima barang waktu barangnya datang.
+          </p>
+          {pesananMenunggu.map((p) => (
+            <ItemPembelian key={p.id} p={p} sibuk={prosesId === p.id} onTerima={() => terima(p)} onBatal={() => batalkan(p)} />
+          ))}
+        </div>
+      )}
 
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -298,45 +369,16 @@ export default function PembelianSection({ draft, setDraft }) {
           {labelBulan(bulanLihat)}: <b>{pembelianBulan.length}</b> nota · Total <b>{formatRupiah(totalBulan)}</b>
         </p>
         {isLoading && <p style={{ color: '#888' }}>Memuat…</p>}
-        {!isLoading && pembelianBulan.length === 0 && (
-          <p style={{ color: '#888', textAlign: 'center' }}>
-            📭 Belum ada pembelian bulan ini.
-            {bulanLihat <= '2026-11' && (
-              <>
-                <br />
-                <small>Belanja sebelum 23 November ada di Laporan → Pengeluaran (kategori "Belanja Stok").</small>
-              </>
-            )}
+        {!isLoading && pembelianBulan.length === 0 && <p style={{ color: '#888', textAlign: 'center' }}>📭 Belum ada pembelian bulan ini.</p>}
+        {bulanLihat <= '2026-11' && (
+          <p style={{ fontSize: 12, color: '#888' }}>
+            ⓘ 📥 Data lama = belanja sebelum ada 🛒 Pembelian (dipindah dari Pengeluaran). Yang barangnya nggak bisa dipastikan masih ada di Laporan →
+            Pengeluaran (kategori "Belanja Stok").
           </p>
         )}
         <div className="table-scroll" style={{ maxHeight: '60vh' }}>
           {pembelianBulan.map((p) => (
-            <div key={p.id} style={{ borderTop: '1px solid #eee', padding: '10px 0' }}>
-              <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                <div>
-                  <b>{p.tanggal}</b> {p.namaSupplier && <span>· {p.namaSupplier}</span>}{' '}
-                  <span className="badge" style={{ background: p.statusBayar === 'Hutang' ? '#ffedd5' : '#dcfce7', color: p.statusBayar === 'Hutang' ? '#c2410c' : '#15803d' }}>
-                    {p.statusBayar === 'Hutang' ? '🚚 Hutang' : '✅ Lunas'}
-                  </span>
-                </div>
-                <b style={{ whiteSpace: 'nowrap' }}>{formatRupiah(p.total)}</b>
-              </div>
-              <div style={{ fontSize: 13, color: '#555', marginTop: 4 }}>
-                {p.items.map((it, i) => (
-                  <div key={i}>
-                    • {it.nama} ×{it.jumlah} @ {formatRupiah(it.harga)}
-                    {it.hargaPokokLama !== it.hargaPokokBaru && (
-                      <span style={{ color: '#888' }}> (pokok {formatRupiah(it.hargaPokokLama)} → {formatRupiah(it.hargaPokokBaru)})</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div style={{ textAlign: 'right', marginTop: 4 }}>
-                <button className="btn btn-outline btn-sm" onClick={() => batalkan(p)} disabled={batalId === p.id}>
-                  {batalId === p.id ? 'Membatalkan…' : '✕ Batalkan'}
-                </button>
-              </div>
-            </div>
+            <ItemPembelian key={p.id} p={p} sibuk={prosesId === p.id} onTerima={() => terima(p)} onBatal={() => batalkan(p)} />
           ))}
         </div>
       </div>
@@ -344,7 +386,52 @@ export default function PembelianSection({ draft, setDraft }) {
   )
 }
 
-function BarisPembelian({ r, onUbah, onHapus }) {
+function ItemPembelian({ p, sibuk, onTerima, onBatal }) {
+  const pesanan = p.statusBarang === 'Dipesan'
+  return (
+    <div style={{ borderTop: '1px solid #eee', padding: '10px 0' }}>
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+        <div>
+          <b>{p.tanggal}</b> {p.namaSupplier && <span>· {p.namaSupplier}</span>}{' '}
+          <span className="badge" style={{ background: p.statusBayar === 'Hutang' ? '#ffedd5' : '#dcfce7', color: p.statusBayar === 'Hutang' ? '#c2410c' : '#15803d' }}>
+            {p.statusBayar === 'Hutang' ? '🚚 Hutang' : '✅ Lunas'}
+          </span>{' '}
+          {pesanan && <span className="badge" style={{ background: '#ede9fe', color: '#6d28d9' }}>⏳ Belum datang</span>}
+          {p.dataLama && <span className="badge" style={{ background: '#f1f5f9', color: '#64748b' }}>📥 Data lama</span>}
+          {!pesanan && !p.dataLama && p.tanggalTerima && p.tanggalTerima !== p.tanggal && (
+            <small style={{ color: '#888' }}> · datang {p.tanggalTerima}</small>
+          )}
+        </div>
+        <b style={{ whiteSpace: 'nowrap' }}>{formatRupiah(p.total)}</b>
+      </div>
+      <div style={{ fontSize: 13, color: '#555', marginTop: 4 }}>
+        {p.items.map((it, i) => (
+          <div key={i}>
+            • {it.nama} ×{it.jumlah} @ {formatRupiah(it.harga)}
+            {it.hargaPokokLama != null && it.hargaPokokLama !== it.hargaPokokBaru && (
+              <span style={{ color: '#888' }}> (pokok {formatRupiah(it.hargaPokokLama)} → {formatRupiah(it.hargaPokokBaru)})</span>
+            )}
+            {it.deskripsiAsli && <small style={{ display: 'block', color: '#aaa', paddingLeft: 10 }}>catatan asli: {it.deskripsiAsli}</small>}
+          </div>
+        ))}
+      </div>
+      {!p.dataLama && (
+        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
+          {pesanan && (
+            <button className="btn btn-sm" style={{ background: '#7c3aed' }} onClick={onTerima} disabled={sibuk}>
+              {sibuk ? 'Memproses…' : '✅ Terima barang'}
+            </button>
+          )}
+          <button className="btn btn-outline btn-sm" onClick={onBatal} disabled={sibuk}>
+            ✕ Batalkan
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BarisPembelian({ r, sudahDatang, onUbah, onHapus }) {
   const b = r.b
   if (!b) {
     return (
@@ -355,8 +442,9 @@ function BarisPembelian({ r, onUbah, onHapus }) {
     )
   }
   const jual = b.hargaJual || 0
-  const naik = r.hpBaru != null && r.hpBaru > r.hpLama
-  const rugi = r.hpBaru != null && jual > 0 && r.hpBaru >= jual
+  // Pesanan: harga pokok baru dihitung waktu barang datang (pakai stok saat itu), jadi belum ditampilkan.
+  const naik = sudahDatang && r.hpBaru != null && r.hpBaru > r.hpLama
+  const rugi = sudahDatang && r.hpBaru != null && jual > 0 && r.hpBaru >= jual
 
   return (
     <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, marginBottom: 8 }}>
@@ -379,7 +467,9 @@ function BarisPembelian({ r, onUbah, onHapus }) {
       </div>
       <div style={{ fontSize: 12, marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <span>
-          {r.hpBaru == null ? (
+          {!sudahDatang ? (
+            <span style={{ color: '#6d28d9' }}>⏳ Harga pokok dihitung waktu barang datang</span>
+          ) : r.hpBaru == null ? (
             <span style={{ color: '#888' }}>Harga pokok sekarang {formatRupiah(r.hpLama)}</span>
           ) : r.hpBaru === r.hpLama ? (
             <span style={{ color: '#888' }}>Harga pokok tetap {formatRupiah(r.hpLama)}</span>

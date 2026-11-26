@@ -7,6 +7,19 @@
 
 export const DAFTAR_PEMBARUAN = [
   {
+    versi: '2026-11-27',
+    tanggal: '27 November 2026',
+    item: [
+      { teks: '⏳ 🛒 Pembelian: ada pilihan "Barangnya sudah datang?". Sudah bayar tapi barang belum datang → pilih "Belum (pesan dulu)", stok belum ditambah. Waktu barangnya datang, tekan ✅ Terima barang. Barang yang dipesan kelihatan "⏳ +N" di daftar Barang.', untuk: 'pemilik' },
+      { teks: '📥 Belanja stok lama yang dulu dicatat di Pengeluaran sudah dipindah ke 🛒 Pembelian (tanda "📥 Data lama"). Jumlah uang & laba tidak berubah.', untuk: 'pemilik' },
+      { teks: '💸 Laporan → Pengeluaran: belanja dari 🛒 Pembelian otomatis muncul (baris abu-abu), jadi nggak perlu dicatat dua kali — kalau tetap dicatat, ada peringatan. Tampilan sekarang kartu, nggak perlu geser ke samping. Deskripsi ada saran otomatis dari catatan sebelumnya + tombol ✕ buat hapus.', untuk: 'pemilik' },
+      { teks: '➕ Tambah barang baru → setelah disimpan langsung lanjut ke 🛒 Pembelian (jumlah & harga sudah terisi). Centang "📦 Stok lama" cuma buat stok yang memang sudah ada — ditandai di Riwayat Restock & Laporan.', untuk: 'pemilik' },
+      { teks: '📊 Ringkasan: info baru "⏳ Pesanan belum datang" dan "📦 Stok lama (tanpa catatan belanja)".', untuk: 'pemilik' },
+      { teks: '➕ Barang baru yang ditambahkan karyawan disimpan dengan stok 0 — stoknya diisi pemilik lewat 🛒 Pembelian.', untuk: 'karyawan' },
+      { teks: '🚪 Tombol keluar sekarang berupa ikon di kanan atas (ada konfirmasi dulu biar nggak kepencet).' },
+    ],
+  },
+  {
     versi: '2026-11-24',
     tanggal: '24 November 2026',
     item: [
